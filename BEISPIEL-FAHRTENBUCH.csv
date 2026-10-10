@@ -1,0 +1,3 @@
+Datum;Abfahrtszeit;Rückkehrzeit;Startort;Zielort;Reisezweck;Kunde;Auftrag;Kostenstelle;Kennzeichen;Fahrzeug;Kilometerstand Start;Kilometerstand Ende;dienstliche Kilometer;private Kilometer;Fahrtart;Bemerkungen
+14.07.2026;07:45;16:30;Köln;Bonn;Ortstermin Brandschaden;Musterkunde GmbH;A-2026-014;1001;K-RK 2026;VW Passat;45100;45168;68;0;dienstlich;Beispieldatensatz
+15.07.2026;08:00;15:30;Köln;Düsseldorf;Probenahme;Beispiel AG;A-2026-015;1001;K-RK 2026;VW Passat;45168;45260;92;0;dienstlich;Unter acht Stunden
