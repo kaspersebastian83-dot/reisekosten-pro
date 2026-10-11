@@ -21,13 +21,30 @@
 - PR-CI prüft Tests/TypeScript/Build ohne Veröffentlichung. Erst eine spätere
   freigegebene Übernahme nach main löst das Pages-Deployment aus.
 
+Korrekturen aus dem PR-Review:
+- Veraltete Tabs überschreiben neuere Fahrten, Belege oder Abschlüsse nicht mehr:
+  Vergleich mit dem zuletzt gespeicherten Stand innerhalb der Schreibtransaktion,
+  mit sichtbarer Konfliktmeldung und Sicherungsmöglichkeit.
+- Suchfilter ändern nur die sichtbaren Tage, nicht die Berechnungsgrundlage.
+  Fahrten, die im Vormonat beginnen, erscheinen auch an ihren Folgetagen.
+- Zustimmende Tabs bleiben bis Update-Aktivierung/Abbruch gesperrt; die Reload-
+  Bereitschaft besteht vor der Antwort. Ein währenddessen neu geöffneter Tab
+  verhindert die Aktivierung. Datei-/Sicherungslesen blockiert Updates; ältere
+  Dateilese-Ergebnisse können eine neuere Auswahl nicht ersetzen.
+- CSV-Quellzeilen folgen den tatsächlichen Parser-Datensätzen; Quote-Fehler
+  sperren den betroffenen Datensatz. Uhrzeiten müssen vollständig gültig sein,
+  numerische Excel-Bruchteile werden vor formatierten Zeitstrings erkannt.
+- Kilometerdetails zeigen den verwendeten Satz mit seiner tatsächlichen
+  Genauigkeit statt einer irreführenden Rundung auf zwei Dezimalstellen.
+- Der explizite Daten-Reset verwendet ebenfalls die geschützte Schreibtransaktion.
+
 Keine neuen Abhängigkeiten, Speicherkeys oder Schema-Migrationen. Bestehende
 Daten und Belege bleiben erhalten. Erklärungsfelder sind optionale Ergänzungen
 in Abrechnungssnapshots. Keine Änderung von Tarifen oder Erstattungsformeln.
 
-Verifikation: npm test (75 Unit-/Regressionstests, TypeScript, Produktionsbuild,
+Verifikation: npm test (87 Unit-/Regressionstests, TypeScript, Produktionsbuild,
 1 statischer Buildtest); vorhandene Chromium-Workflows (14 Checks); neue
-Chromium-Features (8 Checks) unter /reisekosten-pro/, 390px und 820px.
+Chromium-Features (8 Checks) und PR-Review-Regressionen (6 Checks) unter /reisekosten-pro/, 390px und 820px.
 Mit synthetischen Daten und isolierten Browserprofilen geprüft: keine Writes
 vor Bestätigung, Cancel/Selektion/Duplikate/Doppelklick/Transaktionsfehler,
 aktueller Speicher bei Bestätigung, eingefrorene Erklärung, verzögertes und

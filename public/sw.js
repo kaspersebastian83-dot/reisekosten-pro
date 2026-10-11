@@ -28,30 +28,35 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
-// All controlled tabs must acknowledge readiness before an explicit update.
+// All app tabs must hold readiness until the explicitly requested activation.
 let activation = null;
 self.addEventListener("message", (event) => {
   if (event.data?.type === "UPDATE_READINESS" && activation && event.data.requestId === activation.id && event.source) {
     activation.replies.set(event.source.id, event.data.ready === true);
-    activation.check();
+    activation.check?.();
   }
   if (event.data?.type !== "ACTIVATE_UPDATE" || activation) return;
+  // Reserve the request before matchAll yields to a concurrent click/tab.
+  const pending = activation = { id: `${Date.now()}-${Math.random()}`, replies: new Map(), check: null };
   event.waitUntil((async () => {
-    const clients = (await self.clients.matchAll({ type: "window", includeUncontrolled: true }))
+    const appClients = async () => (await self.clients.matchAll({ type: "window", includeUncontrolled: true }))
       .filter((client) => client.url.startsWith(scopeUrl.href));
-    const id = `${Date.now()}-${Math.random()}`;
-    const approved = await new Promise((resolve) => {
-      let timer;
-      activation = { id, replies: new Map(), check() {
-        if (clients.every((client) => activation.replies.has(client.id))) {
-          clearTimeout(timer); resolve(clients.every((client) => activation.replies.get(client.id)));
+    const clients = await appClients();
+    let approved = await new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 3000);
+      pending.check = () => {
+        if (clients.every((client) => pending.replies.has(client.id))) {
+          clearTimeout(timer); resolve(clients.every((client) => pending.replies.get(client.id)));
         }
-      } };
-      timer = setTimeout(() => resolve(false), 3000);
-      clients.forEach((client) => client.postMessage({ type: "CAN_UPDATE", requestId: id }));
-      activation.check();
+      };
+      clients.forEach((client) => client.postMessage({ type: "CAN_UPDATE", requestId: pending.id }));
+      pending.check();
     });
-    clients.forEach((client) => client.postMessage({ type: approved ? "UPDATE_APPROVED" : "UPDATE_BLOCKED" }));
+    // A tab opened during preparation has not consented: abort and retry.
+    const currentClients = await appClients();
+    approved = approved && currentClients.every((client) => pending.replies.get(client.id) === true);
+    const recipients = new Map([...clients, ...currentClients].map((client) => [client.id, client]));
+    recipients.forEach((client) => client.postMessage({ type: approved ? "UPDATE_APPROVED" : "UPDATE_BLOCKED", requestId: pending.id }));
     activation = null;
     if (approved) await self.skipWaiting();
   })());

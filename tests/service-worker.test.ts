@@ -55,3 +55,23 @@ it.each([true, false])("aktiviert ein Update nur nach Zustimmung aller App-Tabs:
   expect(skipped).toBe(ready ? 1 : 0);
   expect(notifications).toEqual(["CAN_UPDATE", ready ? "UPDATE_APPROVED" : "UPDATE_BLOCKED"]);
 });
+
+it("bricht ab, wenn während der Bereitschaftsprüfung ein neuer App-Tab geöffnet wird", async () => {
+  const handlers: Record<string, (event: unknown) => void> = {};
+  const notices: string[] = [];
+  let skipped = 0, scans = 0;
+  const original = { id: "original", url: "https://example.test/reisekosten-pro/", postMessage(data: { type: string; requestId?: string }) {
+    notices.push(data.type);
+    if (data.type === "CAN_UPDATE") queueMicrotask(() => handlers.message({ source: original, data: { type: "UPDATE_READINESS", requestId: data.requestId, ready: true } }));
+  } };
+  const newcomer = { id: "new", url: original.url, postMessage(data: { type: string }) { notices.push(`new:${data.type}`); } };
+  vm.runInNewContext(readFileSync(new URL("../public/sw.js", import.meta.url), "utf8"), {
+    URL, Response, setTimeout, clearTimeout,
+    self: { registration: { scope: "https://example.test/reisekosten-pro/" }, clients: { matchAll: async () => ++scans === 1 ? [original] : [original, newcomer] }, skipWaiting: async () => skipped++, addEventListener: (name: string, fn: typeof handlers[string]) => handlers[name] = fn },
+  });
+  let complete = Promise.resolve();
+  handlers.message({ data: { type: "ACTIVATE_UPDATE" }, waitUntil: (p: Promise<void>) => complete = p });
+  await complete;
+  expect(skipped).toBe(0);
+  expect(notices).toEqual(["CAN_UPDATE", "UPDATE_BLOCKED", "new:UPDATE_BLOCKED"]);
+});

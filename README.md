@@ -144,6 +144,12 @@ Prüfung offen und es wird keine Teilmenge übernommen. Wurde dieselbe Fahrt
 zwischenzeitlich in einem anderen Tab gespeichert, kann die Ergebniszahl kleiner
 als die ursprünglich ausgewählte Zahl sein.
 
+Ändert ein anderer Tab zwischenzeitlich den Speicherstand, darf ein älterer
+Tab diesen nicht durch automatisches Speichern ersetzen. Die App zeigt den
+Konflikt an und bietet die lokale JSON-Sicherung der eigenen Änderungen an.
+Danach neu laden und die gewünschten Änderungen auf dem aktuellen Stand
+übernehmen; eine automatische Zusammenführung findet nicht statt.
+
 Unter **Reisen**, **Übersicht** und **Monatsabrechnungen** öffnet **Berechnung
 anzeigen** die verwendeten Tages-/Monatsbeträge. Kilometer und Ausgaben werden
 in den Fahrt-/Abrechnungsdetails erklärt. Tagespauschalen gelten gemeinsam für
@@ -159,7 +165,11 @@ behält die aktuelle Version, **Jetzt aktualisieren** lädt nach ausdrücklicher
 Zustimmung neu. Offene Importe und Eingaben müssen vorher abgeschlossen oder
 über die angebotene Aktion ausdrücklich verworfen werden. Andere offene
 App-Tabs müssen ebenfalls bereit sein; bei Speicherfehlern zuerst JSON sichern
-und erneut speichern. Offline-Updateprüfungen bleiben still.
+und erneut speichern. Während der Bereitschaftsprüfung sind bereits zustimmende Tabs kurz gesperrt,
+bis alle Tabs zugestimmt haben oder das Update abgebrochen wird. Ein neu
+geöffneter Tab führt zum Abbruch und erfordert einen erneuten Versuch. Auch
+Dateilesen und laufende JSON-Wiederherstellung gelten als offene Arbeit.
+Offline-Updateprüfungen bleiben still.
 
 Es gibt weiterhin keinen separaten CSV/XLSX-Ausgabenimport. Belege werden über
 die vorhandene lokale OCR-/manuelle Prüfung im Belegeingang übernommen; JSON
@@ -176,6 +186,7 @@ Installation (keine Projektabhängigkeit):
 ```bash
 PLAYWRIGHT_MODULE=/pfad/zu/playwright CHROMIUM_EXECUTABLE=/pfad/zu/chromium node tests/browser-check.mjs
 PLAYWRIGHT_MODULE=/pfad/zu/playwright CHROMIUM_EXECUTABLE=/pfad/zu/chromium node tests/feature-browser-check.mjs
+PLAYWRIGHT_MODULE=/pfad/zu/playwright CHROMIUM_EXECUTABLE=/pfad/zu/chromium node tests/review-browser-check.mjs
 ```
 
 Feature-PRs führen in GitHub Actions Tests und Build aus, ohne Pages-Artefakt oder

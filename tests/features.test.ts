@@ -1,6 +1,9 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { DayDetails } from "../app/calculation-details";
 import { describe, expect, it } from "vitest";
 import { buildStatement, calculateDay, round2 } from "../lib/calculations";
-import { csvRecordLines, rowsToTrips, suggestMapping } from "../lib/importer";
+import { csvRecordLines, parseImportFile, rowsToTrips, suggestMapping } from "../lib/importer";
 import { demoState } from "../lib/demo";
 import { normalizeState } from "../lib/storage";
 
@@ -40,6 +43,23 @@ describe("Importprüfung", () => {
     expect(result.review.map((r) => r.status)).toEqual(["excluded", "excluded"]);
     expect(result.trips).toHaveLength(0);
   });
+  it("behandelt Zollzeichen in unquotierten Feldern wie der CSV-Parser", () => {
+    expect(csvRecordLines('Datum;Ziel\n09.03.2026;Ort 6"\n10.03.2026;B')).toEqual([1, 2, 3]);
+  });
+  it.each(["Text 08:00", "08:00 Uhr kaputt", "108:00", "08:00:00:10"])("blockiert unvollständig geparste Uhrzeit %s", (start) => {
+    expect(rowsToTrips([{ ...source, start }], mapping, []).review[0].status).toBe("invalid");
+  });
+  it.each([[0.25, "06:00"], [0.75, "18:00"], [0.99999, "23:59:59"]])("liest die Excel-Zeit %s korrekt", (start, expected) => {
+    expect(rowsToTrips([{ ...source, start }], mapping, []).trips[0].startTime).toBe(expected);
+  });
+  it("verknüpft CSV-Quote-Fehler mit dem betroffenen Datensatz statt error.row", async () => {
+    const file = new File(['date;start;km;target\n09.03.2026;08:00;10;A\n\n10.03.2026;09:00;12;B\n11.03.2026;10:00;13;"C'], "synthetic.csv");
+    const parsed = await parseImportFile(file);
+    expect(parsed.rowNumbers.CSV).toEqual([2, 4, 5]);
+    expect(parsed.rowErrors.CSV).toEqual([2]);
+    const result = rowsToTrips(parsed.sheets.CSV, mapping, [], [], "", "", "", parsed.rowErrors.CSV);
+    expect(result.review.map((r) => r.status)).toEqual(["ready", "ready", "invalid"]);
+  });
   it("verfolgt echte CSV-Quellzeilen auch bei Leerzeilen, CRLF und mehrzeiligen Feldern", () => {
     expect(csvRecordLines('Datum;Ziel\r\n\r\n09.03.2026;"Ziel\r\nmit \"\"Zitat\"\""\r\n10.03.2026;B\r\n')).toEqual([1, 3, 5]);
   });
@@ -70,6 +90,24 @@ describe("Gespeicherte Erklärung aus derselben Berechnung", () => {
     }
     expect(result.rows[1].contributions!.expenses[0].openAmount).toBe(7.78);
     expect(result.totals.openAmount).toBe(round2(result.rows.reduce((sum, r) => sum + r.openAmount, 0)));
+  });
+  it("zeigt den tatsächlich verwendeten Kilometersatz ohne Cent-Abkürzung", () => {
+    const state = demoState(); state.expenses = [];
+    state.settings.tariffs.find((t) => t.kind === "mileage")!.amount = 0.3333;
+    state.trips = [{ ...state.trips[0], businessKm: 1000 }];
+    const row = buildStatement(state, "2026-07").rows[0];
+    const rendered = renderToStaticMarkup(createElement(DayDetails, { day: row }));
+    expect(row.mileage).toBe(333.3);
+    expect(rendered).toContain("0,3333 €/km");
+    expect(rendered).toContain("333,30");
+  });
+  it("erklärt die Begrenzung gestellter Mahlzeiten auf null", () => {
+    const state = demoState(); state.expenses = [];
+    state.trips = [{ ...state.trips[0], startTime: "08:00", endTime: "17:00", meals: { breakfast: true, lunch: true, dinner: true } }];
+    const row = buildStatement(state, "2026-07").rows[0];
+    expect(row.allowanceAfter).toBe(0);
+    const rendered = renderToStaticMarkup(createElement(DayDetails, { day: row }));
+    expect(rendered).toContain("Begrenzung auf null: +14,00");
   });
   it("erklärt Monatsübergreifende Kilometer nur am Starttag", () => {
     const state = demoState(); state.expenses = [];

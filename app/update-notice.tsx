@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export function UpdateNotice({ canUpdate }: { canUpdate: (discard: boolean) => Promise<boolean> }) {
+export function UpdateNotice({ canUpdate, prepare }: { canUpdate: (discard: boolean) => Promise<boolean>; prepare: (locked: boolean) => void }) {
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
   const [deferred, setDeferred] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -9,6 +9,9 @@ export function UpdateNotice({ canUpdate }: { canUpdate: (discard: boolean) => P
   const readiness = useRef(canUpdate); readiness.current = canUpdate;
   const discard = useRef(false);
   const reload = useRef(false);
+  const request = useRef<string | null>(null);
+  const requesting = useRef(false);
+  const setPreparation = useRef(prepare); setPreparation.current = prepare;
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     let disposed = false;
@@ -23,10 +26,17 @@ export function UpdateNotice({ canUpdate }: { canUpdate: (discard: boolean) => P
     const onMessage = async (event: MessageEvent) => {
       if (event.data?.type === "CAN_UPDATE") {
         const ready = await readiness.current(discard.current);
+        if (ready) {
+          // Hold readiness until activation or cancellation. Arm the reload
+          // before replying so controllerchange cannot overtake the approval.
+          request.current = event.data.requestId;
+          reload.current = true;
+          setPreparation.current(true);
+        }
         event.source && (event.source as ServiceWorker).postMessage({ type: "UPDATE_READINESS", requestId: event.data.requestId, ready });
       }
-      if (event.data?.type === "UPDATE_APPROVED") reload.current = true;
-      if (event.data?.type === "UPDATE_BLOCKED") {
+      if (event.data?.type === "UPDATE_BLOCKED" && (!request.current || request.current === event.data.requestId)) {
+        reload.current = false; request.current = null; requesting.current = false; setPreparation.current(false);
         discard.current = false; setBusy(false); setBlocked(true);
         setMessage("Bitte offene Eingaben oder Importe in allen App-Tabs abschließen. Gespeicherte Daten bleiben erhalten.");
       }
@@ -50,8 +60,9 @@ export function UpdateNotice({ canUpdate }: { canUpdate: (discard: boolean) => P
     };
   }, []);
   const accept = async (discardDrafts = false) => {
-    if (!waiting || busy) return;
-    if (!(await readiness.current(discardDrafts))) { setBlocked(true); setMessage("Es gibt offene Eingaben, einen Import oder noch nicht gespeicherte Änderungen. Bitte zuerst abschließen."); return; }
+    if (!waiting || busy || requesting.current) return;
+    requesting.current = true;
+    if (!(await readiness.current(discardDrafts))) { requesting.current = false; setBlocked(true); setMessage("Es gibt offene Eingaben, einen Import oder noch nicht gespeicherte Änderungen. Bitte zuerst abschließen."); return; }
     discard.current = discardDrafts;
     setBusy(true); setMessage("Update wird vorbereitet …");
     waiting.postMessage({ type: "ACTIVATE_UPDATE" });

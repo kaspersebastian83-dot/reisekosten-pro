@@ -46,16 +46,13 @@ import { emptyState, expenseCategories } from "../lib/config";
 import {
   loadState,
   saveState,
-  clearState,
   normalizeState,
   commitTripImport,
 } from "../lib/storage";
 import {
   buildStatement,
-  calculateDay,
   duplicateKey,
   expenseConflictsWithMileageAllowance,
-  groupTripsByDay,
   round2,
   validateTrip,
 } from "../lib/calculations";
@@ -123,6 +120,7 @@ export default function Home() {
   const stateRef = useRef(state); stateRef.current = state;
   const importBusy = useRef(false);
   const [transactionSaving, setTransactionSaving] = useState(false);
+  const [updatePreparing, setUpdatePreparing] = useState(false);
   const confirmImport = async (trips: Trip[], profile: import("../lib/types").ImportProfile, vimcar: boolean) => {
     if (importBusy.current) throw new Error("Import wird bereits gespeichert.");
     importBusy.current = true; setTransactionSaving(true);
@@ -172,12 +170,12 @@ export default function Home() {
     // Änderungen werden der Reihe nach gespeichert. Ein Fehler bleibt sichtbar.
     saveQueue.current = saveQueue.current.then(async () => {
       try {
-        await saveState(state);
+        await saveState(state, lastSaved.current!);
         lastSaved.current = state;
         setSaveError("");
       } catch (error) {
         console.error("Lokales Speichern fehlgeschlagen", error);
-        setSaveError("Änderungen konnten nicht lokal gespeichert werden. Bitte sichern Sie den aktuellen Stand als JSON und versuchen Sie das Speichern erneut.");
+        setSaveError(`Änderungen konnten nicht lokal gespeichert werden. ${error instanceof Error ? error.message : "Bitte sichern Sie den aktuellen Stand als JSON und versuchen Sie das Speichern erneut."}`);
       }
     });
   }, [state, ready, saveRetry]);
@@ -220,7 +218,8 @@ export default function Home() {
   return (
     <PendingWork.Provider value={reportPending}>
     {transactionSaving && <div className="import-saving" role="status">Import wird vollständig gespeichert …</div>}
-    <div className="app-shell" inert={transactionSaving}>
+    {updatePreparing && <div className="import-saving" role="status">Update wird vorbereitet · bitte kurz warten …</div>}
+    <div className="app-shell" inert={transactionSaving || updatePreparing}>
       <aside className={`sidebar ${sidebar ? "open" : ""}`}>
         <div className="brand">
           <div className="brand-mark">RK</div>
@@ -268,7 +267,7 @@ export default function Home() {
         />
       )}
       <main className="main">
-        <UpdateNotice canUpdate={canUpdate} />
+        <UpdateNotice canUpdate={canUpdate} prepare={setUpdatePreparing} />
         {saveError && <div className="error-box" role="alert">
           <p>{saveError}</p>
           <button onClick={() => exportBackup(state)}>JSON-Sicherung herunterladen</button>
@@ -1544,8 +1543,10 @@ function ImportWizard({
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState(new Set<number>());
   const [saving, setSaving] = useState(false);
+  const [reading, setReading] = useState(false);
+  const choosing = useRef(0);
   const submitting = useRef(false);
-  usePendingWork(step > 1 && step < 5 || saving);
+  usePendingWork(step > 1 && step < 5 || saving || reading);
   const rows = sheets[sheet] || [];
   const converted = useMemo(() => rowsToTrips(rows, mapping, state.trips, state.settings.vehicles,
     state.settings.defaultVehicleId, state.settings.homeAddress, state.settings.firstWorkplace, rowErrors[sheet] || []),
@@ -1553,14 +1554,16 @@ function ImportWizard({
   const eligible = converted.review.filter((row) => row.status === "ready");
   const selectedTrips = eligible.filter((row) => selected.has(row.index)).map((row) => row.trip!);
   const prepareReview = () => { setSelected(new Set(eligible.map((row) => row.index))); setFilter("all"); setError(""); setStep(4); };
-  const cancel = () => { if (submitting.current) return; setStep(1); setFile(undefined); setSheets({}); setSelected(new Set()); setError(""); };
+  const cancel = () => { if (submitting.current) return; choosing.current++; setReading(false); setStep(1); setFile(undefined); setSheets({}); setSelected(new Set()); setError(""); };
   const headers = rows[0] ? Object.keys(rows[0]) : [];
   const choose = async (f?: File) => {
     if (!f) return;
-    setError("");
+    const attempt = ++choosing.current;
+    setReading(true); setError("");
     setFile(f);
     try {
       const parsed = await parseImportFile(f);
+      if (attempt !== choosing.current) return;
       setRowNumbers(parsed.rowNumbers); setRowErrors(parsed.rowErrors); setParseWarning(parsed.warning || "");
       setFormat(parsed.format);
       if (parsed.format === "vimcar") setProfileName("Vimcar CSV");
@@ -1570,10 +1573,11 @@ function ImportWizard({
       setMapping(suggestMapping(Object.keys(parsed.sheets[first]?.[0] || {})));
       setStep(2);
     } catch (e) {
+      if (attempt !== choosing.current) return;
       setError(
         e instanceof Error ? e.message : "Datei konnte nicht gelesen werden.",
       );
-    }
+    } finally { if (attempt === choosing.current) setReading(false); }
   };
   const applyProfile = (id: string) => {
     const p = state.profiles.find((x) => x.id === id);
@@ -1623,6 +1627,7 @@ function ImportWizard({
                 onChange={(e) => choose(e.target.files?.[0])}
               />
             </label>
+            {reading && <p role="status">Datei wird lokal gelesen …</p>}
             {error && (
               <div className="error-box">
                 <AlertTriangle />
@@ -1968,22 +1973,10 @@ function Trips({
   const [editing, setEditing] = useState<Trip | null>(null);
   usePendingWork(!!editing);
   const [query, setQuery] = useState("");
-  const trips = state.trips
-    .filter(
-      (t) =>
-        t.date.startsWith(month) &&
-        [t.destination, t.purpose, t.customer]
-          .join(" ")
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-    )
-    .sort(
-      (a, b) =>
-        a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime),
-    );
-  const groups = [...groupTripsByDay(trips).entries()]
-    .filter(([d]) => d.startsWith(month))
-    .sort(([a], [b]) => a.localeCompare(b));
+  const monthly = useMemo(() => buildStatement(state, month), [state, month]);
+  const groups = monthly.rows.filter((row) => row.trips.some((trip) =>
+    [trip.destination, trip.purpose, trip.customer].join(" ").toLowerCase().includes(query.toLowerCase()),
+  )).map((row) => [row.date, [...row.trips].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))] as const);
   const save = () => {
     if (!editing) return;
     const t = {
@@ -2114,7 +2107,7 @@ function Trips({
           />
         )}
         {groups.map(([date, dayTrips]) => {
-          const c = calculateDay(date, dayTrips, state.settings);
+          const c = monthly.rows.find((row) => row.date === date)!;
           return (
             <article className="day-card" key={date}>
               <header>
@@ -2217,7 +2210,7 @@ function Trips({
                     >
                       <Trash2 size={16} />
                     </button>
-                    <DayDetails day={buildStatement(state, date.slice(0, 7)).rows.find((row) => row.date === date) || c} tripId={t.id} />
+                    <DayDetails day={c} tripId={t.id} />
                   </div>
                 ))}
               </div>
@@ -3922,8 +3915,11 @@ function Backup({
   notify: (s: string) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const [restoring, setRestoring] = useState(false);
+  usePendingWork(restoring);
   const restore = async (file?: File) => {
     if (!file) return;
+    setRestoring(true);
     try {
       const parsed = JSON.parse(await file.text()) as AppState;
       if (!parsed.settings || !Array.isArray(parsed.trips)) throw new Error();
@@ -3931,11 +3927,11 @@ function Backup({
       notify("Datensicherung wiederhergestellt");
     } catch {
       notify("Ungültige Datensicherung");
-    }
+    } finally { setRestoring(false); }
   };
   const reset = async () => {
     if (!confirm("Wirklich alle lokalen Daten löschen?")) return;
-    await clearState();
+    // Use the guarded autosave transaction, including its cross-tab check.
     setState(structuredClone(emptyState));
     notify("Lokale Daten gelöscht");
   };

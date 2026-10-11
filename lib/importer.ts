@@ -134,24 +134,32 @@ export async function parseImportFile(file: File): Promise<{
       "Der Vimcar-PDF-Export enthält keine Abfahrts- und Ankunftszeiten. Eine zuverlässige Spesenberechnung ist daraus nicht möglich. Bitte laden Sie den CSV-Export desselben Zeitraums hoch und bewahren Sie den PDF-Bericht separat als Nachweis auf.",
     );
   if (lower.endsWith(".csv")) {
-    const text = await file.text();
-    const parsed = Papa.parse<Record<string, unknown>>(text, {
+    const text = (await file.text()).replace(/^\uFEFF/, "");
+    const rows: Record<string, unknown>[] = [];
+    const errors: number[] = [];
+    let warningCount = 0;
+    let delimiter = "";
+    Papa.parse<Record<string, unknown>>(text, {
       header: true,
       skipEmptyLines: true,
       delimiter: "",
+      step(result) {
+        delimiter = result.meta.delimiter;
+        // Parser quote errors and field mismatches use different row numbering.
+        // Associate them with the actual emitted record, not error.row.
+        if (result.errors.some((error) => error.type !== "Delimiter")) errors.push(rows.length);
+        warningCount += result.errors.length;
+        rows.push(result.data);
+      },
     });
-    if (parsed.errors.length && !parsed.data.length)
-      throw new Error(
-        parsed.errors[0]?.message || "CSV konnte nicht gelesen werden.",
-      );
-    const headers = Object.keys(parsed.data[0] || {});
+    const headers = Object.keys(rows[0] || {});
     return {
-      sheets: { CSV: parsed.data },
-      rowNumbers: { CSV: csvRecordLines(text).slice(1) },
-      rowErrors: { CSV: parsed.errors.map((error) => error.row).filter((row): row is number => row != null) },
+      sheets: { CSV: rows },
+      rowNumbers: { CSV: csvRecordLines(text, delimiter).slice(1) },
+      rowErrors: { CSV: errors },
       format: isVimcarHeaders(headers) ? "vimcar" : "generic",
-      warning: parsed.errors.length
-        ? `${parsed.errors.length} CSV-Hinweis(e)`
+      warning: warningCount
+        ? `${warningCount} CSV-Hinweis(e)`
         : undefined,
     };
   }
@@ -216,18 +224,18 @@ export async function parseImportFile(file: File): Promise<{
 }
 
 // Physical source lines, including blank lines and quoted multiline CSV cells.
-export function csvRecordLines(text: string): number[] {
-  const lines: number[] = []; let line = 1, start = 1, quoted = false, record = "";
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === '"') { if (quoted && text[i + 1] === '"') { record += '""'; i++; continue; } quoted = !quoted; }
-    if (c === "\n" || (c === "\r" && text[i + 1] !== "\n")) {
-      line++;
-      if (!quoted) { if (record.replace(/\r/g, "").length) lines.push(start); record = ""; start = line; continue; }
-    }
-    record += c;
-  }
-  if (record.replace(/\r/g, "").length) lines.push(start);
+export function csvRecordLines(source: string, delimiter = ""): number[] {
+  const text = source.replace(/^\uFEFF/, "");
+  const lines: number[] = [];
+  let cursor = 0, line = 1;
+  // Let the same parser decide where quoted records end, including literal
+  // quote characters in unquoted fields and empty physical records.
+  Papa.parse<string[]>(text, { delimiter: delimiter || Papa.parse(text.split(/\r\n|\r|\n/).find((line) => line.trim()) || "").meta.delimiter, skipEmptyLines: false, step(result) {
+    if (!(result.data.length === 1 && result.data[0] === "")) lines.push(line);
+    const end = result.meta.cursor;
+    line += (text.slice(cursor, end).match(/\r\n|\r|\n/g) || []).length;
+    cursor = end;
+  } });
   return lines;
 }
 
@@ -276,9 +284,15 @@ function excelDate(value: unknown) {
 
 function time(value: unknown) {
   if (value instanceof Date) return value.toISOString().slice(11, 19);
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value < 0 || value >= 1) return "";
+    const seconds = Math.min(86399, Math.round(value * 86400));
+    const hhmm = `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}`;
+    return seconds % 60 ? `${hhmm}:${String(seconds % 60).padStart(2, "0")}` : hhmm;
+  }
   const s = String(value ?? "").trim();
   if (!s) return "";
-  const m = s.match(/(\d{1,2})[:.](\d{2})(?::(\d{2}))?/);
+  const m = s.match(/^(\d{1,2})[:.](\d{2})(?::(\d{2}))?$/);
   if (m && (Number(m[1]) > 23 || Number(m[2]) > 59 || Number(m[3] || 0) > 59)) return "";
   if (m) return `${m[1].padStart(2, "0")}:${m[2]}${m[3] ? `:${m[3]}` : ""}`;
   const fraction = Number(s.replace(",", "."));

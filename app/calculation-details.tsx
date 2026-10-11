@@ -2,7 +2,7 @@ import type { DayCalculation, StatementData, StatementRow } from "../lib/types";
 import { round2 } from "../lib/calculations";
 const euro = (n: number) => n.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 const date = (d: string) => d.split("-").reverse().join(".");
-const number = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 8 });
+const number = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 20 });
 
 export function DayDetails({ day, frozen = false, tripId }: { day: DayCalculation; frozen?: boolean; tripId?: string }) {
   const row = "openAmount" in day ? day as StatementRow : undefined;
@@ -20,7 +20,7 @@ export function DayDetails({ day, frozen = false, tripId }: { day: DayCalculatio
       <p>{euro(day.allowanceBefore)} − {euro(day.breakfastCut)} − {euro(day.lunchCut)} − {euro(day.dinnerCut)} = <b>{euro(day.allowanceAfter)} Spesen</b>. Kürzungen werden auf Cent gerundet; die Spesen fallen höchstens auf 0 €. {day.allowanceBefore - day.breakfastCut - day.lunchCut - day.dinnerCut < 0 && `Begrenzung auf null: +${euro(round2(day.allowanceAfter - (day.allowanceBefore - day.breakfastCut - day.lunchCut - day.dinnerCut)))}.`}</p>
       {row && <>
         <h4>Fahrzeug und Kilometer</h4>
-        {row.contributions?.mileage.map((item) => <p key={item.tripId}>{item.vehicle || "Fahrzeug offen"} · {item.ownership} · {number(item.km)} berechtigte km × {euro(item.rate)}/km = {euro(item.amount)}. {item.reason}</p>)}
+        {row.contributions?.mileage.map((item) => <p key={item.tripId}>{item.vehicle || "Fahrzeug offen"} · {item.ownership} · {number(item.km)} berechtigte km × {number(item.rate)} €/km = {euro(item.amount)}. {item.reason}</p>)}
         <p>Kilometererstattung gesamt: <b>{euro(row.mileage)}</b>{row.contributions && ` · Rundung der Summe: ${euro(round2(row.mileage - row.contributions.mileage.reduce((sum, item) => sum + round2(item.amount), 0)))}`}</p>
         <h4>Ausgaben</h4>
         {row.contributions?.expenses.map((expense) => <p key={expense.id}>{expense.description || expense.category} · {expense.category} · Brutto {number(expense.gross)} {expense.currency} · {expense.paymentType} · {expense.reimbursementStatus}{expense.receiptName ? ` · Beleg: ${expense.receiptName}` : " · ohne Beleg"}. {expense.excluded ? "Tankkosten durch Kilometerpauschale abgedeckt: keine zusätzliche Erstattung." : expense.paymentType !== "privat vorgestreckt" || expense.reimbursementStatus !== "offen" ? "Keine offene Erstattung dieser Ausgabe." : `${number(expense.businessShare)} % dienstlicher Anteil × Wechselkurs ${number(expense.exchangeRate)}; auf Cent gerundet.`} Offen: <b>{euro(expense.openAmount)}</b></p>)}

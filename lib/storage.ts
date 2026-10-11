@@ -152,8 +152,21 @@ export function normalizeState(value?: Partial<AppState>): AppState {
   };
 }
 
-export async function saveState(state: AppState) {
-  await (await db()).put(STORE, state, "main");
+export async function saveState(state: AppState, expected: AppState) {
+  const transaction = (await db()).transaction(STORE, "readwrite");
+  try {
+    const current = normalizeState(await transaction.store.get("main"));
+    // An older tab must never overwrite a newer import, receipt or snapshot.
+    if (JSON.stringify(current) !== JSON.stringify(expected)) {
+      throw new Error("Die Daten wurden in einem anderen Tab geändert. Sichern Sie Ihre eigenen Änderungen als JSON und laden Sie die App anschließend neu. Der neuere Speicherstand wurde nicht überschrieben.");
+    }
+    await transaction.store.put(state, "main");
+    await transaction.done;
+  } catch (error) {
+    try { transaction.abort(); } catch { /* Already aborted. */ }
+    await transaction.done.catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function clearState() {
