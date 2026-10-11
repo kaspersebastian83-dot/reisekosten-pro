@@ -1,9 +1,14 @@
 import { defineConfig } from "vite";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import react from "@vitejs/plugin-react";
 
+const version = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version;
+let commit = process.env.GITHUB_SHA || "";
+if (!commit) { try { commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(); } catch { /* Source archive build. */ } }
 export default defineConfig({
+  define: { __APP_RELEASE__: JSON.stringify({ version, commit: commit.slice(0, 7) }) },
   // Relative URLs make one build work at both user.github.io and
   // user.github.io/repository-name without knowing the repository in advance.
   base: "./",

@@ -222,6 +222,16 @@ export function calculateDay(
     dinnerCut,
     allowanceAfter,
     reason,
+    calculation: {
+      threshold: settings.ruleMode === "legal" ? "Mehr als 8 Stunden" : `${settings.internalComparator === "greater" ? "Mehr als" : "Mindestens"} ${settings.internalMinutes} Minuten (interne Regel)`,
+      manual: manual != null, meals, fullRate: full,
+      mealPercent: {
+        breakfast: tariffFor(settings, date, "breakfast")?.amount ?? 20,
+        lunch: tariffFor(settings, date, "lunch")?.amount ?? 40,
+        dinner: tariffFor(settings, date, "dinner")?.amount ?? 40,
+      },
+      rateLabel: baseTariff ? `${baseTariff.label} · gültig ab ${baseTariff.validFrom}` : kind ? "Kein gültiger Tarif hinterlegt" : "Keine Pauschale für diesen Tag",
+    },
     tariffIds: [baseTariff?.id, fullTariff?.id].filter(Boolean) as string[],
     warnings: [...new Set(warnings)],
     destinations: [...new Set(trips.map((t) => t.destination).filter(Boolean))],
@@ -325,20 +335,16 @@ export function buildStatement(state: AppState, month: string): StatementData {
           )
           .reduce((s, e) => s + e.gross, 0),
       );
-      const mileage = round2(
-        dayTrips
-          .filter(
-            (trip) =>
-              trip.date === date && usesMileageAllowance(state.settings, trip),
-          )
-          .reduce(
-            (sum, trip) =>
-              sum +
-              trip.businessKm *
-                (tariffFor(state.settings, trip.date, "mileage")?.amount || 0),
-            0,
-          ),
-      );
+      const mileageDetails = dayTrips.map((trip) => {
+        const profile = vehicleForTrip(state.settings, trip);
+        const eligible = trip.date === date && usesMileageAllowance(state.settings, trip);
+        const rate = eligible ? tariffFor(state.settings, trip.date, "mileage")?.amount || 0 : 0;
+        return { tripId: trip.id, vehicle: profile?.name || trip.vehicle,
+          ownership: profile ? profile.ownership === "privatwagen" ? "Privatwagen" : "Dienstwagen" : trip.vehicleType,
+          km: eligible ? trip.businessKm : 0, rate, amount: eligible ? trip.businessKm * rate : 0,
+          reason: trip.date !== date ? "Kilometer werden nur am Abfahrtstag angesetzt." : eligible ? rate ? "Privatwagen mit Kilometerpauschale" : "Kein gültiger Kilometertarif" : "Keine Kilometerpauschale für dieses Fahrzeug / diese Erstattungsart." };
+      });
+      const mileage = round2(mileageDetails.reduce((sum, item) => sum + item.amount, 0));
       const companyPaid = round2(
         expenses
           .filter((e) => ["Firmenkarte", "Unternehmen"].includes(e.paymentType))
@@ -354,23 +360,18 @@ export function buildStatement(state: AppState, month: string): StatementData {
           .filter((e) => e.paymentType === "privat vorgestreckt")
           .reduce((s, e) => s + e.gross, 0),
       );
-      const openExpenses = round2(
-        expenses.reduce(
-          (sum, expense) =>
-            sum +
-            (expenseConflictsWithMileageAllowance(
-              state.settings,
-              state.trips,
-              expense,
-            )
-              ? 0
-              : expenseReimbursable(expense)),
-          0,
-        ),
-      );
+      const expenseDetails = expenses.map((expense) => {
+        const excluded = expenseConflictsWithMileageAllowance(state.settings, state.trips, expense);
+        return { id: expense.id, description: expense.description, category: expense.category, gross: expense.gross, currency: expense.currency, receiptName: expense.receipt?.name,
+          businessShare: expense.businessShare, exchangeRate: expense.exchangeRate || 1,
+          paymentType: expense.paymentType, reimbursementStatus: expense.reimbursementStatus,
+          excluded, openAmount: excluded ? 0 : expenseReimbursable(expense) };
+      });
+      const openExpenses = round2(expenseDetails.reduce((sum, expense) => sum + expense.openAmount, 0));
       const openAmount = round2(day.allowanceAfter + mileage + openExpenses);
       return {
         ...day,
+        contributions: { mileage: mileageDetails, expenses: expenseDetails, openExpenses },
         mileage,
         fuel,
         accommodation,

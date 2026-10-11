@@ -2398,3 +2398,42 @@ label.check input {
   font-size: 12px;
   color: #53605b;
 }
+
+/* Reviews and explanations retain the existing cards, colors and typography. */
+.review-controls, .update-actions { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+.review-controls { margin: 20px 0; }
+.import-review { max-height: 520px; overflow: auto; }
+.import-review table { min-width: 660px; }
+.import-review td { vertical-align: top; }
+.import-review input[type="checkbox"] { width: 20px; height: 20px; }
+.calculation-details { margin: 12px 0; min-width: 0; }
+.calculation-details summary { cursor: pointer; color: var(--green); font-weight: 600; padding: 8px 0; }
+.calculation-body { padding: 16px; background: var(--bg, #f5f7fa); border-radius: 10px; color: var(--text, #172033); text-align: left; white-space: normal; }
+.calculation-body p, .calculation-body li { line-height: 1.6; overflow-wrap: anywhere; }
+.calculation-body h4 { margin: 10px 0; }
+.calculation-body ul { padding-left: 20px; }
+.trip-rows .calculation-details { font-size: 13px; grid-column: 1 / -1; }
+.monthly-details { padding: 12px 20px; background: white; border-radius: 12px; }
+.app-version { grid-column: 1 / -1; }
+.update-notice { margin: 16px 20px 0; flex-wrap: wrap; }
+.update-reminder { margin: 12px 20px; }
+@media (max-width: 700px) {
+  .review-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review-controls > *, .wizard-nav > button { max-width: 100%; }
+  .wizard-nav { flex-wrap: wrap; gap: 10px; }
+  .update-actions { align-items: stretch; }
+  .update-actions button { white-space: normal; }
+  .calculation-body { padding: 10px; }
+  .trip-rows > div { flex-wrap: wrap; }
+}
+
+.import-saving { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; background: #ffffffd9; font-weight: 600; }
+.import-review td small { display: block; margin-top: 4px; }
+@media (min-width: 761px) and (max-width: 1200px) {
+  .topbar { height: auto; min-height: 94px; flex-wrap: wrap; }
+  .top-actions { margin-left: 0; width: 100%; flex-wrap: wrap; }
+}
+
+@media (min-width: 761px) and (max-width: 1450px) {
+  .vehicle-list article { grid-template-columns: 125px minmax(0, 1fr) minmax(0, 1fr); }
+}

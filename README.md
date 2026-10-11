@@ -1,6 +1,6 @@
 # Reisekosten Pro
 
-Version 1.6.0 – GitHub-Pages-Ausgabe
+GitHub-Pages-Ausgabe · Die Release-Version kommt aus [package.json](package.json).
 
 Datenschutzfreundliche, deutschsprachige PWA für deutsche Reisekosten- und
 Spesenabrechnungen. Die App verarbeitet Vimcar- und andere Fahrtenbuch-Exporte
@@ -122,3 +122,73 @@ werden im temporären Betriebssystemverzeichnis abgelegt. Er prüft Import,
 Belege, Export, Sicherung, Speicherfehler, mobile Breite und Offline-Start.
 Echte Kamera-Hardware, Safari/iOS und die Qualität realer OCR-Belege müssen
 zusätzlich auf den jeweiligen Geräten geprüft werden.
+
+
+## Import prüfen, Berechnung verstehen, sicher aktualisieren
+
+Unter **Fahrten importieren** wählen Sie CSV/XLSX und kontrollieren die
+Spaltenzuordnung. Die nächste Seite zeigt alle Datenzeilen mit Quellzeile,
+normalisierten Werten und Gründen. Filtern Sie nach Status und wählen Sie die
+bereiten Fahrten aus. Erst **N Fahrten importieren** speichert; **Import
+abbrechen** verwirft nur die Vorschau. Ungültige Daten müssen in der Quelle
+korrigiert werden. Leere optionale Uhrzeiten bleiben als Prüfhinweis zulässig.
+Vimcar-Privatfahrten und Arbeitswege bleiben ausgeschlossen. Auch ausdrücklich
+zugeordnete private/Arbeitsweg-Fahrten allgemeiner Exporte werden vor der
+Übernahme ausgeschlossen, entsprechend ihrem bisherigen Nicht-Erstattungsstatus.
+Bereits vorhandene solche Fahrten werden nicht verändert.
+
+Duplikate in Datei und Datenbank werden angezeigt und beim Bestätigen erneut
+gegen den aktuellen Speicher geprüft. Die ausgewählten Fahrten und das Profil
+werden in einer IndexedDB-Transaktion gespeichert. Bei einem Fehler bleibt die
+Prüfung offen und es wird keine Teilmenge übernommen. Wurde dieselbe Fahrt
+zwischenzeitlich in einem anderen Tab gespeichert, kann die Ergebniszahl kleiner
+als die ursprünglich ausgewählte Zahl sein.
+
+Ändert ein anderer Tab zwischenzeitlich den Speicherstand, darf ein älterer
+Tab diesen nicht durch automatisches Speichern ersetzen. Die App zeigt den
+Konflikt an und bietet die lokale JSON-Sicherung der eigenen Änderungen an.
+Danach neu laden und die gewünschten Änderungen auf dem aktuellen Stand
+übernehmen; eine automatische Zusammenführung findet nicht statt.
+
+Unter **Reisen**, **Übersicht** und **Monatsabrechnungen** öffnet **Berechnung
+anzeigen** die verwendeten Tages-/Monatsbeträge. Kilometer und Ausgaben werden
+in den Fahrt-/Abrechnungsdetails erklärt. Tagespauschalen gelten gemeinsam für
+alle Fahrten eines Tages. Freigegebene Abrechnungen zeigen ausschließlich ihren
+gespeicherten Berechnungsstand. Bei älteren Abrechnungen fehlen eventuell
+historische Details; die App kennzeichnet dies und rekonstruiert keine Werte
+mit heutigen Einstellungen. Tarife, Schwellen und Erstattungsbeträge bleiben
+unverändert.
+
+**Einstellungen → Über diese App** zeigt die laufende Release-Version und den
+Build-Commit. Ein wartendes Update zeigt **Neue Version verfügbar**. **Später**
+behält die aktuelle Version, **Jetzt aktualisieren** lädt nach ausdrücklicher
+Zustimmung neu. Offene Importe und Eingaben müssen vorher abgeschlossen oder
+über die angebotene Aktion ausdrücklich verworfen werden. Andere offene
+App-Tabs müssen ebenfalls bereit sein; bei Speicherfehlern zuerst JSON sichern
+und erneut speichern. Während der Bereitschaftsprüfung sind bereits zustimmende Tabs kurz gesperrt,
+bis alle Tabs zugestimmt haben oder das Update abgebrochen wird. Ein neu
+geöffneter Tab führt zum Abbruch und erfordert einen erneuten Versuch. Auch
+Dateilesen und laufende JSON-Wiederherstellung gelten als offene Arbeit.
+Offline-Updateprüfungen bleiben still.
+
+Es gibt weiterhin keinen separaten CSV/XLSX-Ausgabenimport. Belege werden über
+die vorhandene lokale OCR-/manuelle Prüfung im Belegeingang übernommen; JSON
+bleibt die vollständige Datensicherung, kein zeilenweiser Import.
+
+Keine neuen Abhängigkeiten oder Datenbankmigration: Datenbank `reisekosten-pro`,
+Version 1, Store `state`, Schlüssel `main` bleiben unverändert. Neue Abrechnungen
+enthalten zusätzliche optionale Erklärungsfelder; alte JSON-Sicherungen bleiben
+lesbar. Screenshots und Testdownloads liegen im ignorierten Ordner `outputs/`.
+
+Die optionalen Browserprüfungen verwenden eine vorhandene externe Playwright-
+Installation (keine Projektabhängigkeit):
+
+```bash
+PLAYWRIGHT_MODULE=/pfad/zu/playwright CHROMIUM_EXECUTABLE=/pfad/zu/chromium node tests/browser-check.mjs
+PLAYWRIGHT_MODULE=/pfad/zu/playwright CHROMIUM_EXECUTABLE=/pfad/zu/chromium node tests/feature-browser-check.mjs
+PLAYWRIGHT_MODULE=/pfad/zu/playwright CHROMIUM_EXECUTABLE=/pfad/zu/chromium node tests/review-browser-check.mjs
+```
+
+Feature-PRs führen in GitHub Actions Tests und Build aus, ohne Pages-Artefakt oder
+Deployment. Eine Veröffentlichung erfolgt erst durch die spätere Freigabe und
+Übernahme nach `main`.
