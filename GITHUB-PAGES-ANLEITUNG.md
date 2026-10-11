@@ -83,8 +83,16 @@ Adressleiste auf das Installationssymbol.
 ## Updates
 
 Jede Änderung im Branch `main` startet automatisch einen neuen geprüften
-Build. Die installierte PWA übernimmt die neue Version beim nächsten
-Online-Aufruf. Die gespeicherten Abrechnungsdaten bleiben dabei erhalten.
+Build. Ab der neuen Release-Version zeigt die laufende PWA ein wartendes Update mit
+**Neue Version verfügbar**. Wählen Sie **Jetzt aktualisieren** oder **Später**.
+Schließen/speichern Sie offene Eingaben und Importprüfungen in allen App-Tabs.
+Nur ausdrücklich verworfene, ungespeicherte Eingaben gehen beim Update verloren;
+IndexedDB, localStorage und Belege werden nicht gelöscht. Die Version unter
+**Einstellungen → Über diese App** beschreibt den aktuell laufenden Build.
+
+Beim ersten Wechsel von der bisherigen Version ohne Updatehinweis: offene
+Arbeit speichern, alle App-Tabs und die installierte PWA schließen und online
+wieder öffnen. Niemals Websitedaten löschen, um ein Update zu erzwingen.
 
 ## Wichtige Grenzen
 
@@ -103,28 +111,22 @@ Ordner `.github/`. Der bisherige automatische Pages-Lauf veröffentlichte die
 Quellen: `/src/main.tsx` und die Icons lieferten 404; React und IndexedDB wurden
 nicht gestartet. Ein Cache- oder Datenbank-Reset behebt diesen Fehler nicht.
 
-Der Bugfix-Branch `bugfix/startup-and-workflows` enthält den Build-Workflow.
-Dieser darf für die ausdrücklich angeforderte Veröffentlichung ebenfalls nach
-Pages deployen. `main` wird dabei nicht zusammengeführt oder geändert.
+Der Blankseiten-Bugfix wurde über PR #1 nach `main` übernommen. Für künftige,
+ausdrücklich freigegebene Releases:
 
-Für ein erneutes Deployment dieses Branches:
+1. PR prüfen und erst nach Freigabe nach `main` übernehmen.
+2. **Settings → Pages → Source: GitHub Actions** beibehalten.
+3. Unter **Actions → GitHub Pages bereitstellen** den Lauf für den neuen
+   `main`-Commit abwarten. **build** und **deploy** müssen erfolgreich sein;
+   veröffentlicht wird ausschließlich `dist`.
+4. `https://kaspersebastian83-dot.github.io/reisekosten-pro/` mit abschließendem
+   Schrägstrich öffnen und das angebotene Update ausdrücklich annehmen.
+5. Die laufende Version und den kurzen Commit unter **Einstellungen** prüfen.
 
-1. Unter **Settings → Pages → Source** muss **GitHub Actions** ausgewählt sein.
-2. Unter **Settings → Environments → github-pages → Deployment branches** muss
-   `bugfix/startup-and-workflows` zugelassen sein (neben `main`).
-3. Unter **Actions → GitHub Pages bereitstellen** einen erfolgreichen Lauf
-   des Branches `bugfix/startup-and-workflows` öffnen und **Re-run all jobs**
-   wählen. Alternativ startet ein neuer Push auf diesen Branch den Workflow.
-   **Run workflow** steht erst zuverlässig bereit, wenn die Workflow-Datei im
-   Standardbranch vorhanden ist. Eine Übernahme nach `main` benötigt weiterhin
-   eine ausdrückliche Freigabe.
-4. Beide Jobs **build** und **deploy** müssen erfolgreich abgeschlossen sein.
-   Nur `dist` wird als Website-Artefakt hochgeladen.
-5. Öffnen Sie `https://kaspersebastian83-dot.github.io/reisekosten-pro/` mit
-   abschließendem Schrägstrich. Schließen Sie vorher alle App-Tabs und die
-   installierte PWA, damit ein wartender Service Worker aktiviert werden kann.
-6. Öffnen Sie online erneut; bei Bedarf verwenden Sie **Erneut laden** oder
-   einmal einen harten Reload (Chrome/macOS: Cmd+Shift+R).
+Der Feature-Branch `feature/import-review-calculation-details-version` wird
+nicht veröffentlicht. Sein Pull Request führt nur Tests/Build aus, ohne
+Pages-Konfiguration, Website-Artefakt oder Deployment. Die Concurrency-Gruppe
+ist pro Git-Ref getrennt, damit PR-Prüfungen laufende Deployments nicht abbrechen.
 
 Falls eine alte Version hartnäckig bleibt: In den Chrome-Entwicklertools unter
 **Application → Service Workers** nur den Worker für `/reisekosten-pro/`

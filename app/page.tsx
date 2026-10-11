@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Archive,
@@ -48,6 +48,7 @@ import {
   saveState,
   clearState,
   normalizeState,
+  commitTripImport,
 } from "../lib/storage";
 import {
   buildStatement,
@@ -73,6 +74,11 @@ import {
   exportPdf,
   exportZip,
 } from "../lib/exports";
+
+import { PendingWork, usePendingWork } from "../lib/pending-work";
+import { appRelease } from "../lib/release";
+import { DayDetails, MonthDetails } from "./calculation-details";
+import { UpdateNotice } from "./update-notice";
 
 type Tab =
   | "Übersicht"
@@ -110,6 +116,32 @@ export default function Home() {
   const [saveError, setSaveError] = useState("");
   const lastSaved = useRef<AppState | null>(null);
   const saveQueue = useRef(Promise.resolve());
+  const pendingWork = useRef(new Set<string>());
+  const reportPending = useCallback((id: string, pending: boolean) => {
+    if (pending) pendingWork.current.add(id); else pendingWork.current.delete(id);
+  }, []);
+  const stateRef = useRef(state); stateRef.current = state;
+  const importBusy = useRef(false);
+  const [transactionSaving, setTransactionSaving] = useState(false);
+  const confirmImport = async (trips: Trip[], profile: import("../lib/types").ImportProfile, vimcar: boolean) => {
+    if (importBusy.current) throw new Error("Import wird bereits gespeichert.");
+    importBusy.current = true; setTransactionSaving(true);
+    try {
+      await saveQueue.current;
+      if (stateRef.current !== lastSaved.current) throw new Error("Bitte zuerst die offenen Änderungen erfolgreich speichern.");
+      const committed = await commitTripImport(trips, profile, vimcar);
+      lastSaved.current = committed.state;
+      stateRef.current = committed.state;
+      setState(committed.state);
+      return committed;
+    } finally { importBusy.current = false; setTransactionSaving(false); }
+  };
+  const canUpdate = async (discard: boolean) => {
+    if (!discard && pendingWork.current.size) return false;
+    if (importBusy.current) return false;
+    await saveQueue.current;
+    return stateRef.current === lastSaved.current && (discard || !pendingWork.current.size) && !importBusy.current;
+  };
   const [saveRetry, setSaveRetry] = useState(0);
   const [tab, setTab] = useState<Tab>("Übersicht");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -133,12 +165,7 @@ export default function Home() {
   };
   useEffect(() => {
     void readLocalState();
-    if ("serviceWorker" in navigator) {
-      const workerUrl = new URL("sw.js", document.baseURI);
-      void navigator.serviceWorker.register(workerUrl, { updateViaCache: "none" })
-        .then((registration) => registration.update())
-        .catch((error: unknown) => console.warn("Offline-Modus nicht verfügbar", error));
-    }
+
   }, []);
   useEffect(() => {
     if (!ready || state === lastSaved.current) return;
@@ -191,7 +218,9 @@ export default function Home() {
       </div>
     );
   return (
-    <div className="app-shell">
+    <PendingWork.Provider value={reportPending}>
+    {transactionSaving && <div className="import-saving" role="status">Import wird vollständig gespeichert …</div>}
+    <div className="app-shell" inert={transactionSaving}>
       <aside className={`sidebar ${sidebar ? "open" : ""}`}>
         <div className="brand">
           <div className="brand-mark">RK</div>
@@ -239,6 +268,7 @@ export default function Home() {
         />
       )}
       <main className="main">
+        <UpdateNotice canUpdate={canUpdate} />
         {saveError && <div className="error-box" role="alert">
           <p>{saveError}</p>
           <button onClick={() => exportBackup(state)}>JSON-Sicherung herunterladen</button>
@@ -304,7 +334,7 @@ export default function Home() {
           {tab === "Fahrten importieren" && (
             <ImportWizard
               state={state}
-              update={update}
+              confirmImport={confirmImport}
               notify={notify}
               go={setTab}
             />
@@ -394,7 +424,7 @@ export default function Home() {
           )}
         </div>
       )}
-    </div>
+    </div></PendingWork.Provider>
   );
 }
 
@@ -779,6 +809,7 @@ function QuickExpense({
     vatRate: 19,
   });
   const [advanced, setAdvanced] = useState(false);
+  usePendingWork(true);
   const amountRef = useRef<HTMLInputElement>(null);
   useEffect(() => amountRef.current?.focus(), []);
 
@@ -1035,6 +1066,7 @@ function ReceiptCapture({
   const [progress, setProgress] = useState(0);
   const [scanStatus, setScanStatus] = useState("");
   const [scanError, setScanError] = useState("");
+  usePendingWork(true);
 
   const automaticTripId = suggestion.date
     ? state.trips.find((trip) => trip.date === suggestion.date)?.id
@@ -1479,12 +1511,12 @@ function ReceiptCapture({
 
 function ImportWizard({
   state,
-  update,
+  confirmImport,
   notify,
   go,
 }: {
   state: AppState;
-  update: (f: (s: AppState) => AppState) => void;
+  confirmImport: (trips: Trip[], profile: import("../lib/types").ImportProfile, vimcar: boolean) => ReturnType<typeof commitTripImport>;
   notify: (s: string) => void;
   go: (t: Tab) => void;
 }) {
@@ -1506,7 +1538,22 @@ function ImportWizard({
     format: "vimcar" | "generic";
   }>();
   const [error, setError] = useState("");
+  const [rowNumbers, setRowNumbers] = useState<Record<string, number[]>>({});
+  const [rowErrors, setRowErrors] = useState<Record<string, number[]>>({});
+  const [parseWarning, setParseWarning] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [selected, setSelected] = useState(new Set<number>());
+  const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
+  usePendingWork(step > 1 && step < 5 || saving);
   const rows = sheets[sheet] || [];
+  const converted = useMemo(() => rowsToTrips(rows, mapping, state.trips, state.settings.vehicles,
+    state.settings.defaultVehicleId, state.settings.homeAddress, state.settings.firstWorkplace, rowErrors[sheet] || []),
+    [rows, mapping, state.trips, state.settings, rowErrors, sheet]);
+  const eligible = converted.review.filter((row) => row.status === "ready");
+  const selectedTrips = eligible.filter((row) => selected.has(row.index)).map((row) => row.trip!);
+  const prepareReview = () => { setSelected(new Set(eligible.map((row) => row.index))); setFilter("all"); setError(""); setStep(4); };
+  const cancel = () => { if (submitting.current) return; setStep(1); setFile(undefined); setSheets({}); setSelected(new Set()); setError(""); };
   const headers = rows[0] ? Object.keys(rows[0]) : [];
   const choose = async (f?: File) => {
     if (!f) return;
@@ -1514,6 +1561,7 @@ function ImportWizard({
     setFile(f);
     try {
       const parsed = await parseImportFile(f);
+      setRowNumbers(parsed.rowNumbers); setRowErrors(parsed.rowErrors); setParseWarning(parsed.warning || "");
       setFormat(parsed.format);
       if (parsed.format === "vimcar") setProfileName("Vimcar CSV");
       setSheets(parsed.sheets);
@@ -1534,46 +1582,17 @@ function ImportWizard({
       setProfileName(p.name);
     }
   };
-  const doImport = () => {
-    const converted = rowsToTrips(
-      rows,
-      mapping,
-      state.trips,
-      state.settings.vehicles,
-      state.settings.defaultVehicleId,
-      state.settings.homeAddress,
-      state.settings.firstWorkplace,
-    );
-    update((s) => {
-      s.trips.push(...converted.trips);
-      const importedVehicle = converted.trips[0];
-      const defaultVehicle = s.settings.vehicles.find(
-        (vehicle) => vehicle.id === s.settings.defaultVehicleId,
-      );
-      if (
-        converted.format === "vimcar" &&
-        importedVehicle &&
-        defaultVehicle &&
-        defaultVehicle.name === "Mein Dienstwagen" &&
-        !defaultVehicle.plate
-      ) {
-        defaultVehicle.name = importedVehicle.vehicle || defaultVehicle.name;
-        defaultVehicle.plate = importedVehicle.plate;
-      }
-      s.profiles = [
-        ...s.profiles.filter((p) => p.name !== profileName),
-        {
-          id: uid(),
-          name: profileName,
-          mapping,
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      return s;
-    });
-    setResult(converted);
-    setStep(5);
-    notify(`${converted.trips.length} Betriebsfahrten importiert`);
+  const doImport = async () => {
+    if (submitting.current || !selectedTrips.length) return;
+    submitting.current = true; setSaving(true); setError("");
+    try {
+      const committed = await confirmImport(selectedTrips, { id: uid(), name: profileName, mapping,
+        createdAt: new Date().toISOString() }, format === "vimcar");
+      setResult({ ...converted, trips: committed.trips, duplicates: converted.duplicates + committed.duplicates });
+      setStep(5); notify(`${committed.trips.length} Fahrten importiert`);
+    } catch (error) {
+      setError(`Import nicht gespeichert. Es wurden keine Teilmengen übernommen. ${error instanceof Error ? error.message : "Bitte erneut versuchen."}`);
+    } finally { submitting.current = false; setSaving(false); }
   };
   return (
     <div className="flow-layout">
@@ -1714,16 +1733,43 @@ function ImportWizard({
             </label>
             <WizardNav
               back={() => setStep(2)}
-              next={() => setStep(4)}
+              next={prepareReview}
               disabled={!mapping.date}
             />
           </div>
         )}
         {step === 4 && (
           <div className="wizard-body">
-            <p className="eyebrow">Vorschau</p>
-            <h2>Bitte Daten kurz prüfen</h2>
-            <DataTable headers={headers.slice(0, 7)} rows={rows.slice(0, 8)} />
+            <p className="eyebrow">Import prüfen · {file?.name}</p>
+            <h2>{rows.length} Datenzeilen · {selectedTrips.length} ausgewählt</h2>
+            <div className="result-grid review-counts">
+              <div><b>{eligible.length}</b><span>Bereit</span></div>
+              <div><b>{converted.duplicates}</b><span>Duplikate</span></div>
+              <div><b>{converted.ignoredPrivate + converted.ignoredCommute}</b><span>Privat / Arbeitsweg ausgeschlossen</span></div>
+              <div><b>{converted.invalid}</b><span>Ungültig</span></div>
+              <div><b>{eligible.filter((row) => row.trip!.warnings.length).length}</b><span>Mit Prüfhinweisen</span></div>
+            </div>
+            {parseWarning && <p className="warning-line">{parseWarning} · fehlerhafte Zeilen bitte in der Quelle korrigieren.</p>}
+            <div className="review-controls">
+              <label>Status filtern<select value={filter} onChange={(e) => setFilter(e.target.value)}>
+                <option value="all">Alle Zeilen</option><option value="ready">Bereit</option><option value="duplicate">Duplikate</option>
+                <option value="excluded">Ausgeschlossen</option><option value="invalid">Ungültig</option><option value="warning">Prüfhinweise</option>
+              </select></label>
+              <button disabled={saving} onClick={() => setSelected(new Set(eligible.map((row) => row.index)))}>Alle bereiten auswählen</button>
+              <button disabled={saving} onClick={() => setSelected(new Set())}>Auswahl aufheben</button>
+            </div>
+            <div className="table-wrap import-review"><table><thead><tr><th>Übernehmen</th><th>Quellzeile</th><th>Datum / Zeit</th><th>Fahrt / km</th><th>Status / Erklärung</th></tr></thead><tbody>
+              {converted.review.filter((row) => filter === "all" || row.status === filter || filter === "warning" && row.trip?.warnings.length).map((row) => <tr key={row.index}>
+                <td><input type="checkbox" aria-label={`Zeile ${rowNumbers[sheet]?.[row.index] || row.index + 2} übernehmen`}
+                  disabled={saving || row.status !== "ready"} checked={row.status === "ready" && selected.has(row.index)}
+                  onChange={(e) => setSelected((old) => { const next = new Set(old); if (e.target.checked) next.add(row.index); else next.delete(row.index); return next; })} /></td>
+                <td>{rowNumbers[sheet]?.[row.index] || row.index + 2}</td>
+                <td>{dateDe(row.date || "")}<small>{`${row.startTime || "Zeit offen"} – ${row.endTime || "Zeit offen"}${row.trip?.endDate ? " · " + dateDe(row.trip.endDate) : ""}`}</small></td>
+                <td>{row.classification || "Nicht erkannt"}<small>{row.trip ? `${row.trip.startPlace || "Start offen"} → ${row.trip.destination || "Ziel offen"} · ${row.trip.businessKm.toLocaleString("de-DE")} km` : `${(row.distance || 0).toLocaleString("de-DE")} km`}</small></td>
+                <td><b>{{ready:"Bereit",duplicate:"Duplikat",excluded:"Ausgeschlossen",invalid:"Ungültig"}[row.status]}</b><small>{row.reason}</small></td>
+              </tr>)}
+            </tbody></table></div>
+            {error && <div className="error-box" role="alert">{error}</div>}
             <div className="info-box yellow">
               <AlertTriangle />
               <div>
@@ -1748,15 +1794,13 @@ function ImportWizard({
                 )}
               </div>
             </div>
-            <WizardNav
-              back={() => setStep(3)}
-              next={doImport}
-              nextLabel={
-                format === "vimcar"
-                  ? "Betriebsfahrten importieren"
-                  : `${rows.length} Zeilen importieren`
-              }
-            />
+            <div className="wizard-nav">
+              <button disabled={saving} onClick={() => setStep(3)}>Zurück zur Zuordnung</button>
+              <button disabled={saving} onClick={cancel}>Import abbrechen</button>
+              <button className="primary" disabled={saving || !selectedTrips.length} onClick={() => void doImport()}>
+                {saving ? "Wird gespeichert …" : `${selectedTrips.length} Fahrten importieren`}
+              </button>
+            </div>
           </div>
         )}
         {step === 5 && (
@@ -1766,7 +1810,7 @@ function ImportWizard({
             </div>
             <h2>Import abgeschlossen</h2>
             <p>
-              {result?.trips.length || 0} Betriebsfahrten wurden übernommen.
+              {result?.trips.length || 0} Fahrten wurden übernommen.
             </p>
             <div className="result-grid">
               <div>
@@ -1777,7 +1821,7 @@ function ImportWizard({
                 <b>{result?.invalid || 0}</b>
                 <span>ungültige Zeilen</span>
               </div>
-              {result?.format === "vimcar" && (
+              {result && (
                 <>
                   <div>
                     <b>{result.ignoredCommute}</b>
@@ -1791,7 +1835,7 @@ function ImportWizard({
               )}
               <div>
                 <b>{profileName}</b>
-                <span>Profil gespeichert</span>
+                <span>{result?.trips.length ? "Profil gespeichert" : "Keine neuen Daten gespeichert"}</span>
               </div>
             </div>
             <button className="primary" onClick={() => go("Reisen")}>
@@ -1922,6 +1966,7 @@ function Trips({
   notify: (s: string) => void;
 }) {
   const [editing, setEditing] = useState<Trip | null>(null);
+  usePendingWork(!!editing);
   const [query, setQuery] = useState("");
   const trips = state.trips
     .filter(
@@ -2113,6 +2158,7 @@ function Trips({
                   )}
                 </div>
               )}
+              <DayDetails day={c} />
               <div className="day-quick-actions">
                 <span>Gestellte Mahlzeit:</span>
                 {(
@@ -2171,6 +2217,7 @@ function Trips({
                     >
                       <Trash2 size={16} />
                     </button>
+                    <DayDetails day={buildStatement(state, date.slice(0, 7)).rows.find((row) => row.date === date) || c} tripId={t.id} />
                   </div>
                 ))}
               </div>
@@ -2520,6 +2567,7 @@ function Expenses({
 }) {
   const [editing, setEditing] = useState<Expense | null>(null);
   const [reviewing, setReviewing] = useState<ReceiptInboxItem | null>(null);
+  usePendingWork(!!editing || !!reviewing);
   const inboxItems = state.receiptInbox.filter(
     (item) =>
       item.status !== "zugeordnet" &&
@@ -3277,7 +3325,9 @@ function Statements({
             </tfoot>
           </table>
         </div>
+        <div className="statement-day-details">{statement.rows.map((row) => <DayDetails key={row.date} day={row} frozen={!!existing?.locked} />)}</div>
       </section>
+      <MonthDetails statement={statement} frozen={!!existing?.locked} />
       <section className="summary-grid">
         <div>
           <span>Verpflegungspauschalen</span>
@@ -3436,6 +3486,7 @@ function SettingsPanel({
   notify: (s: string) => void;
 }) {
   const [local, setLocal] = useState(structuredClone(state.settings));
+  usePendingWork(JSON.stringify(local) !== JSON.stringify(state.settings));
   const addVehicle = (ownership: VehicleProfile["ownership"]) => {
     const vehicle: VehicleProfile = {
       id: uid(),
@@ -3491,6 +3542,9 @@ function SettingsPanel({
   };
   return (
     <div className="settings-layout">
+      <section className="card app-version"><p className="eyebrow">Über diese App</p><h3>Reisekosten Pro {appRelease.version}</h3>
+        <p>Laufende Version{appRelease.commit ? ` · Commit ${appRelease.commit}` : ""}. Daten und Belege bleiben lokal in diesem Browser.</p>
+      </section>
       <section className="card">
         <p className="eyebrow">Profil & Unternehmen</p>
         <h3>Angaben für die Abrechnung</h3>

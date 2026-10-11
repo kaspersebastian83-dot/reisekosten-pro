@@ -28,12 +28,46 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
+// All controlled tabs must acknowledge readiness before an explicit update.
+let activation = null;
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "UPDATE_READINESS" && activation && event.data.requestId === activation.id && event.source) {
+    activation.replies.set(event.source.id, event.data.ready === true);
+    activation.check();
+  }
+  if (event.data?.type !== "ACTIVATE_UPDATE" || activation) return;
+  event.waitUntil((async () => {
+    const clients = (await self.clients.matchAll({ type: "window", includeUncontrolled: true }))
+      .filter((client) => client.url.startsWith(scopeUrl.href));
+    const id = `${Date.now()}-${Math.random()}`;
+    const approved = await new Promise((resolve) => {
+      let timer;
+      activation = { id, replies: new Map(), check() {
+        if (clients.every((client) => activation.replies.has(client.id))) {
+          clearTimeout(timer); resolve(clients.every((client) => activation.replies.get(client.id)));
+        }
+      } };
+      timer = setTimeout(() => resolve(false), 3000);
+      clients.forEach((client) => client.postMessage({ type: "CAN_UPDATE", requestId: id }));
+      activation.check();
+    });
+    clients.forEach((client) => client.postMessage({ type: approved ? "UPDATE_APPROVED" : "UPDATE_BLOCKED" }));
+    activation = null;
+    if (approved) await self.skipWaiting();
+  })());
+});
+
 self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
   if (event.request.method !== "GET" || requestUrl.origin !== scopeUrl.origin || !requestUrl.pathname.startsWith(scopeUrl.pathname)) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    // Hash-Dateien ändern ihren Inhalt nie; der Startbildschirm bleibt netzwerkaktuell.
+    // Keep the HTML and hashed assets of this active version together.
+    if (event.request.mode === "navigate") {
+      const shell = await cache.match(appShell[0]);
+      if (shell) return shell;
+    }
+    // Hash-Dateien ändern ihren Inhalt nie.
     if (requestUrl.pathname.includes("/assets/")) {
       const cached = await cache.match(event.request);
       if (cached) return cached;

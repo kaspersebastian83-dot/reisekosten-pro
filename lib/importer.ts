@@ -123,6 +123,8 @@ export function isVimcarHeaders(headers: string[]) {
 
 export async function parseImportFile(file: File): Promise<{
   sheets: Record<string, Record<string, unknown>[]>;
+  rowNumbers: Record<string, number[]>;
+  rowErrors: Record<string, number[]>;
   warning?: string;
   format: "vimcar" | "generic";
 }> {
@@ -145,6 +147,8 @@ export async function parseImportFile(file: File): Promise<{
     const headers = Object.keys(parsed.data[0] || {});
     return {
       sheets: { CSV: parsed.data },
+      rowNumbers: { CSV: csvRecordLines(text).slice(1) },
+      rowErrors: { CSV: parsed.errors.map((error) => error.row).filter((row): row is number => row != null) },
       format: isVimcarHeaders(headers) ? "vimcar" : "generic",
       warning: parsed.errors.length
         ? `${parsed.errors.length} CSV-Hinweis(e)`
@@ -161,7 +165,9 @@ export async function parseImportFile(file: File): Promise<{
     new Uint8Array(await file.arrayBuffer()) as unknown as import("exceljs").Buffer,
   );
   const sheets: Record<string, Record<string, unknown>[]> = {};
+  const rowNumbers: Record<string, number[]> = {};
   workbook.eachSheet((worksheet) => {
+    rowNumbers[worksheet.name] = [];
     let headerRowNumber = 0;
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       const values = Array.isArray(row.values)
@@ -194,17 +200,48 @@ export async function parseImportFile(file: File): Promise<{
         record[header.name] = value;
         if (String(value ?? "").trim()) hasValue = true;
       }
-      if (hasValue) rows.push(record);
+      if (hasValue) { rows.push(record); rowNumbers[worksheet.name].push(rowNumber); }
     });
     sheets[worksheet.name] = rows;
   });
   const firstRows = sheets[Object.keys(sheets)[0]] || [];
   return {
     sheets,
+    rowNumbers,
+    rowErrors: {},
     format: isVimcarHeaders(Object.keys(firstRows[0] || {}))
       ? "vimcar"
       : "generic",
   };
+}
+
+// Physical source lines, including blank lines and quoted multiline CSV cells.
+export function csvRecordLines(text: string): number[] {
+  const lines: number[] = []; let line = 1, start = 1, quoted = false, record = "";
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') { if (quoted && text[i + 1] === '"') { record += '""'; i++; continue; } quoted = !quoted; }
+    if (c === "\n" || (c === "\r" && text[i + 1] !== "\n")) {
+      line++;
+      if (!quoted) { if (record.replace(/\r/g, "").length) lines.push(start); record = ""; start = line; continue; }
+    }
+    record += c;
+  }
+  if (record.replace(/\r/g, "").length) lines.push(start);
+  return lines;
+}
+
+export type ImportStatus = "ready" | "duplicate" | "excluded" | "invalid";
+export interface ImportReviewRow {
+  index: number;
+  status: ImportStatus;
+  reason: string;
+  trip?: Trip;
+  date?: string;
+  classification?: string;
+  startTime?: string;
+  endTime?: string;
+  distance?: number;
 }
 
 function spreadsheetCellValue(cell: import("exceljs").Cell): unknown {
@@ -231,6 +268,8 @@ function excelDate(value: unknown) {
     const parsed = new Date(`${iso}T12:00:00Z`);
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso ? iso : "";
   }
+  const iso = s.match(/^\d{4}-\d{2}-\d{2}$/);
+  if (iso) { const d = new Date(s + "T12:00:00Z"); return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s ? s : ""; }
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 }
@@ -268,6 +307,7 @@ export function rowsToTrips(
   defaultVehicleId = "",
   homeAddress = "",
   firstWorkplace = "",
+  rowErrors: number[] = [],
 ) {
   const existingKeys = new Set(existing.map(duplicateKey));
   let duplicates = 0;
@@ -275,6 +315,7 @@ export function rowsToTrips(
   let ignoredCommute = 0;
   let ignoredPrivate = 0;
   const trips: Trip[] = [];
+  const review: ImportReviewRow[] = [];
   const vimcar = mapping.businessKm === "Betrieb_km";
   const rowKind = (row: Record<string, unknown>) => {
     const getMapped = (field: string) =>
@@ -313,23 +354,39 @@ export function rowsToTrips(
         privateBeforeBusinessDays.add(date);
     }
   }
-  for (const row of rows) {
+  for (const [index, row] of rows.entries()) {
     const get = (f: string) => (mapping[f] ? row[mapping[f]] : "");
     const date = excelDate(get("date"));
-    if (!date) {
+    const preview = { date: date || String(get("date") || ""), startTime: time(get("startTime")) || String(get("startTime") || ""),
+      endTime: time(get("endTime")) || String(get("endTime") || ""), distance: num(get("businessKm")) + num(get("commuteKm")) + num(get("privateKm")) };
+    const invalidField = !date ? "Datum" :
+      rowErrors.includes(index) ? "CSV-Spaltenanzahl / Anführungszeichen" :
+      get("endDate") && !excelDate(get("endDate")) ? "Ankunftsdatum" :
+      excelDate(get("endDate")) && excelDate(get("endDate")) < date ? "Ankunftsdatum vor Abfahrt" :
+      ["startTime", "endTime"].find((field) => String(get(field) ?? "").trim() && !time(get(field))) ? "Uhrzeit" :
+      ["businessKm", "privateKm", "commuteKm", "kmStart", "kmEnd"].find((field) => {
+        const raw = String(get(field) ?? "").trim();
+        return raw && (!/^[-+]?\d+(?:[.,]\d+)*(?:\s*km)?$/i.test(raw.replace(/\s/g, "")) || num(get(field)) < 0);
+      }) ? "Kilometerwert" : "";
+    if (invalidField) {
+      review.push({ index, ...preview, status: "invalid", reason: `${invalidField} ungültig. Bitte die Quelldatei korrigieren und erneut auswählen.` });
       invalid++;
       continue;
     }
-    const kind = vimcar ? rowKind(row) : undefined;
+    const kind = vimcar ? rowKind(row) : norm(get("tripType")).includes("privat") ? "privat"
+      : norm(get("tripType")).includes("tätigkeitsstätte") ? "erste Tätigkeitsstätte" : "dienstlich";
     if (kind === "erste Tätigkeitsstätte") {
+      review.push({ index, ...preview, status: "excluded", reason: "Arbeitsweg zur ersten Tätigkeitsstätte – keine Reisekosten.", date, classification: "Arbeitsweg" });
       ignoredCommute++;
       continue;
     }
     if (kind === "privat") {
+      review.push({ index, ...preview, status: "excluded", reason: "Privatfahrt – keine Reisekosten.", date, classification: "Privat" });
       ignoredPrivate++;
       continue;
     }
     if (vimcar && kind !== "dienstlich") {
+      review.push({ index, ...preview, status: "invalid", reason: "Keine Fahrtenart mit Kilometern erkannt. Betrieb, Arbeitsweg oder Privat in der Quelle korrigieren.", date });
       invalid++;
       continue;
     }
@@ -423,13 +480,16 @@ export function rowsToTrips(
       existingKeys.has(trip.sourceHash) ||
       trips.some((t) => t.sourceHash === trip.sourceHash)
     ) {
+      review.push({ index, ...preview, status: "duplicate", reason: existingKeys.has(trip.sourceHash) ? "Diese Fahrt ist bereits gespeichert." : "Diese Fahrt steht bereits weiter oben in dieser Datei.", trip, date, classification: trip.tripType });
       duplicates++;
       continue;
     }
+    review.push({ index, ...preview, status: "ready", reason: trip.warnings.join(" · ") || "Bereit zur Übernahme", trip, date, classification: trip.tripType });
     trips.push(trip);
   }
   return {
     trips,
+    review,
     duplicates,
     invalid,
     ignoredCommute,

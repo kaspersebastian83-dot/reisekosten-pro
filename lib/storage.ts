@@ -1,5 +1,6 @@
 import { openDB, type IDBPDatabase } from "idb";
-import type { AppState } from "./types";
+import { duplicateKey } from "./calculations";
+import type { AppState, Trip, ImportProfile } from "./types";
 import { emptyState } from "./config";
 
 const DB = "reisekosten-pro";
@@ -70,6 +71,16 @@ function validateState(value: Partial<AppState>) {
     if (!numbers(statement.data.totals, ["allowance", "mileage", "fuel", "accommodation", "other", "companyPaid", "reimbursed", "privatelyAdvanced", "openAmount", "grandTotal"])) fail();
     for (const row of statement.data.rows) {
       if (!record(row) || !texts(row, ["date", "firstStart", "lastEnd", "reason"]) || !numbers(row, ["absenceMinutes", "totalKm", "allowanceBefore", "breakfastCut", "lunchCut", "dinnerCut", "allowanceAfter", "mileage", "fuel", "accommodation", "other", "companyPaid", "reimbursed", "privatelyAdvanced", "openAmount"]) || !warnings(row.warnings) || !warnings(row.destinations) || !warnings(row.customers) || !Array.isArray(row.trips)) fail();
+      if (row.calculation !== undefined) {
+        const detail = row.calculation;
+        if (!record(detail) || !texts(detail, ["threshold", "rateLabel"]) || !numbers(detail, ["fullRate"]) || typeof detail.manual !== "boolean" || !meals(detail.meals) || !record(detail.mealPercent) || !numbers(detail.mealPercent, ["breakfast", "lunch", "dinner"])) fail();
+      }
+      if (row.contributions !== undefined) {
+        const detail = row.contributions;
+        if (!record(detail) || !numbers(detail, ["openExpenses"]) || !Array.isArray(detail.mileage) || !Array.isArray(detail.expenses)) fail();
+        for (const item of detail.mileage) if (!record(item) || !texts(item, ["tripId", "vehicle", "ownership", "reason"]) || !numbers(item, ["km", "rate", "amount"])) fail();
+        for (const item of detail.expenses) if (!record(item) || !texts(item, ["id", "description", "category", "currency", "paymentType", "reimbursementStatus"]) || !numbers(item, ["gross", "businessShare", "exchangeRate", "openAmount"]) || typeof item.excluded !== "boolean" || (item.receiptName !== undefined && typeof item.receiptName !== "string")) fail();
+      }
       validateState({ settings: value.settings, trips: row.trips });
     }
     if (statement.settingsSnapshot || statement.expensesSnapshot) validateState({ settings: statement.settingsSnapshot || value.settings, expenses: statement.expensesSnapshot });
@@ -147,4 +158,34 @@ export async function saveState(state: AppState) {
 
 export async function clearState() {
   await (await db()).delete(STORE, "main");
+}
+
+// One existing state record, one read/write transaction: no schema or key changes.
+export async function commitTripImport(candidates: Trip[], profile: ImportProfile, vimcar: boolean) {
+  const transaction = (await db()).transaction(STORE, "readwrite");
+  try {
+    const state = normalizeState(await transaction.store.get("main"));
+    const seen = new Set(state.trips.map(duplicateKey));
+    const trips: Trip[] = [];
+    for (const trip of candidates) {
+      const key = duplicateKey(trip);
+      if (seen.has(key)) continue;
+      seen.add(key); trips.push(trip);
+    }
+    if (trips.length) {
+      state.trips.push(...trips);
+      state.profiles = [...state.profiles.filter((p) => p.name !== profile.name), profile];
+      const vehicle = state.settings.vehicles.find((v) => v.id === state.settings.defaultVehicleId);
+      if (vimcar && vehicle?.name === "Mein Dienstwagen" && !vehicle.plate) {
+        vehicle.name = trips[0].vehicle || vehicle.name; vehicle.plate = trips[0].plate;
+      }
+      await transaction.store.put(state, "main");
+    }
+    await transaction.done;
+    return { state, trips, duplicates: candidates.length - trips.length };
+  } catch (error) {
+    try { transaction.abort(); } catch { /* Already aborted by IndexedDB. */ }
+    await transaction.done.catch(() => undefined);
+    throw error;
+  }
 }

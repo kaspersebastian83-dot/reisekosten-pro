@@ -223,6 +223,14 @@ export interface AppState {
 }
 
 export interface DayCalculation {
+  calculation?: {
+    threshold: string;
+    manual: boolean;
+    meals: MealSelection;
+    fullRate: number;
+    mealPercent: { breakfast: number; lunch: number; dinner: number };
+    rateLabel: string;
+  };
   date: string;
   trips: Trip[];
   firstStart: string;
@@ -242,6 +250,11 @@ export interface DayCalculation {
 }
 
 export interface StatementRow extends DayCalculation {
+  contributions?: {
+    mileage: { tripId: string; vehicle: string; ownership: string; km: number; rate: number; amount: number; reason: string }[];
+    expenses: { id: string; description: string; category: string; gross: number; currency: string; receiptName?: string; businessShare: number; exchangeRate: number; paymentType: string; reimbursementStatus: string; excluded: boolean; openAmount: number }[];
+    openExpenses: number;
+  };
   mileage: number;
   fuel: number;
   accommodation: number;
