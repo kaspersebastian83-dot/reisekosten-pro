@@ -226,31 +226,39 @@ function excelDate(value: unknown) {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   const s = String(value ?? "").trim();
   const de = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
-  if (de)
-    return `${de[3].length === 2 ? "20" + de[3] : de[3]}-${de[2].padStart(2, "0")}-${de[1].padStart(2, "0")}`;
+  if (de) {
+    const iso = `${de[3].length === 2 ? "20" + de[3] : de[3]}-${de[2].padStart(2, "0")}-${de[1].padStart(2, "0")}`;
+    const parsed = new Date(`${iso}T12:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso ? iso : "";
+  }
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 }
 
 function time(value: unknown) {
+  if (value instanceof Date) return value.toISOString().slice(11, 19);
   const s = String(value ?? "").trim();
+  if (!s) return "";
   const m = s.match(/(\d{1,2})[:.](\d{2})(?::(\d{2}))?/);
+  if (m && (Number(m[1]) > 23 || Number(m[2]) > 59 || Number(m[3] || 0) > 59)) return "";
   if (m) return `${m[1].padStart(2, "0")}:${m[2]}${m[3] ? `:${m[3]}` : ""}`;
-  const num = Number(s.replace(",", "."));
-  if (num >= 0 && num < 1) {
-    const mins = Math.round(num * 1440);
+  const fraction = Number(s.replace(",", "."));
+  if (fraction >= 0 && fraction < 1) {
+    const mins = Math.round(fraction * 1440);
     return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
   }
   return "";
 }
 
-const num = (v: unknown) =>
-  Number(
-    String(v ?? "0")
-      .replace(/\./g, "")
-      .replace(",", ".")
-      .replace(/[^0-9.-]/g, ""),
-  ) || 0;
+const num = (v: unknown) => {
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  const text = String(v ?? "0").trim().replace(/\s/g, "");
+  const normalized = text.includes(",")
+    ? text.replace(/\./g, "").replace(",", ".")
+    : text;
+  const number = Number(normalized.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(number) ? number : 0;
+};
 
 export function rowsToTrips(
   rows: Record<string, unknown>[],

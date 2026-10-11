@@ -106,6 +106,11 @@ const uid = () =>
 export default function Home() {
   const [state, setState] = useState<AppState>(structuredClone(emptyState));
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const lastSaved = useRef<AppState | null>(null);
+  const saveQueue = useRef(Promise.resolve());
+  const [saveRetry, setSaveRetry] = useState(0);
   const [tab, setTab] = useState<Tab>("Übersicht");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [sidebar, setSidebar] = useState(false);
@@ -115,19 +120,40 @@ export default function Home() {
   const [receiptCaptureOpen, setReceiptCaptureOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    loadState().then((s) => {
+  const readLocalState = () => {
+    setLoadError("");
+    return loadState().then((s) => {
+      lastSaved.current = s;
       setState(s);
       setReady(true);
+    }).catch((error: unknown) => {
+      console.error("Lokale Daten konnten nicht geladen werden", error);
+      setLoadError(error instanceof Error ? error.message : "Unbekannter Speicherfehler");
     });
+  };
+  useEffect(() => {
+    void readLocalState();
     if ("serviceWorker" in navigator) {
       const workerUrl = new URL("sw.js", document.baseURI);
-      navigator.serviceWorker.register(workerUrl).catch(() => undefined);
+      void navigator.serviceWorker.register(workerUrl, { updateViaCache: "none" })
+        .then((registration) => registration.update())
+        .catch((error: unknown) => console.warn("Offline-Modus nicht verfügbar", error));
     }
   }, []);
   useEffect(() => {
-    if (ready) saveState(state);
-  }, [state, ready]);
+    if (!ready || state === lastSaved.current) return;
+    // Änderungen werden der Reihe nach gespeichert. Ein Fehler bleibt sichtbar.
+    saveQueue.current = saveQueue.current.then(async () => {
+      try {
+        await saveState(state);
+        lastSaved.current = state;
+        setSaveError("");
+      } catch (error) {
+        console.error("Lokales Speichern fehlgeschlagen", error);
+        setSaveError("Änderungen konnten nicht lokal gespeichert werden. Bitte sichern Sie den aktuellen Stand als JSON und versuchen Sie das Speichern erneut.");
+      }
+    });
+  }, [state, ready, saveRetry]);
   const notify = (message: string, undo?: () => void) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast(message);
@@ -156,8 +182,12 @@ export default function Home() {
   if (!ready)
     return (
       <div className="loading">
-        <span />
-        <p>Reisekosten werden lokal geladen …</p>
+        {loadError ? <>
+          <h1>Lokale Daten konnten nicht geöffnet werden</h1>
+          <p role="alert">{loadError}</p>
+          <p>Ihre gespeicherten Daten wurden nicht gelöscht oder überschrieben. Erlauben Sie lokalen Browserspeicher und schließen Sie gegebenenfalls andere App-Tabs. Löschen Sie keine Websitedaten.</p>
+          <button className="primary" onClick={() => void readLocalState()}>Erneut versuchen</button>
+        </> : <><span /><p>Reisekosten werden lokal geladen …</p></>}
       </div>
     );
   return (
@@ -209,6 +239,11 @@ export default function Home() {
         />
       )}
       <main className="main">
+        {saveError && <div className="error-box" role="alert">
+          <p>{saveError}</p>
+          <button onClick={() => exportBackup(state)}>JSON-Sicherung herunterladen</button>
+          <button onClick={() => setSaveRetry((n) => n + 1)}>Speichern erneut versuchen</button>
+        </div>}
         <header className="topbar">
           <button
             className="icon mobile-only"
@@ -802,7 +837,7 @@ function QuickExpense({
     const vatRate = draft.vatRate || 0;
     const net = round2(draft.gross / (1 + vatRate / 100));
     const autoTrip =
-      draft.tripId || state.trips.find((t) => t.date === draft.date)?.id;
+      draft.tripId === undefined ? state.trips.find((t) => t.date === draft.date)?.id : draft.tripId || undefined;
     const duplicateReceipt =
       !!draft.receipt &&
       state.expenses.some((e) => e.receipt?.hash === draft.receipt?.hash);
@@ -934,7 +969,7 @@ function QuickExpense({
               <select
                 value={draft.tripId || ""}
                 onChange={(e) =>
-                  setDraft({ ...draft, tripId: e.target.value || undefined })
+                  setDraft({ ...draft, tripId: e.target.value })
                 }
               >
                 <option value="">Automatisch nach Datum</option>
@@ -1136,9 +1171,7 @@ function ReceiptCapture({
     const expense: Expense = {
       id: expenseId,
       date: suggestion.date,
-      tripId:
-        selectedTripId ||
-        state.trips.find((trip) => trip.date === suggestion.date)?.id,
+      tripId: selectedTripId || undefined,
       category: suggestion.category || "sonstige Nebenkosten",
       description: suggestion.merchant || "Fotografierter Beleg",
       gross: suggestion.gross,
@@ -2981,7 +3014,7 @@ function Expenses({
 function Statements({
   state,
   month,
-  statement,
+  statement: currentStatement,
   update,
   notify,
 }: {
@@ -2994,6 +3027,12 @@ function Statements({
   const existing = state.statements
     .filter((s) => s.month === month)
     .sort((a, b) => b.version - a.version)[0];
+  const statement = existing?.locked ? existing.data : currentStatement;
+  const exportState = existing?.locked ? {
+    ...state,
+    settings: existing.settingsSnapshot || state.settings,
+    expenses: existing.expensesSnapshot || state.expenses,
+  } : state;
   const number =
     existing?.number ||
     `RK-${month.replace("-", "")}-${String(state.statements.length + 1).padStart(3, "0")}`;
@@ -3001,7 +3040,7 @@ function Statements({
     ...new Map([
       ...statement.rows.flatMap((row) =>
         row.trips.map((trip) => {
-          const profile = state.settings.vehicles.find(
+          const profile = exportState.settings.vehicles.find(
             (vehicle) => vehicle.id === trip.vehicleId,
           );
           const vehicle = {
@@ -3023,12 +3062,12 @@ function Statements({
           return [vehicle.id, vehicle] as const;
         }),
       ),
-      ...state.expenses
+      ...exportState.expenses
         .filter(
           (expense) => expense.date.startsWith(month) && expense.vehicleId,
         )
         .flatMap((expense) => {
-          const profile = state.settings.vehicles.find(
+          const profile = exportState.settings.vehicles.find(
             (vehicle) => vehicle.id === expense.vehicleId,
           );
           if (!profile) return [];
@@ -3058,7 +3097,9 @@ function Statements({
         status: "vollständig",
         version: (latest?.version || 0) + 1,
         locked: false,
-        data: statement,
+        data: structuredClone(currentStatement),
+        settingsSnapshot: structuredClone(s.settings),
+        expensesSnapshot: structuredClone(s.expenses.filter((expense) => expense.date.startsWith(month))),
       };
       s.statements.push(snap);
       return s;
@@ -3080,8 +3121,13 @@ function Statements({
           user: s.settings.profileName || "Lokales Profil",
           changedAt: new Date().toISOString(),
         });
+        if (!x.locked) {
+          x.data = structuredClone(currentStatement);
+          x.settingsSnapshot = structuredClone(s.settings);
+          x.expensesSnapshot = structuredClone(s.expenses.filter((expense) => expense.date.startsWith(month)));
+        }
         x.status = status;
-        x.locked = ["freigegeben", "ausgezahlt"].includes(status);
+        x.locked = x.locked || ["freigegeben", "ausgezahlt"].includes(status);
       }
       return s;
     });
@@ -3103,19 +3149,17 @@ function Statements({
           </p>
         </div>
         <div className="statement-actions">
-          {!existing && (
-            <button className="primary" onClick={create}>
-              <Save size={18} />
-              Abrechnung erstellen
-            </button>
-          )}
+          <button className="primary" onClick={create}>
+            <Save size={18} />
+            {existing ? "Neue Version erstellen" : "Abrechnung erstellen"}
+          </button>
           {existing && (
             <select
               value={existing.status}
               onChange={(e) => setStatus(e.target.value as ReviewStatus)}
             >
-              <option>vollständig</option>
-              <option>zur Freigabe eingereicht</option>
+              {!existing.locked && <><option>vollständig</option>
+              <option>zur Freigabe eingereicht</option></>}
               <option>freigegeben</option>
               <option>ausgezahlt</option>
               <option>storniert</option>
@@ -3126,7 +3170,7 @@ function Statements({
       <section className="card statement-profile">
         <div>
           <span>Name</span>
-          <b>{state.settings.profileName || "Nicht hinterlegt"}</b>
+          <b>{exportState.settings.profileName || "Nicht hinterlegt"}</b>
         </div>
         <div>
           <span>Abrechnungsmonat</span>
@@ -3151,6 +3195,7 @@ function Statements({
           )}
         </div>
       </section>
+      {existing?.locked && !existing.expensesSnapshot && <div className="notice" role="status">Diese ältere Abrechnung enthält eingefrorene Berechnungen, aber keinen eingefrorenen Beleg- und Profilstand. Ihre Exporte verwenden dafür die aktuellen Belege und Einstellungen.</div>}
       {existing?.locked && (
         <div className="notice">
           <ShieldCheck />
@@ -3261,23 +3306,23 @@ function Statements({
           </p>
         </div>
         <div className="export-buttons">
-          <button onClick={() => exportPdf(statement, state, number)}>
+          <button onClick={() => exportPdf(statement, exportState, number)}>
             <FileDown />
             PDF
           </button>
-          <button onClick={() => exportExcel(statement, state)}>
+          <button onClick={() => exportExcel(statement, exportState)}>
             <FileSpreadsheet />
             Excel
           </button>
-          <button onClick={() => exportCsv(statement, state)}>
+          <button onClick={() => exportCsv(statement, exportState)}>
             <Download />
             CSV
           </button>
-          <button onClick={() => exportCsv(statement, state, true)}>
+          <button onClick={() => exportCsv(statement, exportState, true)}>
             <FileSpreadsheet />
             DATEV-CSV
           </button>
-          <button onClick={() => exportZip(statement, state, number)}>
+          <button onClick={() => exportZip(statement, exportState, number)}>
             <Archive />
             ZIP + Belege
           </button>

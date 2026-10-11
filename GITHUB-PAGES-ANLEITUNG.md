@@ -95,3 +95,39 @@ Online-Aufruf. Die gespeicherten Abrechnungsdaten bleiben dabei erhalten.
   öffnen. Ihre eigenen Daten bleiben trotzdem nur in Ihrem Browser.
 - Die Kamera funktioniert auf GitHub Pages über HTTPS. Der Browser muss die
   Kameraberechtigung erhalten.
+
+## Reparatur der Veröffentlichung vom Oktober 2026
+
+Im vorhandenen Repository `kaspersebastian83-dot/reisekosten-pro` fehlte der
+Ordner `.github/`. Der bisherige automatische Pages-Lauf veröffentlichte die
+Quellen: `/src/main.tsx` und die Icons lieferten 404; React und IndexedDB wurden
+nicht gestartet. Ein Cache- oder Datenbank-Reset behebt diesen Fehler nicht.
+
+Der Bugfix-Branch `bugfix/startup-and-workflows` enthält den Build-Workflow.
+Dieser darf für die ausdrücklich angeforderte Veröffentlichung ebenfalls nach
+Pages deployen. `main` wird dabei nicht zusammengeführt oder geändert.
+
+Für ein erneutes Deployment dieses Branches:
+
+1. Unter **Settings → Pages → Source** muss **GitHub Actions** ausgewählt sein.
+2. Unter **Settings → Environments → github-pages → Deployment branches** muss
+   `bugfix/startup-and-workflows` zugelassen sein (neben `main`).
+3. Unter **Actions → GitHub Pages bereitstellen → Run workflow** den Branch
+   `bugfix/startup-and-workflows` auswählen. Alternativ startet ein Push auf
+   diesen Branch den Workflow. Nach einer später ausdrücklich genehmigten
+   Übernahme nach `main` kann dessen Workflow wieder regulär genutzt werden.
+4. Beide Jobs **build** und **deploy** müssen erfolgreich abgeschlossen sein.
+   Nur `dist` wird als Website-Artefakt hochgeladen.
+5. Öffnen Sie `https://kaspersebastian83-dot.github.io/reisekosten-pro/` mit
+   abschließendem Schrägstrich. Schließen Sie vorher alle App-Tabs und die
+   installierte PWA, damit ein wartender Service Worker aktiviert werden kann.
+6. Öffnen Sie online erneut; bei Bedarf verwenden Sie **Erneut laden** oder
+   einmal einen harten Reload (Chrome/macOS: Cmd+Shift+R).
+
+Falls eine alte Version hartnäckig bleibt: In den Chrome-Entwicklertools unter
+**Application → Service Workers** nur den Worker für `/reisekosten-pro/`
+abmelden (**Unregister**) und neu laden. **Nicht „Clear site data“ verwenden**
+und weder IndexedDB noch Websitedaten löschen. Die App benötigt keinen
+Datenbank-Reset. Der neue Worker verwaltet Caches pro Pages-Unterpfad, lädt
+Programmdateien für Offline-Starts vor und lässt fremde App-Caches unangetastet.
+Sprachmodelle für OCR benötigen beim ersten Einsatz weiterhin eine Verbindung.

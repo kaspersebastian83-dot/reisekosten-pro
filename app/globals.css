@@ -1350,7 +1350,9 @@ label.check input {
   margin-bottom: 6px;
 }
 .loading {
-  height: 100vh;
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
   display: grid;
   place-items: center;
   align-content: center;
