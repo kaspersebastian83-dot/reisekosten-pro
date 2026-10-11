@@ -36,17 +36,17 @@ jobs:
         run: npm test
 
       - name: Pages konfigurieren
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bugfix/startup-and-workflows')
         uses: actions/configure-pages@v5
 
       - name: Website-Paket hochladen
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bugfix/startup-and-workflows')
         uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bugfix/startup-and-workflows')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
