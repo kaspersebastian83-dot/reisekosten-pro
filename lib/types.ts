@@ -186,6 +186,8 @@ export interface StatementSnapshot {
   version: number;
   locked: boolean;
   data: StatementData;
+  settingsSnapshot?: Settings;
+  expensesSnapshot?: Expense[];
 }
 
 export interface Settings {

@@ -16,16 +16,10 @@ function vehicleDetails(
   );
   return {
     name: trip.vehicle || profile?.name || "Fahrzeug nicht angegeben",
-    type:
-      trip.vehicleType === "privatfahrzeug"
-        ? "Privatwagen"
-        : trip.vehicleType === "firmenfahrzeug"
-          ? "Dienstwagen"
-          : profile
-            ? profile.ownership === "privatwagen"
-              ? "Privatwagen"
-              : "Dienstwagen"
-            : trip.vehicleType,
+    type: profile
+      ? profile.ownership === "privatwagen" ? "Privatwagen" : "Dienstwagen"
+      : trip.vehicleType === "privatfahrzeug" ? "Privatwagen"
+        : trip.vehicleType === "firmenfahrzeug" ? "Dienstwagen" : trip.vehicleType,
     plate: trip.plate || profile?.plate || "ohne Kennzeichen",
   };
 }

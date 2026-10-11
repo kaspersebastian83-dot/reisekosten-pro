@@ -92,8 +92,8 @@ function thresholdEligible(minutes: number, settings: Settings) {
 
 function tripDays(trip: Trip) {
   const days: string[] = [];
-  const start = new Date(`${trip.date}T12:00:00`);
-  const end = new Date(`${trip.endDate || trip.date}T12:00:00`);
+  const start = new Date(`${trip.date}T12:00:00Z`);
+  const end = new Date(`${trip.endDate || trip.date}T12:00:00Z`);
   for (let d = start; d <= end; d = new Date(d.getTime() + 86_400_000))
     days.push(d.toISOString().slice(0, 10));
   return days;
@@ -178,14 +178,14 @@ export function calculateDay(
   const full = fullTariff?.amount || 0;
   const breakfastCut = meals.breakfast
     ? round2(
-        full * ((tariffFor(settings, date, "breakfast")?.amount || 20) / 100),
+        full * ((tariffFor(settings, date, "breakfast")?.amount ?? 20) / 100),
       )
     : 0;
   const lunchCut = meals.lunch
-    ? round2(full * ((tariffFor(settings, date, "lunch")?.amount || 40) / 100))
+    ? round2(full * ((tariffFor(settings, date, "lunch")?.amount ?? 40) / 100))
     : 0;
   const dinnerCut = meals.dinner
-    ? round2(full * ((tariffFor(settings, date, "dinner")?.amount || 40) / 100))
+    ? round2(full * ((tariffFor(settings, date, "dinner")?.amount ?? 40) / 100))
     : 0;
   const allowanceBefore = baseTariff?.amount || 0;
   const allowanceAfter = Math.max(
@@ -277,19 +277,29 @@ function requiresThreeMonthReview(
 }
 
 export function buildStatement(state: AppState, month: string): StatementData {
+  const monthStart = `${month}-01`;
+  const monthEnd = `${month}-31`;
   const trips = state.trips.filter(
-    (t) =>
-      t.date.slice(0, 7) === month || (t.endDate || "").slice(0, 7) === month,
+    (t) => t.date <= monthEnd && (t.endDate || t.date) >= monthStart,
   );
   const grouped = groupTripsByDay(trips);
+  for (const expense of state.expenses) {
+    if (expense.status !== "storniert" && expense.date.startsWith(month) && !grouped.has(expense.date)) grouped.set(expense.date, []);
+  }
   const rows: StatementRow[] = [...grouped.entries()]
     .filter(([date]) => date.startsWith(month))
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, dayTrips]) => {
       const day = calculateDay(date, dayTrips, state.settings);
+      if (!dayTrips.length) {
+        day.firstStart = "";
+        day.lastEnd = "";
+        day.warnings = [];
+        day.reason = "Ausgaben ohne dienstliche Fahrt an diesem Tag";
+      }
       if (requiresThreeMonthReview(state.trips, date, dayTrips))
         day.warnings.push("Prüfung der Drei-Monats-Regel erforderlich.");
-      const expenses = state.expenses.filter((e) => e.date === date);
+      const expenses = state.expenses.filter((e) => e.date === date && e.status !== "storniert");
       const fuel = round2(
         expenses
           .filter(

@@ -14,7 +14,20 @@
     <title>Reisekosten Pro</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main style="max-width:640px;margin:12vh auto;padding:24px;font-family:system-ui;color:#18211e" role="status">
+        <h1>Reisekosten Pro</h1>
+        <p id="startup-status">Reisekosten werden gestartet … Falls dieser Hinweis bestehen bleibt, prüfen Sie Ihre Verbindung und laden Sie die Seite erneut. Ihre lokalen Daten bleiben erhalten.</p>
+        <button type="button" onclick="location.reload()">Erneut laden</button>
+        <noscript>Bitte aktivieren Sie JavaScript, um Ihre lokalen Reisekosten zu öffnen.</noscript>
+      </main>
+    </div>
+    <script>
+      window.addEventListener("error", function () {
+        var status = document.getElementById("startup-status");
+        if (status) status.textContent = "Die Anwendung konnte nicht geladen werden. Bitte prüfen Sie die Verbindung und laden Sie erneut. Ihre lokalen Daten bleiben erhalten.";
+      }, true);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
