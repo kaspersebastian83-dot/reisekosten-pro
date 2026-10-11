@@ -112,10 +112,12 @@ Für ein erneutes Deployment dieses Branches:
 1. Unter **Settings → Pages → Source** muss **GitHub Actions** ausgewählt sein.
 2. Unter **Settings → Environments → github-pages → Deployment branches** muss
    `bugfix/startup-and-workflows` zugelassen sein (neben `main`).
-3. Unter **Actions → GitHub Pages bereitstellen → Run workflow** den Branch
-   `bugfix/startup-and-workflows` auswählen. Alternativ startet ein Push auf
-   diesen Branch den Workflow. Nach einer später ausdrücklich genehmigten
-   Übernahme nach `main` kann dessen Workflow wieder regulär genutzt werden.
+3. Unter **Actions → GitHub Pages bereitstellen** einen erfolgreichen Lauf
+   des Branches `bugfix/startup-and-workflows` öffnen und **Re-run all jobs**
+   wählen. Alternativ startet ein neuer Push auf diesen Branch den Workflow.
+   **Run workflow** steht erst zuverlässig bereit, wenn die Workflow-Datei im
+   Standardbranch vorhanden ist. Eine Übernahme nach `main` benötigt weiterhin
+   eine ausdrückliche Freigabe.
 4. Beide Jobs **build** und **deploy** müssen erfolgreich abgeschlossen sein.
    Nur `dist` wird als Website-Artefakt hochgeladen.
 5. Öffnen Sie `https://kaspersebastian83-dot.github.io/reisekosten-pro/` mit
