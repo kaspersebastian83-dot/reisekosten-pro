@@ -45,7 +45,9 @@ try {
       await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(page,'Reisen');
       assert.equal(await page.title(),'SpesenKit');
       assert.equal(await page.locator('.brand b').innerText(),'SpesenKit');
-      assert.equal(await page.locator('.brand-mark').innerText(),'SK');
+      assert.equal(await page.locator('.brand-mark img').evaluate(img=>img.complete&&img.naturalWidth>0),true,'brand icon loads');
+      assert.equal(await page.locator('a.suite-link').getAttribute('href'),'../Projektzentrale/','link back to the Projektzentrale');
+      assert.match(await page.locator('a.suite-link').innerText(),/Projektzentrale/);
       assert.equal(await page.locator('.brand-mark').evaluate(el=>el.offsetWidth===el.offsetHeight),true,'brand symbol keeps its square proportions');
       assert.equal(await page.locator('.brand small').innerText(),'Dienstreisen · Spesen · Abrechnungen');
       await check(`${engine} ${viewport.width}: navigation, import access and empty dashboard actions`,async()=>{
