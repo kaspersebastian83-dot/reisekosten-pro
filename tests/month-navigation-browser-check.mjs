@@ -51,7 +51,11 @@ try {
     const {context,page}=await open({viewport,timezoneId:'Europe/Berlin'});await page.clock.setFixedTime(new Date('2026-12-05T10:00:00Z'));
     const errors=[];page.on('pageerror',e=>errors.push(e.message));const picker=page.locator('input[type=month]');
     const monthButton=(name,year=2026)=>page.locator('.year-months').getByRole('button',{name:new RegExp(`^${name} ${year} ·`)});
-    const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'horizontal page overflow');
+    const fits=async()=>{
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'horizontal page overflow');
+      const clipped=await page.locator('.year-month').evaluateAll(buttons=>buttons.filter(b=>b.scrollWidth>b.clientWidth+1).map(b=>b.getAttribute('aria-label')));
+      assert.deepEqual(clipped,[],'content overflows a month button');
+    };
     let baseline,frozen;
     try {
       await page.goto(url);await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
