@@ -96,9 +96,9 @@ type Tab =
   | "Einstellungen"
   | "Datensicherung";
 const tabs: { name: Tab; icon: typeof LayoutDashboard }[] = [
+  { name: "Monatsabrechnungen", icon: FileSpreadsheet },
   { name: "Reisen", icon: ReceiptText },
   { name: "Kosten & Belege", icon: Fuel },
-  { name: "Monatsabrechnungen", icon: FileSpreadsheet },
   { name: "Übersicht", icon: LayoutDashboard },
   { name: "Auswertungen", icon: BarChart3 },
   { name: "Einstellungen", icon: SettingsIcon },
