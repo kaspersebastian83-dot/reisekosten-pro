@@ -55,7 +55,9 @@ try {
       await check(`${engine} ${viewport.width}: import is reachable from the month and returns to it`,async()=>{
         await workspace.getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).click();
         await page.locator('input[type=file]').first().waitFor({state:'attached'});assert.match(await page.locator('.content').innerText(),/Fahrten importieren|Datei/);
-        await page.getByRole('button',{name:'Zurück zum Monatsarbeitsbereich',exact:true}).click();await workspace.waitFor();assert.match(await workspace.innerText(),/Juli 2026/);
+        // Monatswechsel während des Imports behält den Rückweg und führt in den neuen Monat.
+        await page.locator('input[type=month]').fill('2026-06');await page.getByRole('button',{name:'Zurück zum Monatsarbeitsbereich',exact:true}).click();await workspace.waitFor();assert.match(await workspace.innerText(),/Juni 2026/);
+        await page.locator('.year-months').getByRole('button',{name:/^Juli 2026 ·/}).click();assert.match(await workspace.innerText(),/Juli 2026/);
       });
       await check(`${engine} ${viewport.width}: receipt inbox is worked through one after another`,async()=>{
         const banner=workspace.getByRole('region',{name:'Beleg-Eingang',exact:true});assert.match(await banner.innerText(),/2 Belege warten auf Zuordnung/);
@@ -86,10 +88,13 @@ try {
         page.once('dialog',d=>void d.accept());await editor.getByRole('button',{name:'Löschen',exact:true}).click();
         const s1=await waitState(page,s=>s?.expenses.length===before.expenses.length-1);await editor.waitFor({state:'detached'});
         assert.equal(s1.receiptInbox.find(i=>i.id==='a').status,'neu','receipt returns to the inbox');assert.equal(s1.changes.at(-1).newValue,'gelöscht');
-        const trip=s1.trips.find(t=>t.date.startsWith('2026-07')&&t.destination==='Bonn');
-        await timeline.locator('.timeline-entry.trip').filter({hasText:'Bonn'}).first().click();await editor.waitFor();
-        page.once('dialog',d=>void d.accept());await editor.getByRole('button',{name:'Reise löschen',exact:true}).click();
-        const s2=await waitState(page,s=>s?.trips.length===s1.trips.length-1);assert.equal(s2.changes.at(-1).entityType,'trip');assert.ok(trip);
+        // Reise mit zugeordneter Kostenposition: Rückfrage nennt sie, die Kosten bleiben ohne Zuordnung erhalten.
+        const trip=s1.trips.find(t=>t.date.startsWith('2026-07')&&t.destination==='Düsseldorf');const linked=s1.expenses.filter(e=>e.tripId===trip.id);assert.ok(linked.length>0);
+        await timeline.locator('.timeline-entry.trip').filter({hasText:'Düsseldorf'}).first().click();await editor.waitFor();
+        let message='';page.once('dialog',d=>{message=d.message();void d.accept();});await editor.getByRole('button',{name:'Reise löschen',exact:true}).click();
+        const s2=await waitState(page,s=>s?.trips.length===s1.trips.length-1);assert.match(message,/zugeordnete Kostenposition/);
+        assert.equal(s2.expenses.length,s1.expenses.length);for(const e of linked)assert.equal(s2.expenses.find(x=>x.id===e.id).tripId,undefined);
+        assert.ok(s2.changes.some(c=>c.entityType==='trip'&&c.entityId===trip.id&&c.newValue==='gelöscht'));
         await editor.waitFor({state:'detached'});
         await workspace.getByRole('button',{name:'Dienstreise erfassen',exact:true}).click();await editor.waitFor();
         assert.equal(await editor.getByRole('button',{name:'Reise löschen',exact:true}).count(),0,'no delete for a new draft');

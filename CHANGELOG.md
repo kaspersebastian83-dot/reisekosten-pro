@@ -1,5 +1,16 @@
 # Release Notes
 
+## 1.8.0 – Abschlussdurchlauf
+
+Zusammenfassung der Version: Ordnerablage und Sicherungen, Erfassen und Prüfen in der Monatsübersicht, Monatsleiste,
+Stapelerfassung, kompakte Formulare, Beleg-Eingang der Reihe nach, Löschen im Fenster, ohne die Reiter „Reisen“ und
+„Kosten & Belege“.
+
+- Reise löschen löst die Reisezuordnung zugeordneter Kosten und Belege (mit Protokolleintrag) statt sie auf eine
+  gelöschte Reise zeigen zu lassen; die Rückfrage nennt die Anzahl.
+- Monatswechsel während des Fahrtenbuch-Imports behält „Zurück zum Monatsarbeitsbereich“ (führt in den neuen Monat).
+- Versionsnummer 1.8.0; Browserchecks simulieren App-Updates unabhängig von der Versionsnummer.
+
 ## Reiter „Reisen“ und „Kosten & Belege“ entfernt (Schritt 2 von 2)
 
 - Menü: Monatsübersicht, Auswertungen, Einstellungen, Datensicherung.
