@@ -720,3 +720,11 @@ Die Monatsübersicht ist der Arbeitsplatz: „Dienstreise erfassen“, „Hotelr
 erfassen“ öffnen das jeweilige Formular über dem Monat, ohne Tabwechsel. Auch Hinweise der Abschlussprüfung werden
 dort bearbeitet. Die Tabs „Reisen“ und „Kosten & Belege“ bleiben für Suche und Bearbeitung über Monate. Ungespeicherte
 Eingaben sperren weiterhin Bereichs- und Monatswechsel. Berechnung, Abschluss und Datenformat sind unverändert.
+
+## Fluss 2: Monats-Zeitleiste
+
+„Monat im Überblick“ zeigt den gewählten Monat kompakt: je Kalendertag eine Kopfzeile mit der Verpflegungspauschale
+aus `buildStatement` (mehrere Reisen eines Tages teilen sich eine Pauschale), darunter je Dienstreise und Kostenposition
+eine Zeile (Zeit, Ziel, Zweck, Projekt, km bzw. Kategorie, Zahlungsart, Reisezuordnung, Betrag, „Beleg fehlt“,
+Hinweise). Mehrtägige Reisen erscheinen an Folgetagen als Fortsetzung; Kosten zählen nach Rechnungsdatum. Ein Klick
+öffnet den Eintrag in der Monatsübersicht. Die Zeitleiste rechnet nichts selbst (`lib/month-timeline.ts`).

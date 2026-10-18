@@ -1,5 +1,12 @@
 # Release Notes
 
+## Monats-Zeitleiste (Fluss, Schritt 2)
+
+- Neuer Abschnitt „Monat im Überblick“ in der Monatsübersicht: je Tag Datum und Verpflegungspauschale (aus der
+  Monatsberechnung), darunter je Reise und Kostenposition eine Zeile mit Hinweis- und Belegmarkierung.
+- Mehrtägige Reisen erscheinen an Folgetagen als Fortsetzung, Kosten nach Rechnungsdatum.
+- Klick auf eine Zeile öffnet sie direkt dort zum Bearbeiten.
+
 ## Erfassen direkt in der Monatsübersicht (Fluss, Schritt 1)
 
 - Dienstreise, Hotelrechnung und sonstige Kosten öffnen sich als Formular über dem Monat – kein Wechsel in „Reisen“

@@ -6,11 +6,11 @@ import { round2 } from '../lib/calculations';
 import type { StatementComparison } from '../lib/statement-comparison';
 
 const euro = (value: number) => value.toLocaleString('de-DE', {style:'currency', currency:'EUR'});
-export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement, checks, comparison, changes}: {
+export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement, checks, comparison, changes, timeline}: {
   state: AppState; month: string; statement: StatementData;
   startEntry: (kind: 'trip' | 'Hotel' | 'Parken') => void;
   editCosts: () => void; editTrips: () => void; openCapture: () => void; openStatement: () => void; checks: ReactNode;
-  comparison?: StatementComparison; changes?: ReactNode;
+  comparison?: StatementComparison; changes?: ReactNode; timeline?: ReactNode;
 }) {
   const existing = latestStatement(state, month);
   const overview = useMemo(() => monthOverview(state, month, comparison), [state, month, comparison]);
@@ -34,6 +34,7 @@ export function MonthWorkspace({state, month, statement, startEntry, editCosts, 
       </div>
       <p className="muted">Eingaben werden lokal gespeichert und können später weiterbearbeitet werden. Bei Rechnungen zählt das tatsächliche Rechnungsdatum für die Monatszuordnung.</p>
     </section>
+    {timeline}
     {checks}
     <section className="workspace-statement-action" aria-label="Monatsabrechnung">
       <h3>Monatsabrechnung</h3>
