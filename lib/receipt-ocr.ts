@@ -93,7 +93,9 @@ export function parseReceiptText(rawText: string): ReceiptSuggestion {
       (gross ? 35 : 0) +
       (category !== "sonstige Nebenkosten" ? 20 : 5),
   );
+  const projects = [...new Set(rawText.match(/\b\d{2}\.\d{4}\b/g) || [])];
   return {
+    projectNumber: projects.length === 1 ? projects[0] : undefined,
     merchant,
     date,
     gross,

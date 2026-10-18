@@ -11,7 +11,7 @@ export type ReviewStatus =
 export type VehicleType =
   "firmenfahrzeug" | "privatfahrzeug" | "mietwagen" | "öffentlich" | "anderes";
 export type PaymentType =
-  "Firmenkarte" | "privat vorgestreckt" | "Unternehmen" | "bereits erstattet";
+  "Firmenkarte" | "privat vorgestreckt" | "Unternehmen" | "bereits erstattet" | "unbekannt";
 
 export interface VehicleProfile {
   id: string;
@@ -98,7 +98,15 @@ export interface Receipt {
   dataUrl: string;
 }
 
-export interface ReceiptSuggestion {
+// Optional receipt context; old backups need no migration or inferred defaults.
+export interface ExpenseContext {
+  projectNumber?: string;
+  stayStart?: string;
+  stayEnd?: string;
+  breakfastIncluded?: "yes" | "no" | "unknown";
+}
+
+export interface ReceiptSuggestion extends ExpenseContext {
   date?: string;
   gross?: number;
   merchant?: string;
@@ -117,6 +125,7 @@ export interface ReceiptInboxItem {
   suggestion: ReceiptSuggestion;
   tripId?: string;
   expenseId?: string;
+  paymentType?: PaymentType;
   notes: string;
 }
 
@@ -130,7 +139,7 @@ export interface MerchantRule {
   updatedAt: string;
 }
 
-export interface Expense {
+export interface Expense extends ExpenseContext {
   id: string;
   date: string;
   tripId?: string;

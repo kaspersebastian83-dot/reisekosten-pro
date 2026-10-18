@@ -319,3 +319,77 @@ Prüfung: `npm test` umfasst auch `tests/manual-trip.test.ts`. Der optionale
 Tagwechsel, Mahlzeiten, mehrtägige Speicherung/Neuladen, eingefrorene Berichte,
 Exporte, Import und Offline-Verhalten bei 390, 820 und 1440 px in Chromium/WebKit.
 Die Browserprogramme werden extern bereitgestellt; keine neue Projektabhängigkeit.
+
+### Belege mit Dienstreisen verbinden (Schritt 2)
+
+**Kosten & Belege**, Belegfoto/OCR, Schnellerfassung und der vorhandene Kosteneditor
+verwenden dieselben Zuordnungsvorschläge. Eine Projektnummer identifiziert das
+Projekt; der Ort kommt weiterhin aus der Reise (`Trip.order`). Bei Hotels wird
+zusätzlich der eingegebene tatsächliche Übernachtungsbeginn/-ende mit der Reise
+abgeglichen. Der gesamte Aufenthalt muss innerhalb der Reisedaten liegen. Das
+Rechnungsdatum bleibt separat und bestimmt weiterhin den Abrechnungsmonat.
+Hotelvorschläge ohne Aufenthaltszeitraum werden ausdrücklich als zeitlich ungeprüft
+gekennzeichnet. Bei sonstigen Belegen wird das Ausgabedatum innerhalb der Reise
+geprüft. Ohne Projekt kann nur ein zeitlicher Vorschlag erfolgen.
+
+**Kein Vorschlag wird still gespeichert:** Mit „Zuordnung bestätigen“ oder der
+manuellen Reiseauswahl bestätigt man die konkrete Reise-ID. Mehrere Treffer werden
+alle angeboten. Ohne Bestätigung bleibt die Ausgabe „Noch keiner Dienstreise
+zugeordnet“ und kann trotzdem gespeichert werden. Die Auswahl ist nicht auf den
+aktuellen Abrechnungsmonat beschränkt. Bereits bestätigte IDs bleiben beim Laden,
+bei OCR und bei späteren Datums-/Projektänderungen stabil; abweichende Angaben
+führen zu einem sichtbaren Prüfhinweis. Im Kosteneditor kann die Zuordnung geändert
+oder gelöst werden. Verknüpfte Einträge im Belegeingang werden dabei synchronisiert;
+der Änderungsverlauf enthält den vorherigen und neuen Ausgabestand.
+
+Unter jeder Reise stehen die **zugeordneten Kosten & Belege**, über alle
+Rechnungsmonate hinweg. Private und vom Unternehmen bezahlte Ausgaben sowie die
+persönliche Erstattung werden getrennt gezeigt. Bilder lassen sich lokal ansehen,
+andere Originaldateien herunterladen; fehlende Belege werden gekennzeichnet. Die
+Bearbeitung verwendet den vorhandenen Kosteneditor.
+
+Hotelname wird als vorhandener Händler gespeichert. Frühstück ist eine manuell
+bestätigte Information mit den Zuständen Ja/Nein/Unbekannt. „Ja“ zeigt einen
+Prüfhinweis; **keine automatische Mahlzeitenkürzung** oder Veränderung der Reise.
+Es gibt keine neue automatische Übernachtungspauschale. Die Voraussetzungen einer
+Arbeitgeberpauschale, mögliche Überschneidungen mit bestehenden manuell erfassten
+Übernachtungskosten sowie die tatsächliche Behandlung von Frühstück bleiben vor
+der Abrechnung fachlich zu prüfen.
+
+Die bestehende Zahlungs-/Abrechnungslogik bleibt maßgeblich: Nur `privat vorgestreckt`
+mit Erstattungsstatus `offen` erhöht den persönlichen Auszahlungsbetrag. Firmenkarte,
+Unternehmen, bereits erstattete und ungeklärte Zahlungen erhöhen ihn nicht.
+Händlerregeln stellen die Zahlungsart nicht mehr automatisch um. Private Zahlung ist
+bei neuen Ausgaben sichtbar vorbelegt und vor dem Speichern zu prüfen. Bei alten
+Ausgaben ohne Zahlungsart und alten Belegeingängen ohne Zahlungsinformation gilt
+„unbekannt“, ohne einen Zahler oder eine private Auslage zu unterstellen. Explizit
+vorhandene Zahlungsarten und Erstattungszustände werden nicht umgedeutet.
+
+**Kompatible Datenfelder:** `Expense` und die bestehenden OCR-/Eingangsvorschläge
+können optional `projectNumber` (nur Nummer), `stayStart`, `stayEnd` und
+`breakfastIncluded` (`yes`/`no`/`unknown`) enthalten. `ReceiptInboxItem.paymentType`
+bewahrt die manuell gewählte Zahlungsart bis zur späteren Übernahme. Die vorhandene
+`tripId` ist die bestätigte Referenz; es gibt keine zusätzliche Projekt-Datenbank.
+IndexedDB `reisekosten-pro`, Version 1, Store `state`, Schlüssel `main`,
+App-Datenversion und PWA-/Pages-Pfade bleiben erhalten. Neue Felder werden beim
+Laden/Backup geprüft; alte Sicherungen bleiben kompatibel. Keine Löschmigration,
+keine Neuberechnung abgeschlossener Berichte. PDF-/Excel-/CSV-/ZIP-Formate bleiben
+erhalten; die neuen Kontextfelder stehen in UI und JSON-Backup, ohne neue Spalten
+in den bisherigen Exportformaten.
+
+Exakt gleiche Dateihashes oder gleiche Rechnungsnummer und Händler blockieren eine
+zweite Ausgabe; vorhandene Datensätze werden weiter bearbeitet. Gleicher Händler,
+Tag und Betrag ohne eindeutige Rechnungsnummer ergeben einen zusätzlichen
+Duplikat-Prüfhinweis. Neu fotografierte/anders beschnittene Rechnungen ohne verlässliche
+Rechnungsnummer können nicht sicher dedupliziert werden und bleiben manuell zu prüfen.
+Die Erkennung extrahiert eine Projektnummer nur bei eindeutigem Textvorkommen.
+Aufenthaltszeitraum und Frühstück werden nicht aus unsicheren OCR-Textstellen abgeleitet.
+Die bestehende lokale OCR lädt ggf. Laufzeit-/Sprachdateien herunter; Beleginhalte
+werden nicht an einen OCR-Dienst übertragen. Langsame Erkennung überschreibt keine
+inzwischen manuell korrigierten Felder; überholte Dateilesungen/Erkennung werden verworfen.
+
+Gezielte Prüfungen: `tests/receipt-linking.test.ts` (Zuordnung, Duplikate, Zahlungen,
+Backup-Kompatibilität, unveränderte Reisen/Berichte) und optional
+`tests/receipt-linking-browser-check.mjs` mit synthetischen Belegen bei 390/820/1440 px
+in Chromium und WebKit. Physische Kamera, tatsächliche OCR-Qualität und die konkrete
+fachliche Frühstücks-/Übernachtungsbehandlung bitte vor praktischer Nutzung prüfen.

@@ -50,12 +50,15 @@ function validateState(value: Partial<AppState>) {
     if (trip.dailyMeals && (!record(trip.dailyMeals) || !Object.values(trip.dailyMeals).every(meals))) fail();
   }
   const receipt = (v: unknown) => record(v) && texts(v, ["id", "name", "type", "hash", "dataUrl"]) && numbers(v, ["size"]);
+  const context = (v: Partial<Record<"projectNumber" | "stayStart" | "stayEnd" | "breakfastIncluded", unknown>>) => (["projectNumber", "stayStart", "stayEnd"] as const).every(key => v[key] === undefined || typeof v[key] === "string") && (v.breakfastIncluded === undefined || (typeof v.breakfastIncluded === "string" && ["yes", "no", "unknown"].includes(v.breakfastIncluded)));
   for (const expense of value.expenses || []) {
-    if (!record(expense) || !texts(expense, ["id", "date", "category", "description", "currency", "paymentType", "reimbursementStatus", "status"]) || !numbers(expense, ["gross", "net", "vatRate", "vat", "exchangeRate", "businessShare"]) || !warnings(expense.warnings) || (expense.receipt && !receipt(expense.receipt))) fail();
+    if (!record(expense) || !texts(expense, ["id", "date", "category", "description", "currency", "reimbursementStatus", "status"]) || !numbers(expense, ["gross", "net", "vatRate", "vat", "exchangeRate", "businessShare"]) || !warnings(expense.warnings) || (expense.receipt && !receipt(expense.receipt))) fail();
+    if ((expense.tripId !== undefined && typeof expense.tripId !== "string") || !context(expense) || (expense.paymentType !== undefined && typeof expense.paymentType !== "string")) fail();
   }
   for (const item of value.receiptInbox || []) {
     if (!record(item) || !receipt(item.receipt) || !record(item.suggestion) || !numbers(item.suggestion, ["confidence"]) || !texts(item, ["id", "capturedAt", "status", "notes"])) fail();
   }
+  for (const item of value.receiptInbox || []) if ((item.tripId !== undefined && typeof item.tripId !== "string") || !context(item.suggestion) || (item.paymentType !== undefined && typeof item.paymentType !== "string")) fail();
   const settings = value.settings!;
   for (const key of Object.keys(emptyState.settings) as (keyof typeof settings)[]) {
     const field = settings[key];
@@ -128,7 +131,8 @@ export function normalizeState(value?: Partial<AppState>): AppState {
       ) || settings.vehicles.find((item) => item.ownership === ownership);
     return vehicle ? { ...trip, vehicleId: vehicle.id } : trip;
   });
-  const expenses = (value.expenses || []).map((expense) => {
+  const expenses = (value.expenses || []).map((original) => {
+    const expense = original.paymentType ? original : { ...original, paymentType: "unbekannt" as const };
     if (!expense.vehicleId) return expense;
     const vehicle = settings.vehicles.find(
       (item) =>
