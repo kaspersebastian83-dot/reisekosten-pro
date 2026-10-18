@@ -8,7 +8,7 @@ class StartupBoundary extends Component<{ children: ReactNode }, { failed: boole
   render() {
     if (this.state.failed) return (
       <main className="loading" role="alert">
-        <h1>Reisekosten Pro konnte nicht gestartet werden</h1>
+        <h1>SpesenKit konnte nicht gestartet werden</h1>
         <p>Beim Anzeigen ist ein Fehler aufgetreten. Ihre lokalen Daten wurden nicht gelöscht.</p>
         <p>Bitte neu laden. Bleibt der Fehler bestehen, prüfen Sie die Browser-Konsole.</p>
         <button onClick={() => location.reload()}>Erneut laden</button>
@@ -26,7 +26,7 @@ async function start() {
   createRoot(root).render(<StrictMode><StartupBoundary><Home /></StartupBoundary></StrictMode>);
 }
 void start().catch((error) => {
-  console.error("Reisekosten-Start fehlgeschlagen", error);
+  console.error("SpesenKit-Start fehlgeschlagen", error);
   const status = document.getElementById("startup-status");
   if (status) status.textContent = "Programmdateien konnten nicht geladen werden. Prüfen Sie die Verbindung und laden Sie die Seite erneut. Ihre lokalen Daten bleiben erhalten.";
 });

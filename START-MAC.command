@@ -10,7 +10,7 @@ if [ ! -d node_modules ]; then
   echo "Einmalige Installation wird vorbereitet..."
   npm install || exit 1
 fi
-echo "Reisekosten Pro startet. Das Fenster bitte geöffnet lassen."
+echo "SpesenKit startet. Das Fenster bitte geöffnet lassen."
 npm run dev &
 server_pid=$!
 trap 'kill "$server_pid" 2>/dev/null' EXIT INT TERM

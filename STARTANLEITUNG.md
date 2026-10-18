@@ -1,4 +1,4 @@
-# Reisekosten Pro – Startanleitung
+# SpesenKit – Startanleitung
 
 Für die Veröffentlichung als installierbare Web-App siehe
 [GITHUB-PAGES-ANLEITUNG.md](GITHUB-PAGES-ANLEITUNG.md).

@@ -1,4 +1,4 @@
-# Reisekosten Pro auf GitHub Pages veröffentlichen
+# SpesenKit auf GitHub Pages veröffentlichen
 
 ## 1. Vor dem Wechsel sichern
 
@@ -10,7 +10,8 @@ die Browserdaten der lokalen Installation zugreifen.
 ## 2. Repository erstellen
 
 1. Öffnen Sie [github.com/new](https://github.com/new).
-2. Vergeben Sie beispielsweise den Namen `reisekosten-pro`.
+2. Der bestehende Repository-Name `reisekosten-pro` bleibt unverändert.
+   SpesenKit ist ausschließlich der sichtbare Produktname.
 3. Wählen Sie **Private**, wenn Ihr GitHub-Tarif GitHub Pages für private
    Repositories unterstützt. Andernfalls kann das Repository öffentlich sein:
    Diese Ausgabe enthält keine persönlichen Vorgabedaten.

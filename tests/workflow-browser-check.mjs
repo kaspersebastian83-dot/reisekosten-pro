@@ -43,6 +43,11 @@ try {
     };
     try {
       await page.goto(url);await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+      assert.equal(await page.title(),'SpesenKit');
+      assert.equal(await page.locator('.brand b').innerText(),'SpesenKit');
+      assert.equal(await page.locator('.brand-mark').innerText(),'SK');
+      assert.equal(await page.locator('.brand-mark').evaluate(el=>el.offsetWidth===el.offsetHeight),true,'brand symbol keeps its square proportions');
+      assert.equal(await page.locator('.brand small').innerText(),'Dienstreisen · Spesen · Abrechnungen');
       await check(`${engine} ${viewport.width}: navigation, import access and empty dashboard actions`,async()=>{
         const names=['Reisen','Kosten & Belege','Monatsabrechnungen','Übersicht','Auswertungen','Einstellungen','Datensicherung'];
         assert.deepEqual(await page.locator('.sidebar nav button span').allTextContents(),names);

@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Reisekosten Pro
+title SpesenKit
 cd /d "%~dp0"
 
 rem npm-Zwischenspeicher ausserhalb des entpackten Programmordners ablegen.
@@ -53,7 +53,7 @@ exit /b 1
 echo Installation erfolgreich.
 
 :start_app
-echo Reisekosten Pro startet. Das Fenster bitte geoeffnet lassen.
+echo SpesenKit startet. Das Fenster bitte geoeffnet lassen.
 start "" cmd /c "timeout /t 4 /nobreak >nul & start http://localhost:5173"
 call npm run dev
 pause

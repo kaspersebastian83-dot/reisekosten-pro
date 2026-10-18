@@ -1,13 +1,13 @@
 {
-  "name": "Reisekosten Pro",
-  "short_name": "Reisekosten",
-  "description": "Lokale deutsche Reisekosten- und Spesenabrechnung",
+  "name": "SpesenKit",
+  "short_name": "SpesenKit",
+  "description": "Dienstreisen · Spesen · Abrechnungen",
   "id": ".",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "background_color": "#f4f6f3",
-  "theme_color": "#174f3a",
+  "background_color": "#eef4fb",
+  "theme_color": "#356da8",
   "icons": [
     {"src":"./icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
     {"src":"./icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"},

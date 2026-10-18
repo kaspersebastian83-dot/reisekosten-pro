@@ -98,7 +98,7 @@ try {
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`import-review-${label}.png`),fullPage:true});
       await page.getByRole('button',{name:'Import abbrechen',exact:true}).click();await nav(page,'Monatsabrechnungen');await page.locator('.monthly-details summary').click();
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`calculation-details-${label}.png`),fullPage:true});
-      await nav(page,'Einstellungen');assert.match(await page.locator('.app-version').innerText(),/Reisekosten Pro 1\.7\.0/);assert.match(await page.locator('.app-version').innerText(),/Commit [a-f0-9]{7}/);
+      await nav(page,'Einstellungen');assert.match(await page.locator('.app-version').innerText(),/SpesenKit 1\.7\.0/);assert.match(await page.locator('.app-version').innerText(),/Commit [a-f0-9]{7}/);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`version-${label}.png`),fullPage:true});
     }
   });

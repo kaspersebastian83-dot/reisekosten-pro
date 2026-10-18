@@ -20,3 +20,27 @@ test("creates a GitHub Pages compatible static build", async () => {
   assert.match(worker, /key\.startsWith\(CACHE_PREFIX\)/);
   assert.doesNotMatch(html, /(?:href|src)=["']\/(?!\/)/);
 });
+
+test("SpesenKit branding preserves PWA identity, repository paths and icon sizes", async () => {
+  const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+  const manifest = JSON.parse(await readFile(new URL("../dist/manifest.webmanifest", import.meta.url), "utf8"));
+  const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.match(html, /<title>SpesenKit<\/title>/);
+  assert.match(html, /apple-mobile-web-app-title" content="SpesenKit"/);
+  assert.doesNotMatch(html, /Reisekosten Pro/);
+  assert.equal(pkg.name, "reisekosten-pro");
+  assert.equal(pkg.displayName, "SpesenKit");
+  assert.equal(manifest.name, "SpesenKit");
+  assert.equal(manifest.short_name, "SpesenKit");
+  assert.equal(manifest.description, "Dienstreisen · Spesen · Abrechnungen");
+  for (const key of ["id", "start_url", "scope"]) assert.equal(manifest[key], ".");
+  assert.match(html, /rel="apple-touch-icon" href="\.\/icon-192.png"/);
+  for (const size of [192, 512]) {
+    const png = await readFile(new URL(`../dist/icon-${size}.png`, import.meta.url));
+    assert.equal(png.subarray(1, 4).toString(), "PNG");
+    assert.equal(png.readUInt32BE(16), size);
+    assert.equal(png.readUInt32BE(20), size);
+    assert.ok(manifest.icons.some(icon => icon.src === `./icon-${size}.png` && icon.sizes === `${size}x${size}` && icon.purpose === "any maskable"));
+  }
+  assert.match(await readFile(new URL("../dist/favicon.svg", import.meta.url), "utf8"), /<title id="title">SpesenKit<\/title>/);
+});

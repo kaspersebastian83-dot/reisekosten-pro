@@ -81,6 +81,7 @@ try {
     assert.equal(snapshot.statements[0].expensesSnapshot.length,1);
     const pdf=await download(page,'PDF');assert.equal(pdf.bytes.subarray(0,4).toString(),'%PDF');assert.ok((pdf.bytes.toString('latin1').match(/\/Type \/Page\b/g)||[]).length>=3);assert.ok(/\/Subtype \/Image/.test(pdf.bytes.toString('latin1')),'PDF embeds receipt image');assert.ok(pdf.bytes.toString('latin1').includes('Privatwagen'),'PDF uses reimbursed vehicle profile');
     const xlsx=await download(page,'Excel');assert.equal(xlsx.bytes.subarray(0,2).toString(),'PK');
+    const {Workbook}=require('exceljs');const exported=new Workbook();await exported.xlsx.load(xlsx.bytes);assert.equal(exported.creator,'SpesenKit');assert.equal(exported.getWorksheet('Übersicht').getCell('A1').value,'Reisekostenabrechnung');
     const csv=await download(page,'CSV');assert.match(csv.bytes.toString(),/11\.48/);assert.match(csv.bytes.toString(),/12\.5/);
     const zip=await download(page,'ZIP + Belege');assert.equal(zip.bytes.subarray(0,2).toString(),'PK');
     await nav(page,'Einstellungen');await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('dienstwagen');await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s?.settings.vehicles[0].ownership==='dienstwagen');
@@ -136,7 +137,7 @@ try {
     await page.goto(url);
     if(mode==='denied'||mode==='malformed'){await page.getByRole('heading',{name:'Lokale Daten konnten nicht geöffnet werden'}).waitFor();if(mode==='malformed')assert.equal((await state(page)).expenses,'broken');}
     if(mode==='bundle')await page.getByText(/Die Anwendung konnte nicht geladen werden|Programmdateien konnten nicht geladen werden/).waitFor();
-    if(mode==='render'){await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(page,'Übersicht');await page.getByRole('heading',{name:'Reisekosten Pro konnte nicht gestartet werden'}).waitFor();}
+    if(mode==='render'){await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(page,'Übersicht');await page.getByRole('heading',{name:'SpesenKit konnte nicht gestartet werden'}).waitFor();}
     if(mode==='quota'){await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(page,'Einstellungen');await page.getByLabel('Firma',{exact:true}).fill('Synthetic');await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await page.getByRole('alert').getByText(/Änderungen konnten nicht lokal gespeichert/).waitFor();}
     await context.close();
   });

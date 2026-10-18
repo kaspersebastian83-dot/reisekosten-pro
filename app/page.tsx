@@ -216,7 +216,7 @@ export default function Home() {
           <p role="alert">{loadError}</p>
           <p>Ihre gespeicherten Daten wurden nicht gelöscht oder überschrieben. Erlauben Sie lokalen Browserspeicher und schließen Sie gegebenenfalls andere App-Tabs. Löschen Sie keine Websitedaten.</p>
           <button className="primary" onClick={() => void readLocalState()}>Erneut versuchen</button>
-        </> : <><span /><p>Reisekosten werden lokal geladen …</p></>}
+        </> : <><span /><p>SpesenKit wird lokal geladen …</p></>}
       </div>
     );
   return (
@@ -226,10 +226,10 @@ export default function Home() {
     <div className="app-shell" inert={transactionSaving || updatePreparing}>
       <aside className={`sidebar ${sidebar ? "open" : ""}`}>
         <div className="brand">
-          <div className="brand-mark">RK</div>
+          <div className="brand-mark">SK</div>
           <div>
-            <b>Reisekosten Pro</b>
-            <small>Lokal · nachvollziehbar</small>
+            <b>SpesenKit</b>
+            <small>Dienstreisen · Spesen · Abrechnungen</small>
           </div>
           <button
             className="icon mobile-only"
@@ -3552,7 +3552,7 @@ function SettingsPanel({
   };
   return (
     <div className="settings-layout">
-      <section className="card app-version"><p className="eyebrow">Über diese App</p><h3>Reisekosten Pro {appRelease.version}</h3>
+      <section className="card app-version"><p className="eyebrow">Über diese App</p><h3>SpesenKit {appRelease.version}</h3>
         <p>Laufende Version{appRelease.commit ? ` · Commit ${appRelease.commit}` : ""}. Daten und Belege bleiben lokal in diesem Browser.</p>
       </section>
       <section className="card">

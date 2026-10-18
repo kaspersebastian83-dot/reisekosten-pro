@@ -1,5 +1,14 @@
 # Release Notes
 
+
+## SpesenKit – sichtbare Umbenennung
+
+- Produktname und Untertitel: SpesenKit · Dienstreisen · Spesen · Abrechnungen.
+- Branding, Start-/Fehleranzeigen, PWA-Name, SK-Icons und Excel-Ersteller aktualisiert.
+- Repository `reisekosten-pro`, Pages-URL, Installationsidentität, Datenbank,
+  Backups, Abrechnungen und Berechnungen unverändert; keine Migration oder Rücksetzung.
+- Der dienstreiseorientierte Workflow aus PR #3 bleibt erhalten.
+
 ## 1.7.0 – zur Prüfung, noch nicht veröffentlicht
 
 - Importprüfung zeigt alle CSV/XLSX-Fahrten mit echten Quellzeilen, Status,
