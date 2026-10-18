@@ -320,14 +320,24 @@ try {
     await until(async () => message, 'Bestätigung');
     assert.match(message, /ACHTUNG: .*2026-05 V01.*2026-06 V01/);
     assert.deepEqual(await idbState(page), current, 'abgebrochen: nichts geändert');
-    // Manuelle Sicherung wiederherstellen: aktueller Stand wird vorher gesichert, Ordnerdatei folgt.
+    // Nach der manuellen Sicherung etwas ändern …
+    await nav(page, 'Einstellungen');
+    await page.getByLabel('Name', { exact: true }).fill('Nach der Sicherung geändert');
+    await page.getByRole('button', { name: 'Einstellungen speichern', exact: true }).click();
+    await until(async () => (await readFolder(page))?.file.state.settings.profileName === 'Nach der Sicherung geändert', 'Änderung im Ordner');
+    await nav(page, 'Datensicherung');
+    // … dann die manuelle Sicherung wiederherstellen: aktueller Stand wird vorher gesichert, Ordnerdatei folgt.
     const revision = (await readFolder(page)).file.revision;
     page.once('dialog', (dialog) => { message = dialog.message(); void dialog.accept(); });
     await list.locator('tr', { hasText: 'Manuell' }).getByRole('button', { name: 'Wiederherstellen' }).click();
     await until(async () => (await names()).some((n) => n.startsWith('spesenkit_vor_wiederherstellung_')), 'Vorher-Sicherung');
     assert.doesNotMatch(message, /ACHTUNG/);
     await until(async () => (await readFolder(page)).file.revision > revision, 'Ordnerdatei aktualisiert');
+    assert.equal((await readFolder(page)).file.state.settings.profileName, current.settings.profileName, 'Ordnerdatei zeigt den wiederhergestellten Stand');
+    assert.equal((await idbState(page)).settings.profileName, current.settings.profileName);
     assert.deepEqual(tripIds(await idbState(page)), tripIds(current));
+    const saved = (await readFolder(page)).copies.find((c) => c.name.startsWith('spesenkit_vor_wiederherstellung_'));
+    assert.equal(JSON.parse(saved.text).settings.profileName, 'Nach der Sicherung geändert', 'Vorher-Sicherung enthält den ersetzten Stand');
     assert.equal(await folderStatus(page), 'ok');
     await fits(page);
     await list.screenshot({ path: path.join(output, 'sicherungen-1440.png') });
