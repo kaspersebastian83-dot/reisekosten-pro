@@ -37,8 +37,16 @@ function run<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDB
   }));
 }
 
+/** Ohne verbundenen Ordner soll SpesenKit keine zusätzliche Datenbank anlegen – nur lesen, wenn es sie gibt. */
+async function suiteExists() {
+  const list = (indexedDB as IDBFactory & { databases?: () => Promise<{ name?: string }[]> }).databases;
+  if (!list) return true;
+  try { return (await list.call(indexedDB)).some((db) => db.name === SUITE_DB); } catch { return true; }
+}
+
 export const suiteLinks = {
   async get(): Promise<FolderLink | undefined> {
+    if (!opening && !(await suiteExists())) return undefined;
     const value = await run<FolderLink | undefined>("readonly", (store) => store.get(LINK_KEY));
     if (!value || typeof value !== "object" || !value.handle || !Number.isInteger(value.revision) || typeof value.hash !== "string") return undefined;
     return value;
