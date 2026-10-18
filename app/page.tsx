@@ -73,7 +73,7 @@ import { MonthWorkspace } from "./month-workspace";
 import { StatementClosing } from "./statement-closing";
 import { StatementChanges } from "./statement-changes";
 import { compareClosedStatementWithCurrent, isClosedStatement, persistCorrectionDraft, relatedTripsForSnapshot, snapshotHistoryLimitations, stateForStatementVersion } from "../lib/statement-comparison";
-import { FolderBanner, FolderCard, FolderConflictDialog, FolderStatusLine, useFolderStorage, type FolderStorage } from "./folder-storage";
+import { FolderBanner, FolderCard, FolderConflictDialog, FolderStatusLine, StatementFiling, useFolderStorage, type FolderStorage } from "./folder-storage";
 import { changeStatementStatus, persistStatementClosing, type ClosingConfirmation, type ClosingIssue } from "../lib/statement-closing";
 import { MonthNavigation } from "./month-navigation";
 import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel, monthOverview } from "../lib/month-navigation";
@@ -84,6 +84,7 @@ import {
   exportCsv,
   exportExcel,
   exportPdf,
+  printPdf,
   exportZip,
   correctionExportNotice,
 } from "../lib/exports";
@@ -166,9 +167,20 @@ export default function Home() {
       closedLocally = true;
       // Erfolg erst melden, wenn auch die Datei im SpesenKit-Ordner geschrieben ist.
       const filed = await folder.flush();
-      if (filed.error) throw new Error(`Der Abschluss ist im Browser gespeichert, aber noch nicht im SpesenKit-Ordner: ${filed.error} Bitte den Hinweis oben beachten und erneut speichern.`);
+      const closedVersion = committed.statements.find((item) => item.id === confirmation.snapshotId);
+      const label = `${monthLabel(confirmation.month)}${closedVersion ? ` (Version ${closedVersion.version})` : ""}`;
+      if (filed.error) {
+        folder.deferFiling(confirmation.snapshotId, label, "Der Ordner war beim Abschluss nicht beschreibbar.");
+        throw new Error(`Der Abschluss ist im Browser gespeichert, aber noch nicht im SpesenKit-Ordner: ${filed.error} Bitte den Hinweis oben beachten und erneut speichern.`);
+      }
       setSaveError("");
-      notify(filed.linked ? "Monatsabrechnung abgeschlossen und im SpesenKit-Ordner gespeichert." : "Monatsabrechnung lokal gespeichert und abgeschlossen.");
+      // Erst nach dem gesicherten Datenstand: PDF/ZIP ablegen. Ein Fehler hier ändert den Abschluss nicht und bleibt als Hinweis sichtbar.
+      let filing = "";
+      if (filed.linked) {
+        try { const report = await folder.fileVersion(confirmation.snapshotId, label); filing = report.written.length || report.existing.length ? ` Abgelegt in ${report.folder}.` : ""; }
+        catch { filing = " Die Dateien sind noch nicht abgelegt – siehe Hinweis oben."; }
+      }
+      notify(filed.linked ? `Monatsabrechnung abgeschlossen und im SpesenKit-Ordner gespeichert.${filing}` : "Monatsabrechnung lokal gespeichert und abgeschlossen.");
     } catch (failure) {
       const text = failure instanceof Error ? failure.message : "Lokales Speichern fehlgeschlagen.";
       setSaveError(closedLocally ? text : `Der Monatsabschluss wurde nicht bestätigt. ${text}`);
@@ -491,6 +503,7 @@ export default function Home() {
               viewRules={() => setTab("Einstellungen")}
               commitClosing={commitClosing}
               commitCorrection={commitCorrection}
+              folder={folder}
               editClosingIssue={target => {
                 setWorkspaceEntry({month});
                 if (target.kind === "trip") { setEditingTrip(state.trips.find(trip => trip.id === target.id) || null); setTab("Reisen"); }
@@ -2858,7 +2871,7 @@ function Statements({
   update,
   notify,
   startEntry, editCosts, editTrips, openCapture, viewRules,
-  commitClosing, editClosingIssue, commitCorrection,
+  commitClosing, editClosingIssue, commitCorrection, folder,
 }: {
   state: AppState;
   month: string;
@@ -2873,6 +2886,7 @@ function Statements({
   commitClosing: (confirmation: ClosingConfirmation) => Promise<void>;
   commitCorrection: (month: string, expected: AppState) => Promise<string>;
   editClosingIssue: (target: NonNullable<ClosingIssue['target']>) => void;
+  folder: FolderStorage;
 }) {
   const [reviewMonth, setReviewMonth] = useState<string | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
@@ -3199,6 +3213,7 @@ function Statements({
           </button>
         </div>
       </section>
+      {existing && isClosedStatement(existing) && <StatementFiling folder={folder} snapshot={existing} label={`${monthLabel(month)} (Version ${existing.version})`} print={() => printPdf(statement, exportState, number, exportContext)} />}
       </>}
     </>
   );

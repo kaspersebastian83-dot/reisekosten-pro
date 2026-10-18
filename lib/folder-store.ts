@@ -19,17 +19,19 @@ export const DATA_DIR = "Daten";
 export const DATA_FILE = "spesenkit.json";
 export const PREVIOUS_FILE = "spesenkit.vorher.json";
 export const COPY_DIR = "Sicherungen";
+export const FILING_DIR = "Spesen";
 export const FILE_FORMAT = "spesenkit-daten";
 export const FILE_FORMAT_VERSION = 1;
 
 type Permission = "granted" | "denied" | "prompt";
-export interface WritableLike { write(data: string): Promise<void>; close(): Promise<void>; abort?(): Promise<void> }
-export interface FileHandleLike { kind?: "file"; name?: string; getFile(): Promise<{ text(): Promise<string> }>; createWritable(): Promise<WritableLike> }
+export interface WritableLike { write(data: string | Blob): Promise<void>; close(): Promise<void>; abort?(): Promise<void> }
+export interface FileHandleLike { kind?: "file"; name?: string; getFile(): Promise<{ text(): Promise<string>; size?: number }>; createWritable(): Promise<WritableLike> }
 export interface DirHandleLike {
   kind?: "directory";
   name: string;
   getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<DirHandleLike>;
   getFileHandle(name: string, options?: { create?: boolean }): Promise<FileHandleLike>;
+  removeEntry?(name: string): Promise<void>;
   queryPermission?(descriptor: { mode: "readwrite" }): Promise<Permission>;
   requestPermission?(descriptor: { mode: "readwrite" }): Promise<Permission>;
 }
@@ -44,7 +46,7 @@ export interface FolderFileContent {
 }
 export interface FolderFile { content: FolderFileContent; state: AppState; hash: string; text: string }
 /** Pro Browserprofil gespeichert (gemeinsame Datenbank „mosaik-suite“): welcher Ordner, welcher Dateistand zuletzt abgeglichen. */
-export interface FolderLink { handle: DirHandleLike; revision: number; hash: string; savedAt?: string; /** Anzeige, z. B. „Max Mustermann\SpesenKit“. */ label?: string }
+export interface FolderLink { handle: DirHandleLike; revision: number; hash: string; savedAt?: string; /** Anzeige, z. B. „Max Mustermann\SpesenKit“. */ label?: string; /** Formate für die automatische Ablage nach dem Abschluss. */ filing?: Partial<Record<"pdf" | "xlsx" | "zip", boolean>> }
 export interface WriteResult { revision: number; hash: string; savedAt: string }
 
 export type FolderErrorCode = "invalid" | "conflict" | "permission" | "read" | "write" | "verify";
@@ -67,8 +69,10 @@ async function fileText(dir: DirHandleLike, name: string) {
   catch (error) { if (errorName(error) === "NotFoundError") return null; throw accessError(error, `„${name}“`); }
   try { return await (await handle.getFile()).text(); } catch (error) { throw accessError(error, `„${name}“`); }
 }
-async function writeText(dir: DirHandleLike, name: string, text: string) {
+async function writeText(dir: DirHandleLike, name: string, text: string | Blob) {
   let writable: WritableLike | undefined;
+  // getFileHandle({create}) legt die Datei sofort (leer) an. Scheitert das Schreiben, darf keine leere Datei zurückbleiben.
+  const existed = await dir.getFileHandle(name).then(() => true, () => false);
   try {
     writable = await (await dir.getFileHandle(name, { create: true })).createWritable();
     await writable.write(text);
@@ -76,6 +80,7 @@ async function writeText(dir: DirHandleLike, name: string, text: string) {
   } catch (error) {
     // createWritable schreibt in eine Zwischendatei; ohne close() bleibt die Zieldatei unverändert.
     try { await writable?.abort?.(); } catch { /* bereits abgebrochen */ }
+    if (!existed) { try { await dir.removeEntry?.(name); } catch { /* bleibt als leere Datei; wird beim Ablegen als fehlend behandelt */ } }
     if (errorName(error) === "NotAllowedError" || errorName(error) === "SecurityError") throw new FolderError("permission", `Kein Schreibzugriff auf „${name}“. Bitte den Ordnerzugriff bestätigen.`);
     throw new FolderError("write", `„${name}“ konnte nicht geschrieben werden${errorName(error) === "QuotaExceededError" ? " (Speicherplatz voll)" : ""}.`);
   }
@@ -203,4 +208,28 @@ export function stateSummary(state: AppState) {
     profile: state.settings.profileName || "ohne Namen",
     lastChange: [...state.changes.map((c) => c.changedAt), ...state.trips.map((t) => t.importedAt)].filter(Boolean).sort().at(-1),
   };
+}
+
+/** Unterordner anlegen (z. B. Spesen/2026/09). */
+export async function ensureDir(root: DirHandleLike, parts: string[]) {
+  let dir = root;
+  for (const part of parts) dir = (await subDir(dir, part, true))!;
+  return dir;
+}
+/** Vorhandene Unterordner öffnen, ohne anzulegen; null, wenn einer fehlt. */
+export async function openDir(root: DirHandleLike, parts: string[]) {
+  let dir: DirHandleLike | null = root;
+  for (const part of parts) { dir = await subDir(dir, part, false); if (!dir) return null; }
+  return dir;
+}
+export async function fileExists(dir: DirHandleLike, name: string) {
+  // Eine leere Datei (abgebrochener Schreibvorgang) gilt als nicht vorhanden.
+  try { const file = await (await dir.getFileHandle(name)).getFile(); return file.size === undefined ? (await file.text()).length > 0 : file.size > 0; }
+  catch (error) { if (errorName(error) === "NotFoundError") return false; throw accessError(error, `„${name}“`); }
+}
+/** Legt eine Datei nur an, wenn es sie noch nicht gibt. Vorhandene Dateien werden nie überschrieben. */
+export async function writeNewFile(dir: DirHandleLike, name: string, data: string | Blob | (() => Promise<string | Blob>)) {
+  if (await fileExists(dir, name)) return "exists" as const;
+  await writeText(dir, name, typeof data === "function" ? await data() : data);
+  return "written" as const;
 }

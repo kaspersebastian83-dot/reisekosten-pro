@@ -290,6 +290,20 @@ export function buildPdfDocument(
   return doc;
 }
 
+/** Dieselbe PDF wie „PDF“-Export, als Datei für die Ablage im SpesenKit-Ordner. */
+export function pdfFile(data: StatementData, state: AppState, number: string, context?: StatementExportContext) {
+  const doc = buildPdfDocument(data, state, number, context);
+  return { name: statementExportFilename(data.month, 'pdf', context), blob: doc.output("blob") as Blob };
+}
+
+/** Öffnet die PDF dieses Stands mit Druckdialog; ohne Pop-up-Erlaubnis wird sie stattdessen heruntergeladen. */
+export function printPdf(data: StatementData, state: AppState, number: string, context?: StatementExportContext) {
+  const doc = buildPdfDocument(data, state, number, context);
+  doc.autoPrint();
+  const opened = window.open(doc.output("bloburl") as unknown as string, "_blank");
+  if (!opened) doc.save(statementExportFilename(data.month, 'pdf', context));
+}
+
 export function exportPdf(
   data: StatementData,
   state: AppState,
@@ -339,6 +353,12 @@ const rowsForExport = (data: StatementData, state: AppState) =>
   });
 
 export async function exportExcel(data: StatementData, state: AppState, context?: StatementExportContext) {
+  const file = await excelFile(data, state, context);
+  download(file.blob, file.name);
+}
+
+/** Dieselbe Excel-Datei wie „Excel“-Export, ohne Download. */
+export async function excelFile(data: StatementData, state: AppState, context?: StatementExportContext) {
   const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "SpesenKit";
@@ -387,12 +407,12 @@ export async function exportExcel(data: StatementData, state: AppState, context?
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
-  download(
-    new Blob([buffer as unknown as BlobPart], {
+  return {
+    name: statementExportFilename(data.month, 'xlsx', context),
+    blob: new Blob([buffer as unknown as BlobPart], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
-    statementExportFilename(data.month, 'xlsx', context),
-  );
+  };
 }
 
 export function exportCsv(data: StatementData, state: AppState, datev = false, context?: StatementExportContext) {
@@ -427,6 +447,17 @@ export async function exportZip(
   number: string,
   context?: StatementExportContext,
 ) {
+  const file = await zipFile(data, state, number, context);
+  download(file.blob, file.name);
+}
+
+/** Dasselbe Paket wie „ZIP + Belege“, ohne Download. */
+export async function zipFile(
+  data: StatementData,
+  state: AppState,
+  number: string,
+  context?: StatementExportContext,
+) {
   const zip = new JSZip();
   const pdf = buildPdfDocument(data, state, number, context);
   zip.file(
@@ -443,8 +474,5 @@ export async function exportZip(
       const base64 = e.receipt!.dataUrl.split(",")[1];
       zip.file(`Belege/${e.id}_${e.receipt!.name}`, base64, { base64: true });
     });
-  download(
-    await zip.generateAsync({ type: "blob" }),
-    statementExportFilename(data.month, 'zip', context),
-  );
+  return { name: statementExportFilename(data.month, 'zip', context), blob: await zip.generateAsync({ type: "blob" }) };
 }
