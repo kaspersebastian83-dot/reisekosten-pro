@@ -3,8 +3,10 @@
 GitHub-Pages-Ausgabe · Die Release-Version kommt aus [package.json](package.json).
 
 Datenschutzfreundliche, deutschsprachige PWA für deutsche Reisekosten- und
-Spesenabrechnungen. Die App verarbeitet Vimcar- und andere Fahrtenbuch-Exporte
-direkt im Browser, berechnet Verpflegungspauschalen, verwaltet Fahrzeuge,
+Spesenabrechnungen. Dienstreisen werden manuell erfasst und mit Kosten und
+Belegen zur Monatsabrechnung ergänzt. Optional verarbeitet die App weiterhin
+Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
+Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV-, DATEV-CSV- und ZIP-Exporte.
 
 ## Datenschutzmodell
@@ -126,7 +128,7 @@ zusätzlich auf den jeweiligen Geräten geprüft werden.
 
 ## Import prüfen, Berechnung verstehen, sicher aktualisieren
 
-Unter **Fahrten importieren** wählen Sie CSV/XLSX und kontrollieren die
+Unter **Reisen → Fahrten importieren** wählen Sie CSV/XLSX und kontrollieren die
 Spaltenzuordnung. Die nächste Seite zeigt alle Datenzeilen mit Quellzeile,
 normalisierten Werten und Gründen. Filtern Sie nach Status und wählen Sie die
 bereiten Fahrten aus. Erst **N Fahrten importieren** speichert; **Import
@@ -192,3 +194,40 @@ PLAYWRIGHT_MODULE=/pfad/zu/playwright CHROMIUM_EXECUTABLE=/pfad/zu/chromium node
 Feature-PRs führen in GitHub Actions Tests und Build aus, ohne Pages-Artefakt oder
 Deployment. Eine Veröffentlichung erfolgt erst durch die spätere Freigabe und
 Übernahme nach `main`.
+
+
+## Dienstreisen als Hauptworkflow
+
+Die App startet unter **Reisen**. **Reise erfassen** öffnet die vorhandene
+manuelle Erfassung für Datum, Enddatum, Beginn und Ende der Abwesenheit,
+Reiseziel und Reisezweck. Bestätigen Sie die tatsächliche berufliche
+Abwesenheit und tragen Sie gestellte Mahlzeiten ein. Die bestehenden
+Verpflegungs- und Fahrtkostenberechnungen bleiben unverändert.
+
+Unter **Kosten & Belege** oder über die Schnellerfassung lassen sich Ausgaben
+und Belege einer Reise zuordnen. In der **Übersicht** öffnen **Reise erfassen**,
+**Ausgabe erfassen** und **Beleg hinzufügen** direkt die jeweilige Erfassung.
+**Monatsabrechnungen** erstellt anschließend die Abrechnung und Exporte.
+Ein Fahrtenbuchimport ist für diesen Ablauf nicht erforderlich.
+
+Der vollständige Importassistent bleibt über den sekundären Button
+**Fahrten importieren** unter **Reisen** erreichbar; **Zurück zu Reisen** führt
+zurück. Der Import hat keinen eigenen Hauptnavigationspunkt mehr.
+Die blaue Akzentpalette und hellen Karten orientieren sich an LabelKit;
+es werden keine neuen UI-Bibliotheken oder Schriftendienste geladen.
+
+### Regressionstest des manuellen Workflows
+
+Nach `npm test` mit einer bereits installierten Playwright-Umgebung:
+
+```sh
+PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_EXECUTABLE=/pfad/zu/chromium node tests/workflow-browser-check.mjs
+BROWSER_ENGINE=webkit PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_EXECUTABLE=/pfad/zu/pw_run.sh node tests/workflow-browser-check.mjs
+```
+
+Der Test startet einen lokalen Produktionsserver mit Repository-Unterpfad und
+prüft isoliert mit synthetischen Daten Navigation, manuelle Reise,
+Verpflegungspauschale, Reisezuordnung einer Ausgabe mit Bildbeleg,
+Monatsabrechnung, PDF/Excel, nachträglichen Import und Offline-Neuladen bei
+1440, 820 und 390 Pixel Breite. Physische iPhone-/iPad-Geräte und reale
+Kamera-/OCR-Qualität sind damit nicht abgedeckt.

@@ -87,11 +87,10 @@ type Tab =
   | "Einstellungen"
   | "Datensicherung";
 const tabs: { name: Tab; icon: typeof LayoutDashboard }[] = [
-  { name: "Übersicht", icon: LayoutDashboard },
-  { name: "Fahrten importieren", icon: Import },
   { name: "Reisen", icon: ReceiptText },
   { name: "Kosten & Belege", icon: Fuel },
   { name: "Monatsabrechnungen", icon: FileSpreadsheet },
+  { name: "Übersicht", icon: LayoutDashboard },
   { name: "Auswertungen", icon: BarChart3 },
   { name: "Einstellungen", icon: SettingsIcon },
   { name: "Datensicherung", icon: Archive },
@@ -141,12 +140,17 @@ export default function Home() {
     return stateRef.current === lastSaved.current && (discard || !pendingWork.current.size) && !importBusy.current;
   };
   const [saveRetry, setSaveRetry] = useState(0);
-  const [tab, setTab] = useState<Tab>("Übersicht");
+  const [tab, setTab] = useState<Tab>("Reisen");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [sidebar, setSidebar] = useState(false);
   const [toast, setToast] = useState("");
   const [undoAction, setUndoAction] = useState<(() => void) | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const openTrip = () => {
+    setTab("Reisen");
+    setEditingTrip(blankTrip(state.settings));
+  };
   const [receiptCaptureOpen, setReceiptCaptureOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -239,7 +243,8 @@ export default function Home() {
           {tabs.map(({ name, icon: Icon }) => (
             <button
               key={name}
-              className={tab === name ? "active" : ""}
+              className={tab === name || (tab === "Fahrten importieren" && name === "Reisen") ? "active" : ""}
+              aria-current={tab === name || (tab === "Fahrten importieren" && name === "Reisen") ? "page" : undefined}
               onClick={() => {
                 setTab(name);
                 setSidebar(false);
@@ -326,20 +331,29 @@ export default function Home() {
               go={setTab}
               update={update}
               notify={notify}
+              openTrip={openTrip}
               openQuick={() => setQuickOpen(true)}
               openCapture={() => setReceiptCaptureOpen(true)}
             />
           )}
           {tab === "Fahrten importieren" && (
+            <>
+            <button className="ghost import-back" onClick={() => setTab("Reisen")}>
+              Zurück zu Reisen
+            </button>
             <ImportWizard
               state={state}
               confirmImport={confirmImport}
               notify={notify}
               go={setTab}
             />
+            </>
           )}
           {tab === "Reisen" && (
             <Trips
+              editing={editingTrip}
+              setEditing={setEditingTrip}
+              openImport={() => setTab("Fahrten importieren")}
               state={state}
               month={month}
               update={update}
@@ -435,6 +449,7 @@ function Dashboard({
   go,
   update,
   notify,
+  openTrip,
   openQuick,
   openCapture,
 }: {
@@ -445,6 +460,7 @@ function Dashboard({
   go: (t: Tab) => void;
   update: (f: (s: AppState) => AppState) => void;
   notify: (s: string) => void;
+  openTrip: () => void;
   openQuick: () => void;
   openCapture: () => void;
 }) {
@@ -506,16 +522,16 @@ function Dashboard({
           </div>
         </div>
         <div className="workflow-steps">
-          <button onClick={() => go("Fahrten importieren")}>
+          <button onClick={openTrip}>
             <span className={monthTrips.length ? "step-done" : "step-open"}>
               {monthTrips.length ? <Check size={18} /> : "1"}
             </span>
             <div>
-              <b>Fahrten</b>
+              <b>Reise erfassen</b>
               <small>
                 {monthTrips.length
-                  ? `${monthTrips.length} übernommen`
-                  : "Fahrtenbuch importieren"}
+                  ? `${monthTrips.length} erfasst`
+                  : "Dienstreise manuell erfassen"}
               </small>
             </div>
             <ChevronRight size={17} />
@@ -588,31 +604,22 @@ function Dashboard({
           <h2>
             {monthTrips.length
               ? `${monthTrips.length} Fahrten – ${statement.rows.length} Reisetage`
-              : "Fahrtenbuch importieren und loslegen"}
+              : "Ihre nächste Dienstreise beginnt hier"}
           </h2>
           <p>
-            Fahrten importieren, Ausgaben kurz ergänzen und den Monat
-            abschließen – ohne Buchhaltungsformular.
+            Reise erfassen, Ausgaben und Belege ergänzen und den Monat
+            abschließen. Ein Fahrtenbuch ist dafür nicht erforderlich.
           </p>
         </div>
         <div className="hero-actions">
-          {monthTrips.length && (
-            <button className="ghost" onClick={openQuick}>
-              <Plus size={18} /> Betrag erfassen
-            </button>
-          )}
-          <button
-            className="primary"
-            onClick={() =>
-              monthTrips.length ? openCapture() : go("Fahrten importieren")
-            }
-          >
-            {monthTrips.length ? "Beleg fotografieren" : "Datei importieren"}
-            {monthTrips.length ? (
-              <Camera size={18} />
-            ) : (
-              <ChevronRight size={18} />
-            )}
+          <button className="primary" onClick={openTrip}>
+            <Plus size={18} /> Reise erfassen
+          </button>
+          <button className="ghost" onClick={openQuick}>
+            <Plus size={18} /> Ausgabe erfassen
+          </button>
+          <button className="ghost" onClick={openCapture}>
+            <Camera size={18} /> Beleg hinzufügen
           </button>
         </div>
       </section>
@@ -696,7 +703,7 @@ function Dashboard({
             <CheckRow
               label="Mögliche Duplikate"
               value={duplicates}
-              go={() => go("Fahrten importieren")}
+              go={() => go("Reisen")}
             />
             <CheckRow
               label="Abrechnung erstellt"
@@ -1964,13 +1971,18 @@ function Trips({
   month,
   update,
   notify,
+  editing,
+  setEditing,
+  openImport,
 }: {
   state: AppState;
   month: string;
   update: (f: (s: AppState) => AppState) => void;
   notify: (s: string) => void;
+  editing: Trip | null;
+  setEditing: (trip: Trip | null) => void;
+  openImport: () => void;
 }) {
-  const [editing, setEditing] = useState<Trip | null>(null);
   usePendingWork(!!editing);
   const [query, setQuery] = useState("");
   const monthly = useMemo(() => buildStatement(state, month), [state, month]);
@@ -2082,7 +2094,7 @@ function Trips({
   };
   return (
     <>
-      <div className="toolbar">
+      <div className="toolbar trips-toolbar">
         <div className="search">
           <input
             placeholder="Ziel, Zweck oder Kunde suchen"
@@ -2090,6 +2102,7 @@ function Trips({
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
+        <div className="trip-actions">
         <button
           className="primary"
           onClick={() => setEditing(blankTrip(state.settings))}
@@ -2097,13 +2110,17 @@ function Trips({
           <Plus size={18} />
           Reise erfassen
         </button>
+        <button className="ghost" onClick={openImport}>
+          <Import size={18} /> Fahrten importieren
+        </button>
+        </div>
       </div>
       <div className="day-list">
         {groups.length === 0 && (
           <Empty
             icon={<ReceiptText />}
             title="Noch keine Reisen in diesem Monat"
-            text="Importieren Sie Ihr Fahrtenbuch oder erfassen Sie eine Reise manuell."
+            text="Erfassen Sie Ihre Dienstreise mit Ziel, Anlass und Abwesenheitszeiten. Kosten und Belege können Sie anschließend zuordnen."
           />
         )}
         {groups.map(([date, dayTrips]) => {
@@ -2280,7 +2297,7 @@ function TripForm({
         />
       </label>
       <label>
-        Beginn
+        Beginn der Abwesenheit
         <input
           type="time"
           step="1"
@@ -2289,7 +2306,7 @@ function TripForm({
         />
       </label>
       <label>
-        Ende
+        Ende der Abwesenheit
         <input
           type="time"
           step="1"
