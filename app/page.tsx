@@ -96,7 +96,7 @@ import { appRelease } from "../lib/release";
 import { DayDetails, MonthDetails } from "./calculation-details";
 import { UpdateNotice } from "./update-notice";
 import { nextExpenseDraft, nextTripDraft } from "../lib/batch-entry";
-import { openInboxItems, removeExpense, removeTrip } from "../lib/entry-removal";
+import { linkedExpenseCount, openInboxItems, removeExpense, removeTrip } from "../lib/entry-removal";
 import type { TimelineFilter } from "../lib/month-timeline";
 
 // „Reisen“ und „Kosten & Belege“ sind in der Monatsübersicht aufgegangen; der Import ist von dort erreichbar.
@@ -254,7 +254,8 @@ export default function Home() {
   };
   const selectMonth = (value: string) => {
     if (!isMonth(value) || value === month || !leaveForm()) return;
-    setWorkspaceEntry(null); setMonth(value);
+    // Während des Imports bleibt der Rückweg erhalten und führt in den neu gewählten Monat.
+    setWorkspaceEntry((entry) => entry ? { month: value } : null); setMonth(value);
   };
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [receiptCaptureOpen, setReceiptCaptureOpen] = useState(false);
@@ -1607,7 +1608,8 @@ function Trips({
   // Aus dem Bearbeitungsfenster: mit Rückfrage, danach schließen.
   const deleteEditing = () => {
     if (!editing || !state.trips.some((t) => t.id === editing.id)) return;
-    if (!window.confirm(`Reise vom ${dateDe(editing.date)}${editing.destination ? ` nach ${editing.destination}` : ""} löschen? Gespeicherte Abrechnungen bleiben unverändert.`)) return;
+    const linked = linkedExpenseCount(state, editing.id);
+    if (!window.confirm(`Reise vom ${dateDe(editing.date)}${editing.destination ? ` nach ${editing.destination}` : ""} löschen?${linked ? ` ${linked === 1 ? "Eine zugeordnete Kostenposition bleibt" : `${linked} zugeordnete Kostenpositionen bleiben`} erhalten, aber ohne Reisezuordnung.` : ""} Gespeicherte Abrechnungen bleiben unverändert.`)) return;
     del(editing.id);
     setEditing(null);
     notify("Reise gelöscht. Die Löschung steht im Änderungsprotokoll.");

@@ -8,6 +8,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { closeStatementInBrowser } from './close-statement-browser.mjs';
 const require = createRequire(import.meta.url);
+const appVersion = JSON.parse((await import('node:fs')).readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version.replaceAll('.', '\\.');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve('dist');
 let legacyMode = false;
@@ -21,7 +22,7 @@ const server = http.createServer(async (req,res) => {
     if (!file.startsWith(root+'/')) throw Error();
     let body = legacyMode && pathname.endsWith('/sw.js') ? Buffer.from(legacyWorker) : await readFile(file);
     if (pathname.endsWith('/sw.js') && workerRevision) body = Buffer.from(body.toString().replace(/(CACHE_PREFIX\})[a-f0-9]{16}/, '$1test-r'+workerRevision));
-    if (pathname.endsWith('.js') && !pathname.endsWith('/sw.js') && workerRevision) body = Buffer.from(body.toString().replace('version:`1.7.0`', `version:\`1.7.${workerRevision}\``));
+    if (pathname.endsWith('.js') && !pathname.endsWith('/sw.js') && workerRevision) body = Buffer.from(body.toString().replace(/version:`\d+\.\d+\.\d+`/, `version:\`9.9.${workerRevision}\``));
     res.writeHead(200, {'Content-Type': ({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'})[path.extname(file)] || 'application/octet-stream', 'Cache-Control':'no-cache'}).end(body);
   } catch {res.writeHead(404).end('Not found');}
 });
@@ -104,7 +105,7 @@ try {
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`import-review-${label}.png`),fullPage:true});
       await page.getByRole('button',{name:'Import abbrechen',exact:true}).click();await nav(page,'Monatsübersicht');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung ansehen)$/}).click();await page.locator('.monthly-details summary').click();
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`calculation-details-${label}.png`),fullPage:true});
-      await nav(page,'Einstellungen');assert.match(await page.locator('.app-version').innerText(),/SpesenKit 1\.7\.0/);assert.match(await page.locator('.app-version').innerText(),/Commit [a-f0-9]{7}/);
+      await nav(page,'Einstellungen');assert.match(await page.locator('.app-version').innerText(),new RegExp(`SpesenKit ${appVersion}`));assert.match(await page.locator('.app-version').innerText(),/Commit [a-f0-9]{7}/);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`version-${label}.png`),fullPage:true});
     }
   });
@@ -131,14 +132,14 @@ try {
     workerRevision=2;await page.evaluate(async()=>{await (await navigator.serviceWorker.ready).update();});
     await page.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).waitFor();
     await page.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).click();await page.getByText(/Es gibt offene Eingaben/).waitFor();
-    assert.match(await page.locator('.app-version').innerText(),/1\.7\.1/);
+    assert.match(await page.locator('.app-version').innerText(),/9\.9\.1/);
     await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(output,'version-update-desktop.png'),fullPage:true});
     await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s.settings.company==='Pending edit');
     const load=page.waitForEvent('load');await page.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).click();await load;
     await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();assert.equal((await state(page)).settings.company,'Pending edit');
   });
   await check('offline startup retains running version and handles checks quietly',async()=>{
-    await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(page,'Einstellungen');assert.match(await page.locator('.app-version').innerText(),/1\.7\.2/);await context.setOffline(false);assert.deepEqual(errors,[]);
+    await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(page,'Einstellungen');assert.match(await page.locator('.app-version').innerText(),/9\.9\.2/);await context.setOffline(false);assert.deepEqual(errors,[]);
   });
   console.log(JSON.stringify({checks:results.length,results,output},null,2));
 } catch(error) { console.error(await page.locator('body').innerText());await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,'failure.png'),fullPage:true});throw error; }

@@ -19,7 +19,7 @@ const server = http.createServer(async (req,res) => {
     if (!file.startsWith(root+'/')) throw Error();
     let body = legacyMode && pathname.endsWith('/sw.js') ? Buffer.from(legacyWorker) : await readFile(file);
     if (pathname.endsWith('/sw.js') && workerRevision) body = Buffer.from(body.toString().replace(/(CACHE_PREFIX\})[a-f0-9]{16}/, '$1test-r'+workerRevision));
-    if (pathname.endsWith('.js') && !pathname.endsWith('/sw.js') && workerRevision) body = Buffer.from(body.toString().replace('version:`1.7.0`', `version:\`1.7.${workerRevision}\``));
+    if (pathname.endsWith('.js') && !pathname.endsWith('/sw.js') && workerRevision) body = Buffer.from(body.toString().replace(/version:`\d+\.\d+\.\d+`/, `version:\`9.9.${workerRevision}\``));
     res.writeHead(200, {'Content-Type': ({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'})[path.extname(file)] || 'application/octet-stream', 'Cache-Control':'no-cache'}).end(body);
   } catch {res.writeHead(404).end('Not found');}
 });

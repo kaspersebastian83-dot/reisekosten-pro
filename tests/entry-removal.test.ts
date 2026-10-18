@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { demoState } from "../lib/demo";
-import { openInboxItems, removeExpense, removeTrip } from "../lib/entry-removal";
+import { linkedExpenseCount, openInboxItems, removeExpense, removeTrip } from "../lib/entry-removal";
 import { buildStatement } from "../lib/calculations";
 import { filterTimeline, monthTimeline } from "../lib/month-timeline";
 import type { ReceiptInboxItem } from "../lib/types";
@@ -15,6 +15,19 @@ describe("Löschen aus dem Bearbeitungsfenster", () => {
     expect(state.trips.some((t) => t.id === trip.id)).toBe(false);
     expect(state.changes.at(-1)).toMatchObject({ entityType: "trip", entityId: trip.id, newValue: "gelöscht", reason: "Manuell gelöscht", oldValue: trip });
     expect(state.statements).toEqual(statements);
+  });
+
+  it("löst beim Löschen einer Reise die Zuordnung ihrer Kosten und Belege, statt sie verwaist zu lassen", () => {
+    const state = demoState(); const trip = state.trips[0];
+    state.expenses[0].tripId = trip.id; state.expenses[1].tripId = "andere-reise";
+    state.receiptInbox = [inbox("a", { tripId: trip.id }), inbox("bb", { tripId: "andere-reise" })];
+    expect(linkedExpenseCount(state, trip.id)).toBe(1);
+    removeTrip(state, trip.id, ctx);
+    expect(state.expenses).toHaveLength(demoState().expenses.length);
+    expect(state.expenses[0].tripId).toBeUndefined();
+    expect(state.expenses[1].tripId).toBe("andere-reise");
+    expect(state.receiptInbox.map((i) => i.tripId)).toEqual([undefined, "andere-reise"]);
+    expect(state.changes.filter((c) => c.entityType === "expense" && c.field === "tripId")).toHaveLength(1);
   });
 
   it("entfernt eine Kostenposition und gibt den Beleg in den Eingang zurück", () => {
