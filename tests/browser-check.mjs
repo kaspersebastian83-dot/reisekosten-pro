@@ -29,7 +29,7 @@ const results=[];
 let syntheticBackup;
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
-const nav=async(page,name)=>{if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
@@ -38,7 +38,7 @@ try {
   const {context,page}=await open(); const errors=[],failed=[],badHttp=[],external=[]; activePage=page;
   page.on('pageerror',e=>errors.push(e.message));page.on('requestfailed',r=>failed.push(r.url()));page.on('response',r=>{if(r.status()>=400)badHttp.push([r.url(),r.status()]);});page.on('request',r=>{if(!r.url().startsWith(url.slice(0,url.indexOf('/reisekosten-pro/'))) && !r.url().startsWith('data:') && !r.url().startsWith('blob:'))external.push([r.method(),r.url()]);});
   await check('production subpath / React / IndexedDB / manifest / worker',async()=>{
-    await page.goto(url);await page.getByRole('heading',{name:'Übersicht',exact:true}).waitFor();
+    await page.goto(url);await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
     assert.deepEqual(errors,[]);assert.deepEqual(failed,[]);assert.deepEqual(badHttp,[]);
     const manifest=await (await page.request.get(url+'manifest.webmanifest')).json();assert.equal(manifest.scope,'.');
     await page.evaluate(()=>navigator.serviceWorker.ready);
@@ -58,7 +58,7 @@ try {
   await check('settings persist and private-car reimbursement',async()=>{
     await nav(page,'Einstellungen');await page.getByLabel('Firma',{exact:true}).fill('Synthetischer Test');
     await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('privatwagen');
-    await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s?.settings.company==='Synthetischer Test');await page.reload();await page.getByRole('heading',{name:'Übersicht',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-03');
+    await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s?.settings.company==='Synthetischer Test');await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-03');
     await nav(page,'Monatsabrechnungen');assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+11,48/);
   });
   // OCR asset loading is deliberately blocked; manual capture must remain usable.
@@ -95,7 +95,7 @@ try {
   await check('offline reload including lazy Excel chunk and foreign-cache preservation',async()=>{
     await page.evaluate(async()=>{const c=await caches.open('other-app-cache');await c.put('/other-app/test',new Response('keep'));await navigator.serviceWorker.ready;});
     assert.ok((await page.evaluate(()=>caches.keys())).includes('other-app-cache'));
-    await page.reload();await page.getByRole('heading',{name:'Übersicht',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Übersicht',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-03');await nav(page,'Monatsabrechnungen');await download(page,'Excel');await context.setOffline(false);
+    await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-03');await nav(page,'Monatsabrechnungen');await download(page,'Excel');await context.setOffline(false);
   });
   await check('mobile layout and menu, import, settings and receipt modal at 390px',async()=>{
     await page.setViewportSize({width:390,height:844});for(const name of ['Übersicht','Fahrten importieren','Kosten & Belege','Einstellungen']){await nav(page,name);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal page overflow in '+name);}
@@ -108,7 +108,7 @@ try {
   await check('legacy worker update, foreign caches and IndexedDB preservation', async()=>{
     legacyMode=true;
     const {context,page}=await open();
-    await page.goto(url);await page.getByRole('heading',{name:'Übersicht',exact:true}).waitFor();await page.evaluate(()=>navigator.serviceWorker.ready);
+    await page.goto(url);await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await page.evaluate(()=>navigator.serviceWorker.ready);
     await nav(page,'Datensicherung');await page.locator('.backup-grid input[type=file]').setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer:syntheticBackup});await waitState(page,s=>s?.expenses.length===1);
     await page.evaluate(async()=>{
       const foreign=await caches.open('foreign-app');await foreign.put('/other-repo/marker',new Response('keep'));
@@ -119,7 +119,7 @@ try {
     await page.evaluate(async()=>{const registration=await navigator.serviceWorker.ready;await registration.update();});
     await page.waitForFunction(async()=>!!(await navigator.serviceWorker.getRegistration()).waiting);
     await page.close();
-    const next=await context.newPage();await next.goto(url);await next.getByRole('heading',{name:'Übersicht',exact:true}).waitFor();
+    const next=await context.newPage();await next.goto(url);await next.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
     await next.waitForFunction(async()=>{const keys=await caches.keys();return keys.some(k=>k.startsWith('reisekosten-pro:/reisekosten-pro/:'));});
     assert.deepEqual(JSON.parse(JSON.stringify(await state(next))),before);
     const cachesKept=await next.evaluate(async()=>({foreign:!!await (await caches.open('foreign-app')).match('/other-repo/marker'),legacy:!!await (await caches.open('reisekosten-pro-v1.6.0')).match('/other-repo/legacy')}));
@@ -132,12 +132,12 @@ try {
     if(mode==='quota')await context.addInitScript(()=>{IDBObjectStore.prototype.put=()=>{throw new DOMException('Storage full','QuotaExceededError');};});
     if(mode==='render')await context.addInitScript(()=>{Number.prototype.toLocaleString=()=>{throw Error('Synthetic render error');};});
     if(mode==='bundle')await context.route('**/assets/*.js',r=>r.abort());
-    if(mode==='malformed'){await page.goto(url);await page.getByRole('heading',{name:'Übersicht',exact:true}).waitFor();await page.evaluate(()=>new Promise(resolve=>{const r=indexedDB.open('reisekosten-pro',1);r.onsuccess=()=>{const tx=r.result.transaction('state','readwrite');tx.objectStore('state').put({settings:{},trips:[],expenses:'broken'},'main');tx.oncomplete=()=>{r.result.close();resolve();};};}));}
+    if(mode==='malformed'){await page.goto(url);await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await page.evaluate(()=>new Promise(resolve=>{const r=indexedDB.open('reisekosten-pro',1);r.onsuccess=()=>{const tx=r.result.transaction('state','readwrite');tx.objectStore('state').put({settings:{},trips:[],expenses:'broken'},'main');tx.oncomplete=()=>{r.result.close();resolve();};};}));}
     await page.goto(url);
     if(mode==='denied'||mode==='malformed'){await page.getByRole('heading',{name:'Lokale Daten konnten nicht geöffnet werden'}).waitFor();if(mode==='malformed')assert.equal((await state(page)).expenses,'broken');}
     if(mode==='bundle')await page.getByText(/Die Anwendung konnte nicht geladen werden|Programmdateien konnten nicht geladen werden/).waitFor();
-    if(mode==='render')await page.getByRole('heading',{name:'Reisekosten Pro konnte nicht gestartet werden'}).waitFor();
-    if(mode==='quota'){await page.getByRole('heading',{name:'Übersicht',exact:true}).waitFor();await nav(page,'Einstellungen');await page.getByLabel('Firma',{exact:true}).fill('Synthetic');await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await page.getByRole('alert').getByText(/Änderungen konnten nicht lokal gespeichert/).waitFor();}
+    if(mode==='render'){await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(page,'Übersicht');await page.getByRole('heading',{name:'Reisekosten Pro konnte nicht gestartet werden'}).waitFor();}
+    if(mode==='quota'){await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(page,'Einstellungen');await page.getByLabel('Firma',{exact:true}).fill('Synthetic');await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await page.getByRole('alert').getByText(/Änderungen konnten nicht lokal gespeichert/).waitFor();}
     await context.close();
   });
   console.log(JSON.stringify({checks:results.length,results,output},null,2));

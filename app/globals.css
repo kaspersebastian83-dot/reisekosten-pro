@@ -1,18 +1,18 @@
 @import "tailwindcss";
 :root {
-  --ink: #18211e;
-  --muted: #69736f;
-  --line: #dfe5e2;
-  --paper: #f4f6f3;
+  --ink: #21303e;
+  --muted: #62788f;
+  --line: #dce8f5;
+  --paper: #eef4fb;
   --white: #fff;
-  --green: #174f3a;
-  --green2: #287456;
-  --mint: #e5f1eb;
+  --green: #356da8;
+  --green2: #3f7cc0;
+  --mint: #e6f0fb;
   --yellow: #b67516;
   --yellow-bg: #fff6df;
   --red: #aa3a34;
   --red-bg: #fff0ef;
-  --shadow: 0 12px 36px rgba(24, 42, 34, 0.08);
+  --shadow: 0 1px 3px rgba(40, 72, 116, 0.1);
 }
 * {
   box-sizing: border-box;
@@ -54,7 +54,7 @@ button:disabled {
   position: fixed;
   inset: 0 auto 0 0;
   width: 258px;
-  background: #102d23;
+  background: #284e76;
   color: #fff;
   padding: 24px 16px;
   display: flex;
@@ -71,8 +71,8 @@ button:disabled {
   width: 42px;
   height: 42px;
   border-radius: 13px;
-  background: #d9eee3;
-  color: #174f3a;
+  background: #e6f0fb;
+  color: #356da8;
   display: grid;
   place-items: center;
   font-weight: 900;
@@ -84,7 +84,7 @@ button:disabled {
 }
 .brand small {
   display: block;
-  color: #a8c4b7;
+  color: #c2d6ec;
   margin-top: 3px;
 }
 .brand .icon {
@@ -102,7 +102,7 @@ button:disabled {
   gap: 12px;
   border: 0;
   background: transparent;
-  color: #bad0c6;
+  color: #dce8f5;
   border-radius: 11px;
   padding: 11px 12px;
   text-align: left;
@@ -110,11 +110,11 @@ button:disabled {
 }
 .sidebar nav button:hover,
 .sidebar nav button.active {
-  background: #1f4d3d;
+  background: #356da8;
   color: white;
 }
 .sidebar nav button.active {
-  box-shadow: inset 3px 0 #91c7ae;
+  box-shadow: inset 3px 0 #9fc4ec;
 }
 .sidebar nav button span {
   flex: 1;
@@ -134,11 +134,11 @@ button:disabled {
 .privacy-note {
   margin-top: auto;
   padding: 15px;
-  border: 1px solid #315647;
+  border: 1px solid #5a83af;
   border-radius: 13px;
   display: flex;
   gap: 10px;
-  color: #c8ded4;
+  color: #dce8f5;
 }
 .privacy-note b {
   display: block;
@@ -227,7 +227,7 @@ button:disabled {
   margin: 0 auto;
 }
 .hero-panel {
-  background: linear-gradient(120deg, #174f3a, #23684e);
+  background: linear-gradient(120deg, #356da8, #4179b2);
   color: white;
   border-radius: 20px;
   padding: 28px 30px;
@@ -245,7 +245,7 @@ button:disabled {
 .hero-panel p {
   margin: 0;
   max-width: 700px;
-  color: #cce0d6;
+  color: #e6f0fb;
   line-height: 1.55;
 }
 .status-pill {
@@ -278,11 +278,11 @@ button:disabled {
   color: white;
 }
 .primary:hover {
-  background: #0f3d2c;
+  background: #285889;
 }
 .hero-panel .primary {
-  background: #eef7f2;
-  color: #164b37;
+  background: #f4f9fe;
+  color: #284e76;
   white-space: nowrap;
 }
 .ghost {
@@ -290,7 +290,7 @@ button:disabled {
   border: 1px solid var(--line);
 }
 .ghost:hover {
-  background: #f4f7f5;
+  background: #f4f9fe;
 }
 .danger-button {
   background: var(--red-bg);
@@ -321,7 +321,7 @@ button:disabled {
 .metric {
   background: white;
   border: 1px solid var(--line);
-  border-radius: 15px;
+  border-radius: 8px;
   padding: 19px;
   display: flex;
   flex-direction: column;
@@ -340,8 +340,8 @@ button:disabled {
   color: var(--muted);
 }
 .metric.strong {
-  background: #e5f1eb;
-  border-color: #c8dfd2;
+  background: #e6f0fb;
+  border-color: #c2d6ec;
 }
 .dashboard-grid {
   display: grid;
@@ -351,7 +351,7 @@ button:disabled {
 .card {
   background: white;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 8px;
   padding: 22px;
   box-shadow: 0 3px 12px rgba(20, 42, 32, 0.025);
 }
@@ -393,7 +393,7 @@ button:disabled {
 .ranking i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #267153, #73a990);
+  background: linear-gradient(90deg, #3f7cc0, #9fc4ec);
   border-radius: 8px;
 }
 .bar-row b {
@@ -453,14 +453,14 @@ button:disabled {
 }
 .notice {
   margin-top: 18px;
-  border: 1px solid #c9ded3;
-  background: #edf6f1;
+  border: 1px solid #c2d6ec;
+  background: #f4f9fe;
   border-radius: 14px;
   padding: 16px 18px;
   display: flex;
   align-items: center;
   gap: 13px;
-  color: #1d5e45;
+  color: #356da8;
 }
 .notice div {
   flex: 1;
@@ -585,7 +585,7 @@ textarea {
 }
 input:focus,
 select:focus {
-  border-color: #398267;
+  border-color: #3f7cc0;
   box-shadow: 0 0 0 3px rgba(55, 128, 100, 0.12);
 }
 input:disabled {
@@ -672,9 +672,9 @@ tbody tr:last-child td {
   border-bottom: 0;
 }
 .side-help {
-  background: #1a4938;
+  background: #284e76;
   color: white;
-  border-radius: 16px;
+  border-radius: 8px;
   padding: 22px;
   align-self: start;
 }
@@ -683,13 +683,13 @@ tbody tr:last-child td {
 }
 .side-help ol {
   padding-left: 20px;
-  color: #c5d9d0;
+  color: #dce8f5;
   line-height: 1.6;
 }
 .side-help p {
-  border-top: 1px solid #396152;
+  border-top: 1px solid #5a83af;
   padding-top: 16px;
-  color: #c5d9d0;
+  color: #dce8f5;
   line-height: 1.5;
 }
 .success-state {
@@ -751,7 +751,7 @@ tbody tr:last-child td {
 .day-card {
   background: white;
   border: 1px solid var(--line);
-  border-radius: 15px;
+  border-radius: 8px;
   overflow: hidden;
 }
 .day-card > header {
@@ -763,7 +763,7 @@ tbody tr:last-child td {
 .date-tile {
   width: 50px;
   height: 50px;
-  background: #edf5f1;
+  background: #f4f9fe;
   border-radius: 11px;
   display: flex;
   flex-direction: column;
@@ -941,7 +941,7 @@ label.check input {
   width: 42px;
   height: 42px;
   border-radius: 11px;
-  background: #edf5f1;
+  background: #f4f9fe;
   color: var(--green);
   display: grid;
   place-items: center;
@@ -1068,7 +1068,7 @@ label.check input {
   border-color: var(--green);
 }
 .summary-grid .total span {
-  color: #bed7cb;
+  color: #dce8f5;
 }
 .export-card {
   display: flex;
@@ -1153,7 +1153,7 @@ label.check input {
 }
 .month-bars i {
   width: min(48px, 70%);
-  background: linear-gradient(#68a389, #23664d);
+  background: linear-gradient(#9fc4ec, #3f7cc0);
   border-radius: 7px 7px 2px 2px;
 }
 .month-bars b {
@@ -1295,7 +1295,7 @@ label.check input {
 .backup-icon {
   width: 54px;
   height: 54px;
-  border-radius: 15px;
+  border-radius: 8px;
   background: var(--mint);
   color: var(--green);
   display: grid;
@@ -1323,7 +1323,7 @@ label.check input {
   grid-column: 1/-1;
   border: 1px solid #efcbc8;
   background: #fffafa;
-  border-radius: 15px;
+  border-radius: 8px;
   padding: 20px;
 }
 .danger-zone h3 {
@@ -1338,7 +1338,7 @@ label.check input {
   text-align: center;
   background: white;
   border: 1px dashed #bdcbc5;
-  border-radius: 15px;
+  border-radius: 8px;
   padding: 55px 25px;
   color: var(--muted);
 }
@@ -1375,7 +1375,7 @@ label.check input {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  background: #153e30;
+  background: #284e76;
   color: white;
   border-radius: 11px;
   padding: 13px 16px;
@@ -1452,7 +1452,7 @@ label.check input {
   border-left: 0;
 }
 .workflow-steps > button:hover {
-  background: #f7faf8;
+  background: #f4f9fe;
 }
 .workflow-steps > button > span {
   width: 32px;
@@ -1616,7 +1616,7 @@ label.check input {
   height: 55px;
   border: 1px dashed #9eb6aa;
   border-radius: 10px;
-  background: #f7faf8;
+  background: #f4f9fe;
   color: var(--green);
   display: flex;
   flex-direction: row;
@@ -1750,7 +1750,7 @@ label.check input {
   border: 0;
   border-left: 1px solid rgba(255, 255, 255, 0.25);
   background: transparent;
-  color: #d9eee3;
+  color: #e6f0fb;
   padding: 3px 0 3px 10px;
   display: flex;
   align-items: center;
@@ -1786,7 +1786,7 @@ label.check input {
   min-height: 330px;
   border: 2px dashed #a9c4b7;
   border-radius: 17px;
-  background: #f7faf8;
+  background: #f4f9fe;
   display: grid;
   place-items: center;
   text-align: center;
@@ -2102,9 +2102,6 @@ label.check input {
   .batch-confirm {
     align-items: stretch;
     flex-direction: column;
-  }
-  .hero-panel.compact {
-    display: none;
   }
   .quick-backdrop {
     padding: 0;
@@ -2437,3 +2434,24 @@ label.check input {
 @media (min-width: 761px) and (max-width: 1450px) {
   .vehicle-list article { grid-template-columns: 125px minmax(0, 1fr) minmax(0, 1fr); }
 }
+
+/* Workflow actions stay labelled and reachable on phones and tablets. */
+.trips-toolbar { flex-wrap: wrap; }
+.trips-toolbar .search { flex: 1 1 240px; }
+.trips-toolbar .search input { width: 100%; min-width: 0; }
+.trip-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.trips-toolbar .primary { font-size: 14px; padding: 11px 15px; }
+.trip-actions button { min-height: 44px; }
+.hero-panel.compact { flex-wrap: wrap; }
+.hero-actions { flex-wrap: wrap; }
+.import-back { margin-bottom: 16px; min-height: 44px; }
+button:focus-visible { outline: 3px solid #5a93d0; outline-offset: 3px; }
+@media (max-width: 760px) {
+  .trip-actions { width: 100%; }
+  .trip-actions button { flex: 1 1 160px; }
+  .hero-actions { width: 100%; align-items: stretch; }
+  .hero-actions button { flex: 1 1 180px; min-height: 44px; }
+}
+
+/* Keep the backup log inside its scroll container on narrow screens. */
+.backup-grid > * { min-width: 0; }
