@@ -95,6 +95,8 @@ try {
     workerRevision=0;const {context,page}=await start();
     try {
       await importTrips(page);const backup=await state(page);backup.settings.company='Synthetic restored company';
+      // Seit 3.3c fragt „JSON auswählen“ vor dem Ersetzen ausdrücklich nach; hier bestätigen.
+      page.on('dialog',dialog=>void dialog.accept());
       await nav(page,'Datensicherung');await page.evaluate(()=>navigator.serviceWorker.ready);
       await page.evaluate(()=>{const read=File.prototype.text;File.prototype.text=async function(){const value=await read.call(this);if(this.name==='synthetic-backup.json')await new Promise(resolve=>window.releaseBackupRead=resolve);return value;};});
       await page.locator('input[type=file]').setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});await page.waitForFunction(()=>!!window.releaseBackupRead);
