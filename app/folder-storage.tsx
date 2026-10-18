@@ -43,6 +43,8 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   const wanted = useRef(false);
   const lastError = useRef<Error | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Zuletzt bekannter Ordner: für die Berechtigungsabfrage direkt im Klick (ohne vorherige Datenbankabfrage). */
+  const knownHandle = useRef<FolderLink["handle"] | null>(null);
 
   const linkName = (link?: FolderLink | null) => link?.label || link?.handle.name || FOLDER_NAME;
   const okStatus = (link: FolderLink, pending = false): FolderStatus => ({ kind: "ok", name: linkName(link), revision: link.revision, savedAt: link.savedAt, pending });
@@ -94,6 +96,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     try { link = await suiteLinks.get(); }
     catch (error) { setStatus({ kind: "error", name: FOLDER_NAME, message: `Gemeinsamer App-Speicher nicht lesbar: ${message(error)}` }); return; }
     if (!link) { setStatus({ kind: "none" }); return; }
+    knownHandle.current = link.handle;
     const permission = await link.handle.queryPermission?.({ mode: "readwrite" }).catch(() => "denied" as const) ?? "granted";
     if (permission !== "granted") { setStatus({ kind: "permission", name: linkName(link) }); return; }
     await reconcile(link);
@@ -163,14 +166,17 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
       const root = await resolveAppFolder(chosen);
       const next: FolderLink = { handle: root, revision: 0, hash: "", label: root === chosen ? root.name : `${chosen.name}\\${root.name}` };
       await suiteLinks.set(next);
+      knownHandle.current = root;
       await reconcile(next);
     } catch (error) { setStatus({ kind: "error", name: chosen.name, message: message(error) }); }
   }, [notify, reconcile, setStatus]);
 
   const confirmAccess = useCallback(async () => {
+    // Die Abfrage muss unmittelbar auf den Klick folgen, sonst zeigt der Browser sie nicht an.
+    const handle = knownHandle.current;
+    const permission = handle ? await handle.requestPermission?.({ mode: "readwrite" }).catch(() => "denied" as const) ?? "granted" : "denied";
     const current = await suiteLinks.get().catch(() => undefined);
     if (!current) { setStatus({ kind: "none" }); return; }
-    const permission = await current.handle.requestPermission?.({ mode: "readwrite" }).catch(() => "denied" as const) ?? "granted";
     if (permission !== "granted") { notify("Zugriff nicht erteilt. Die Daten werden weiter nur im Browser gespeichert."); return; }
     await reconcile(current);
   }, [notify, reconcile, setStatus]);
