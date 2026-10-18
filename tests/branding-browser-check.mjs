@@ -64,7 +64,7 @@ try {
     await page.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).waitFor();
     await page.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).click();
     await page.waitForFunction(()=>document.title==='SpesenKit');
-    await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+    await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
     assert.deepEqual(await state(page),before);
     assert.equal(await page.evaluate(()=>localStorage.getItem('synthetic-existing-setting')),'keep');
     const databases=await page.evaluate(()=>indexedDB.databases());
@@ -74,7 +74,7 @@ try {
     for(const key of ['id','scope','start_url'])assert.equal(manifest[key],oldManifest[key]);
     assert.equal(manifest.name,'SpesenKit');assert.equal(manifest.short_name,'SpesenKit');
     assert.equal(await page.locator('.brand b').innerText(),'SpesenKit');
-    await page.locator('input[type=month]').fill('2026-07');await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();
+    await page.locator('input[type=month]').fill('2026-07');await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();
     const pdf=await download(page,'PDF');assert.match(pdf.bytes.toString('latin1'),/Reisekostenabrechnung/);
     const excel=await download(page,'Excel');const {Workbook}=require('exceljs');const workbook=new Workbook();await workbook.xlsx.load(excel.bytes);
     assert.equal(workbook.creator,'SpesenKit');assert.equal(workbook.getWorksheet('Übersicht').getCell('A1').value,'Reisekostenabrechnung');
@@ -89,7 +89,7 @@ try {
     // JSON backups omit undefined properties; compare the serialized backup contract.
     const restored=JSON.parse(backup.bytes);
     assert.deepEqual(JSON.parse(JSON.stringify(await state(page))),restored);
-    await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+    await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
     assert.equal(await page.title(),'SpesenKit');assert.deepEqual(JSON.parse(JSON.stringify(await state(page))),restored);
     await nav(page,'Fahrten importieren');await page.getByRole('heading',{name:'Fahrtenbuch auswählen'}).waitFor();
     await context.setOffline(false);

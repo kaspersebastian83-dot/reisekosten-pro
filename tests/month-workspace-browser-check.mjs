@@ -49,12 +49,12 @@ try {
     const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'page overflow');
     let frozen,tripId;
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await nav(page,'Datensicherung');await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).click();
       const seed=await waitState(page,s=>s?.trips.length>0);
       seed.trips=[];seed.expenses=[];seed.statements=[];seed.receiptInbox=[];seed.changes=[];seed.merchantRules=[];
-      await writeState(page,seed);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
-      await nav(page,'Monatsabrechnungen');await page.locator('.year-months').getByRole('button',{name:/^Juni 2026 ·/}).click();
+      await writeState(page,seed);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+      await nav(page,'Monatsübersicht');await page.locator('.year-months').getByRole('button',{name:/^Juni 2026 ·/}).click();
       await check(`${engine} ${viewport.width}: June workspace opens without snapshots and retains responsive year navigation`,async()=>{
         await assertJune();assert.equal((await state(page)).statements.length,0);assert.equal(await page.locator('.statement-head').count(),0);
         assert.equal(await workspace.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).count(),1);
@@ -105,8 +105,8 @@ try {
       });
       await check(`${engine} ${viewport.width}: saved entries resume after reload without any draft; cancelling new input preserves June`,async()=>{
         const before=await state(page);assert.equal(before.statements.length,0);
-        await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();assert.deepEqual(await state(page),before);
-        await nav(page,'Monatsabrechnungen');await selectMonth('2026-06');await assertJune();
+        await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();assert.deepEqual(await state(page),before);
+        await nav(page,'Monatsübersicht');await selectMonth('2026-06');await assertJune();
         await clickAction('Dienstreise erfassen');await editor.getByRole('button',{name:'Abbrechen',exact:true}).click();
         await page.getByRole('button',{name:'Zurück zum Monatsarbeitsbereich',exact:true}).click();await assertJune();assert.deepEqual(await state(page),before);
       });
@@ -126,9 +126,9 @@ try {
         assert.equal((await download(page,'Excel')).bytes.subarray(0,2).toString(),'PK');assert.deepEqual((await state(page)).statements[0],frozen);
       });
       await check(`${engine} ${viewport.width}: offline reload preserves entries, receipt, links, frozen data and explicit June selection remains read-only`,async()=>{
-        const before=await state(page);await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
-        await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
-        assert.deepEqual(await state(page),before);await nav(page,'Monatsabrechnungen');await selectMonth('2026-06');await assertJune();assert.deepEqual(await state(page),before);assert.equal(await page.evaluate(()=>localStorage.length),0);
+        const before=await state(page);await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+        await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+        assert.deepEqual(await state(page),before);await nav(page,'Monatsübersicht');await selectMonth('2026-06');await assertJune();assert.deepEqual(await state(page),before);assert.equal(await page.evaluate(()=>localStorage.length),0);
         await fits();assert.deepEqual(errors,[]);await context.setOffline(false);
       });
     } catch(error){await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-failure.png`),fullPage:true});throw error;}

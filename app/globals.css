@@ -2560,3 +2560,13 @@ button:focus-visible { outline: 3px solid #5a93d0; outline-offset: 3px; }
 @media(max-width:600px){.workspace-figures,.workspace-entry-actions{grid-template-columns:minmax(0,1fr)}.workspace-edit-actions{flex-direction:column;align-items:stretch}.workspace-statement-action>.primary{width:100%;white-space:normal;min-height:48px}}
 
 .statement-head[tabindex="-1"] {scroll-margin-top:150px}
+
+.month-checks {min-width:0;border-top:1px solid var(--line);padding-top:20px}
+.month-checks summary {min-height:44px;padding:12px 0;cursor:pointer;font-weight:700}
+.month-checks .check-list button {min-height:44px;white-space:normal}
+.month-checks .check-list b {min-width:0;overflow-wrap:anywhere}
+.month-checks .month-review {color:var(--red);padding-left:20px}
+.month-checks>.ghost {margin-top:12px;min-height:44px;white-space:normal}
+.previous-dashboard-statistics {margin-bottom:20px;min-width:0}
+.previous-dashboard-statistics>summary {min-height:44px;cursor:pointer;font-weight:700}
+.previous-dashboard-statistics .metric-grid {margin-top:16px}

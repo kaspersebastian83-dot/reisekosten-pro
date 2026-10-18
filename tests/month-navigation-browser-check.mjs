@@ -39,10 +39,10 @@ try {
   for(const [timezone,time,expected] of [['Europe/Berlin','2026-12-05T10:00:00Z','2026-11'],['Pacific/Kiritimati','2026-12-31T10:05:00Z','2026-12']]) {
     const {context,page}=await open({timezoneId:timezone});
     try {
-      await page.clock.setFixedTime(new Date(time));await page.goto(url);await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+      await page.clock.setFixedTime(new Date(time));await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await check(`${engine}: previous local month at ${timezone} ${time}`,async()=>{
         assert.equal(await page.locator('input[type=month]').inputValue(),expected);
-        await nav(page,'Monatsabrechnungen');assert.equal(await page.locator('.year-month').count(),12);
+        await nav(page,'Monatsübersicht');assert.equal(await page.locator('.year-month').count(),12);
         assert.equal(await state(page),undefined);assert.equal(await page.evaluate(()=>localStorage.length),0);
       });
     } finally {await context.close();}
@@ -58,7 +58,7 @@ try {
     };
     let baseline,frozen;
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       assert.equal(await picker.inputValue(),'2026-11');await picker.fill('');assert.equal(await picker.inputValue(),'2026-11');
       await nav(page,'Datensicherung');await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).click();
       const seed=await waitState(page,s=>s?.trips.length>0);
@@ -66,7 +66,7 @@ try {
       seed.trips=[{...base,id:'jan',date:'2026-01-10',endDate:'2026-01-10'},{...base,id:'cross-month',date:'2026-07-30',endDate:'2026-08-02',overnight:true},{...base,id:'sep',date:'2026-09-10',endDate:'2026-09-10',destination:'',warnings:['Reiseziel fehlt']},{...base,id:'current',date:'2026-12-02',endDate:'2026-12-02'},{...base,id:'future',date:'2027-01-02',endDate:'2027-01-02'}];
       seed.expenses=[{...seed.expenses[0],id:'aug-expense',date:'2026-08-03',category:'Parken',gross:12,net:12,vat:0,paymentType:'privat vorgestreckt',status:'ungeprüft',warnings:[]}];
       seed.statements=[];seed.receiptInbox=[];seed.changes=[];seed.merchantRules=[];
-      await writeState(page,seed);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(page,'Monatsabrechnungen');
+      await writeState(page,seed);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(page,'Monatsübersicht');
       await check(`${engine} ${viewport.width}: PDF/draft do not close a month; explicit persisted approval does`,async()=>{
         await monthButton('Januar').click();assert.match(await monthButton('Januar').getAttribute('class'),/month-working/);
         await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===1);const before=await state(page);
@@ -77,14 +77,14 @@ try {
         await monthButton('Oktober').click();await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();const drafts=await waitState(page,s=>s?.statements.length===2);
         assert.match(await monthButton('Oktober').getAttribute('class'),/month-open/);
         const emptyDraft=drafts.statements[1];drafts.statements.push({...emptyDraft,id:'historical',month:'2025-12',status:'ausgezahlt',locked:true,data:{...emptyDraft.data,month:'2025-12'}});
-        await writeState(page,drafts);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(page,'Monatsabrechnungen');baseline=await state(page);
+        await writeState(page,drafts);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(page,'Monatsübersicht');baseline=await state(page);
       });
       await check(`${engine} ${viewport.width}: twelve accessible months, clear stored statuses and unique cross-month trip count`,async()=>{
         assert.equal(await page.locator('.year-month').count(),12);
         assert.match(await monthButton('Juli').getAttribute('aria-label'),/In Bearbeitung · 1 Reise/);assert.match(await monthButton('August').getAttribute('aria-label'),/In Bearbeitung · 1 Reise/);
         assert.match(await monthButton('September').getAttribute('aria-label'),/Prüfung erforderlich/);assert.match(await monthButton('Oktober').getAttribute('aria-label'),/Offen/);
         for(let i=0;i<12;i++){const button=monthButton(names[i]);assert.ok((await button.boundingBox()).height>=44);await button.click();assert.equal(await picker.inputValue(),`2026-${String(i+1).padStart(2,'0')}`);assert.equal(await button.getAttribute('aria-current'),'date');}
-        assert.deepEqual(await state(page),baseline);await monthButton('September').click();assert.match(await page.locator('.month-statement .month-review').innerText(),/Reiseziel fehlt/);
+        assert.deepEqual(await state(page),baseline);await monthButton('September').click();await page.locator('.month-checks summary').click();assert.match(await page.locator('.month-checks .month-review').innerText(),/Reiseziel fehlt/);
         await fits();const left=await page.locator('.year-navigation').boundingBox();const right=await page.locator('.month-statement').boundingBox();
         if(viewport.width===1440)assert.ok(left.x+left.width<=right.x+1);else assert.ok(left.y+left.height<=right.y+1);
         await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-year.png`),fullPage:false});
@@ -102,16 +102,16 @@ try {
         await monthButton('August').click();
         await nav(page,'Reisen');assert.equal(await picker.inputValue(),'2026-08');assert.equal(await page.locator('.day-card').count(),2);
         await nav(page,'Kosten & Belege');assert.equal(await picker.inputValue(),'2026-08');assert.equal(await page.locator('.expense-card').count(),1);
-        await nav(page,'Übersicht');assert.equal(await picker.inputValue(),'2026-08');assert.match(await page.locator('.month-command').innerText(),/August 2026/);
-        await nav(page,'Monatsabrechnungen');assert.equal(await picker.inputValue(),'2026-08');assert.match(await page.getByRole('region',{name:'Monatsarbeitsbereich',exact:true}).innerText(),/August 2026/);assert.deepEqual(await state(page),baseline);
+        await nav(page,'Monatsübersicht');assert.equal(await picker.inputValue(),'2026-08');assert.match(await page.getByRole('region',{name:'Monatsarbeitsbereich',exact:true}).innerText(),/August 2026/);
+        await nav(page,'Monatsübersicht');assert.equal(await picker.inputValue(),'2026-08');assert.match(await page.getByRole('region',{name:'Monatsarbeitsbereich',exact:true}).innerText(),/August 2026/);assert.deepEqual(await state(page),baseline);
       });
       await check(`${engine} ${viewport.width}: normal close updates backlog; offline reload keeps records and resets only session selection`,async()=>{
         await page.getByRole('button',{name:'Mit Juli 2026 beginnen',exact:true}).click();await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===4);
         await page.locator('.statement-actions select').selectOption('freigegeben');await waitState(page,s=>s?.statements.find(s=>s.month==='2026-07')?.locked);
         assert.equal(await picker.inputValue(),'2026-07');await page.getByRole('button',{name:'Mit August 2026 beginnen',exact:true}).click();assert.equal(await picker.inputValue(),'2026-08');
         const before=await state(page);assert.deepEqual(before.statements[0],frozen);assert.deepEqual(before.trips,baseline.trips);assert.deepEqual(before.expenses,baseline.expenses);
-        await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
-        assert.equal(await picker.inputValue(),'2026-11');assert.deepEqual(await state(page),before);await nav(page,'Monatsabrechnungen');assert.match(await monthButton('Juli').getAttribute('aria-label'),/Abgeschlossen/);await fits();assert.deepEqual(errors,[]);
+        await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+        assert.equal(await picker.inputValue(),'2026-11');assert.deepEqual(await state(page),before);await nav(page,'Monatsübersicht');assert.match(await monthButton('Juli').getAttribute('aria-label'),/Abgeschlossen/);await fits();assert.deepEqual(errors,[]);
       });
     } catch(e){await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-failure.png`),fullPage:true});console.error('Browser failure artifacts:',output);throw e;}finally{await context.close();}
   }

@@ -10,7 +10,6 @@ import {
   Check,
   ChevronRight,
   CircleGauge,
-  Clock3,
   Copy,
   Download,
   FileDown,
@@ -18,7 +17,6 @@ import {
   Fuel,
   Import,
   Inbox,
-  LayoutDashboard,
   Menu,
   Plus,
   ReceiptText,
@@ -71,7 +69,7 @@ import { readReceiptFile } from "../lib/receipt-file";
 import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
 import { MonthWorkspace } from "./month-workspace";
 import { MonthNavigation } from "./month-navigation";
-import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel } from "../lib/month-navigation";
+import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel, monthOverview } from "../lib/month-navigation";
 import { demoState } from "../lib/demo";
 import { applyMerchantRule, recognizeReceiptLocally } from "../lib/receipt-ocr";
 import {
@@ -88,19 +86,17 @@ import { DayDetails, MonthDetails } from "./calculation-details";
 import { UpdateNotice } from "./update-notice";
 
 type Tab =
-  | "Übersicht"
   | "Fahrten importieren"
   | "Reisen"
   | "Kosten & Belege"
-  | "Monatsabrechnungen"
+  | "Monatsübersicht"
   | "Auswertungen"
   | "Einstellungen"
   | "Datensicherung";
-const tabs: { name: Tab; icon: typeof LayoutDashboard }[] = [
-  { name: "Monatsabrechnungen", icon: FileSpreadsheet },
+const tabs: { name: Tab; icon: typeof FileSpreadsheet }[] = [
+  { name: "Monatsübersicht", icon: FileSpreadsheet },
   { name: "Reisen", icon: ReceiptText },
   { name: "Kosten & Belege", icon: Fuel },
-  { name: "Übersicht", icon: LayoutDashboard },
   { name: "Auswertungen", icon: BarChart3 },
   { name: "Einstellungen", icon: SettingsIcon },
   { name: "Datensicherung", icon: Archive },
@@ -150,7 +146,7 @@ export default function Home() {
     return stateRef.current === lastSaved.current && (discard || !pendingWork.current.size) && !importBusy.current;
   };
   const [saveRetry, setSaveRetry] = useState(0);
-  const [tab, setTab] = useState<Tab>("Reisen");
+  const [tab, setTab] = useState<Tab>("Monatsübersicht");
   const [month, setMonth] = useState(() => previousCalendarMonth());
   const [sidebar, setSidebar] = useState(false);
   const [toast, setToast] = useState("");
@@ -159,7 +155,7 @@ export default function Home() {
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [workspaceEntry, setWorkspaceEntry] = useState<{month: string} | null>(null);
   const [expenseDraft, setExpenseDraft] = useState<Expense | null>(null);
-  const returnToWorkspace = () => {if (workspaceEntry) setMonth(workspaceEntry.month); setWorkspaceEntry(null); setExpenseDraft(null); setEditingTrip(null); setTab("Monatsabrechnungen");};
+  const finishWorkspaceEntry = () => {if (workspaceEntry) setMonth(workspaceEntry.month); setWorkspaceEntry(null); setExpenseDraft(null); setEditingTrip(null); setTab("Monatsübersicht");};
   const startMonthEntry = (kind: "trip" | "Hotel" | "Parken") => {
     const today = new Date().toLocaleDateString("sv-SE");
     const date = localCalendarMonth() === month ? today : `${month}-01`;
@@ -170,11 +166,23 @@ export default function Home() {
       setExpenseDraft({...blankExpense(), date, category: kind}); setTab("Kosten & Belege");
     }
   };
-  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
-  const openTrip = () => {
-    setTab("Reisen");
-    setEditingTrip(blankTrip(state.settings));
+  const leaveForm = () => {
+    if (!pendingWork.current.size) return true;
+    notify("Bitte offene Eingaben zuerst speichern oder im Formular ausdrücklich abbrechen.");
+    return false;
   };
+  const returnToWorkspace = () => {if (leaveForm()) finishWorkspaceEntry();};
+  const navigate = (target: Tab) => {
+    if (target === tab) return;
+    if (!leaveForm()) return;
+    if (target === "Monatsübersicht" && workspaceEntry) finishWorkspaceEntry();
+    else setTab(target);
+  };
+  const selectMonth = (value: string) => {
+    if (!isMonth(value) || value === month || !leaveForm()) return;
+    setWorkspaceEntry(null); setMonth(value);
+  };
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [receiptCaptureOpen, setReceiptCaptureOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -270,13 +278,12 @@ export default function Home() {
               className={tab === name || (tab === "Fahrten importieren" && name === "Reisen") ? "active" : ""}
               aria-current={tab === name || (tab === "Fahrten importieren" && name === "Reisen") ? "page" : undefined}
               onClick={() => {
-                setTab(name);
+                navigate(name);
                 setSidebar(false);
               }}
             >
               <Icon size={19} />
               <span>{name}</span>
-              {name === "Übersicht" && issueCount > 0 && <em>{issueCount}</em>}
             </button>
           ))}
         </nav>
@@ -334,32 +341,18 @@ export default function Home() {
               <input
                 type="month"
                 value={month}
-                onChange={(e) => {if (isMonth(e.target.value)) setMonth(e.target.value);}}
+                onChange={(e) => selectMonth(e.target.value)}
               />
             </label>
             <div className={`quality ${issueCount ? "warn" : "ok"}`}>
               <CircleGauge size={18} />
               <span>
-                {issueCount ? `${issueCount} Prüfhinweise` : "Alles geprüft"}
+                {issueCount ? `${issueCount} Prüfhinweise insgesamt` : "Prüfliste im Monatsbereich"}
               </span>
             </div>
           </div>
         </header>
         <div className="content">
-          {tab === "Übersicht" && (
-            <Dashboard
-              state={state}
-              month={month}
-              statement={statement}
-              issueCount={issueCount}
-              go={setTab}
-              update={update}
-              notify={notify}
-              openTrip={openTrip}
-              openQuick={() => setQuickOpen(true)}
-              openCapture={() => setReceiptCaptureOpen(true)}
-            />
-          )}
           {tab === "Fahrten importieren" && (
             <>
             <button className="ghost import-back" onClick={() => setTab("Reisen")}>
@@ -373,10 +366,10 @@ export default function Home() {
             />
             </>
           )}
-          {workspaceEntry && <div className="notice workspace-return"><span>Arbeitsmonat: <b>{monthLabel(workspaceEntry.month)}</b></span><button className="ghost" onClick={returnToWorkspace}>Zurück zum Monatsarbeitsbereich</button></div>}
+          {workspaceEntry && tab !== "Monatsübersicht" && <div className="notice workspace-return"><span>Arbeitsmonat: <b>{monthLabel(workspaceEntry.month)}</b></span><button className="ghost" onClick={returnToWorkspace}>Zurück zum Monatsarbeitsbereich</button></div>}
           {tab === "Reisen" && (
             <Trips
-              onSaved={workspaceEntry ? returnToWorkspace : undefined}
+              onSaved={workspaceEntry ? finishWorkspaceEntry : undefined}
               editing={editingTrip}
               setEditing={setEditingTrip}
               openImport={() => setTab("Fahrten importieren")}
@@ -397,13 +390,13 @@ export default function Home() {
               initialDraft={expenseDraft}
               clearInitialDraft={() => setExpenseDraft(null)}
               workspaceMonth={workspaceEntry?.month}
-              onSaved={workspaceEntry ? returnToWorkspace : undefined}
+              onSaved={workspaceEntry ? finishWorkspaceEntry : undefined}
               initialExpenseId={editingExpenseId}
               clearInitialExpense={() => setEditingExpenseId(null)}
             />
           )}
-          {tab === "Monatsabrechnungen" && (
-            <MonthNavigation state={state} month={month} onSelect={setMonth}>
+          {tab === "Monatsübersicht" && (
+            <MonthNavigation state={state} month={month} onSelect={selectMonth}>
             <Statements
               state={state}
               month={month}
@@ -414,6 +407,7 @@ export default function Home() {
               editCosts={() => {setWorkspaceEntry({month}); setTab("Kosten & Belege");}}
               editTrips={() => {setWorkspaceEntry({month}); setTab("Reisen");}}
               openCapture={() => setReceiptCaptureOpen(true)}
+              viewRules={() => setTab("Einstellungen")}
             />
             </MonthNavigation>
           )}
@@ -480,28 +474,10 @@ export default function Home() {
   );
 }
 
-function Dashboard({
-  state,
-  month,
-  statement,
-  issueCount,
-  go,
-  update,
-  notify,
-  openTrip,
-  openQuick,
-  openCapture,
-}: {
-  state: AppState;
-  month: string;
-  statement: ReturnType<typeof buildStatement>;
-  issueCount: number;
-  go: (t: Tab) => void;
-  update: (f: (s: AppState) => AppState) => void;
-  notify: (s: string) => void;
-  openTrip: () => void;
-  openQuick: () => void;
-  openCapture: () => void;
+function MonthChecks({state, month, update, notify, editTrips, editCosts, viewRules}: {
+  state: AppState; month: string;
+  update: (f: (s: AppState) => AppState) => void; notify: (s: string) => void;
+  editTrips: () => void; editCosts: () => void; viewRules: () => void;
 }) {
   const monthTrips = state.trips.filter(
     (t) => t.date.startsWith(month) && t.tripType === "dienstlich",
@@ -537,132 +513,31 @@ function Dashboard({
     });
     notify(`${confirmable.length} eindeutige Fahrten bestätigt`);
   };
-  return (
-    <>
-      <section className="month-command">
-        <div className="command-intro">
-          <div>
-            <p className="eyebrow">Ihr schneller Monatsabschluss</p>
-            <h2>
-              {new Date(month + "-01T12:00").toLocaleDateString("de-DE", {
-                month: "long",
-                year: "numeric",
-              })}
-            </h2>
-            <p>Nur die gelben Punkte brauchen Ihre Aufmerksamkeit.</p>
-          </div>
-          <div className="time-saved">
-            <Sparkles size={18} />
-            <span>
-              {issueCount
-                ? `${issueCount} Punkte offen`
-                : "Bereit zum Abschluss"}
-            </span>
-          </div>
-        </div>
-        <div className="workflow-steps">
-          <button onClick={openTrip}>
-            <span className={monthTrips.length ? "step-done" : "step-open"}>
-              {monthTrips.length ? <Check size={18} /> : "1"}
-            </span>
-            <div>
-              <b>Reise erfassen</b>
-              <small>
-                {monthTrips.length
-                  ? `${monthTrips.length} erfasst`
-                  : "Dienstreise manuell erfassen"}
-              </small>
-            </div>
-            <ChevronRight size={17} />
-          </button>
-          <button onClick={openCapture}>
-            <span
-              className={
-                state.receiptInbox.some((item) => item.status !== "zugeordnet")
-                  ? "step-warn"
-                  : "step-done"
-              }
-            >
-              <Camera size={18} />
-            </span>
-            <div>
-              <b>Belege & Ausgaben</b>
-              <small>
-                {state.receiptInbox.filter(
-                  (item) => item.status !== "zugeordnet",
-                ).length
-                  ? `${state.receiptInbox.filter((item) => item.status !== "zugeordnet").length} Belege warten`
-                  : monthExpenses.length
-                    ? `${monthExpenses.length} erfasst`
-                    : "Beleg fotografieren"}
-              </small>
-            </div>
-            <ChevronRight size={17} />
-          </button>
-          <button onClick={() => go("Reisen")}>
-            <span className={issueCount ? "step-warn" : "step-done"}>
-              {issueCount || <Check size={18} />}
-            </span>
-            <div>
-              <b>Prüfen</b>
-              <small>
-                {issueCount ? "Nur Ausnahmen ansehen" : "Alles plausibel"}
-              </small>
-            </div>
-            <ChevronRight size={17} />
-          </button>
-          <button onClick={() => go("Monatsabrechnungen")}>
-            <span className={issueCount ? "step-locked" : "step-done"}>4</span>
-            <div>
-              <b>Abschließen</b>
-              <small>PDF und Export erstellen</small>
-            </div>
-            <ChevronRight size={17} />
-          </button>
-        </div>
-        {confirmable.length > 0 && (
-          <div className="batch-confirm">
-            <div>
-              <Clock3 size={18} />
-              <span>
-                <b>{confirmable.length} vollständige Fahrten</b> können
-                gemeinsam bestätigt werden.
-              </span>
-            </div>
-            <button className="primary" onClick={confirmClearTrips}>
-              Eindeutige Zeiten bestätigen
-            </button>
-          </div>
-        )}
-      </section>
-      <section className="hero-panel compact">
-        <div>
-          <span className="status-pill">
-            {monthTrips.length ? "Monat in Bearbeitung" : "Bereit zum Start"}
-          </span>
-          <h2>
-            {monthTrips.length
-              ? `${monthTrips.length} Fahrten – ${statement.rows.length} Reisetage`
-              : "Ihre nächste Dienstreise beginnt hier"}
-          </h2>
-          <p>
-            Reise erfassen, Ausgaben und Belege ergänzen und den Monat
-            abschließen. Ein Fahrtenbuch ist dafür nicht erforderlich.
-          </p>
-        </div>
-        <div className="hero-actions">
-          <button className="primary" onClick={openTrip}>
-            <Plus size={18} /> Reise erfassen
-          </button>
-          <button className="ghost" onClick={openQuick}>
-            <Plus size={18} /> Ausgabe erfassen
-          </button>
-          <button className="ghost" onClick={openCapture}>
-            <Camera size={18} /> Beleg hinzufügen
-          </button>
-        </div>
-      </section>
-      <section className="metric-grid">
+  const tripIssues = monthTrips.filter(t => t.warnings.length || t.status === "ungeprüft" || t.status === "importiert").length;
+  const expenseIssues = monthExpenses.filter(e => e.warnings.length || e.status === "ungeprüft").length;
+  const reasons = monthOverview(state, month).reasons;
+  return <section className="month-checks" aria-label="Prüfen">
+    <h3>Prüfen</h3>
+    <details>
+      <summary>Offene Prüfhinweise ansehen</summary>
+      <p>{tripIssues || expenseIssues || missingReceipts || duplicates || reasons.length ? "Vorhandene Hinweise und noch ungeprüfte Einträge dieses Monats." : "Keine bekannten Prüfhinweise für diesen Monat. Dies ersetzt keine vollständige Abschlussprüfung."}</p>
+      {!!reasons.length && <ul className="month-review">{reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
+      <div className="check-list">
+        <CheckRow label="Ungeprüfte Reisen / Reisehinweise" value={tripIssues} go={editTrips} />
+        <CheckRow label="Ungeprüfte Kosten / Kostenhinweise" value={expenseIssues} go={editCosts} />
+        <CheckRow label="Fehlende Belege" value={missingReceipts} go={editCosts} />
+        <CheckRow label="Mögliche Duplikate" value={duplicates} go={editTrips} />
+      </div>
+      <p>{state.receiptInbox.filter(item => item.status !== "zugeordnet").length} Belege im Eingang insgesamt. <button className="ghost" onClick={editCosts}>Belege prüfen</button></p>
+    </details>
+    {confirmable.length > 0 && <div className="batch-confirm"><span><b>{confirmable.length} vollständige Fahrten</b> können gemeinsam bestätigt werden.</span><button className="primary" onClick={confirmClearTrips}>Eindeutige Zeiten bestätigen</button></div>}
+    <button className="ghost" onClick={viewRules}>Tarife und Regeln ansehen</button>
+  </section>;
+}
+
+function DashboardStatistics({state, month, statement}: {state: AppState; month: string; statement: ReturnType<typeof buildStatement>}) {
+  const monthTrips = state.trips.filter(t => t.date.startsWith(month) && t.tripType === "dienstlich");
+  return <>      <section className="metric-grid">
         <Metric
           label="Dienstliche Kilometer"
           value={`${statement.rows.reduce((s, r) => s + r.totalKm, 0).toLocaleString("de-DE")} km`}
@@ -687,7 +562,7 @@ function Dashboard({
           strong
         />
       </section>
-      <section className="dashboard-grid">
+      <section className="dashboard-statistics">
         <div className="card">
           <div className="card-head">
             <div>
@@ -718,55 +593,7 @@ function Dashboard({
             ))}
           </div>
         </div>
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <p className="eyebrow">Noch zu tun</p>
-              <h3>Prüfliste</h3>
-            </div>
-            <span className={`count ${issueCount ? "yellow" : "green"}`}>
-              {issueCount}
-            </span>
-          </div>
-          <div className="check-list">
-            <CheckRow
-              label="Ungeprüfte Datensätze"
-              value={issueCount}
-              go={() => go("Reisen")}
-            />
-            <CheckRow
-              label="Fehlende Belege"
-              value={missingReceipts}
-              go={() => go("Kosten & Belege")}
-            />
-            <CheckRow
-              label="Mögliche Duplikate"
-              value={duplicates}
-              go={() => go("Reisen")}
-            />
-            <CheckRow
-              label="Abrechnung erstellt"
-              value={state.statements.some((s) => s.month === month) ? 0 : 1}
-              go={() => go("Monatsabrechnungen")}
-            />
-          </div>
-        </div>
-      </section>
-      <div className="notice">
-        <ShieldCheck />
-        <div>
-          <b>Gesetzliche Standardregel aktiv</b>
-          <p>
-            Mehr als 8 Stunden: 14,00 € · voller Tag: 28,00 €. Tarife werden
-            anhand des Reisedatums bestimmt.
-          </p>
-        </div>
-        <button className="ghost" onClick={() => go("Einstellungen")}>
-          Regeln ansehen
-        </button>
-      </div>
-    </>
-  );
+      </section></>;
 }
 
 function Metric({
@@ -3019,7 +2846,7 @@ function Statements({
   statement: currentStatement,
   update,
   notify,
-  startEntry, editCosts, editTrips, openCapture,
+  startEntry, editCosts, editTrips, openCapture, viewRules,
 }: {
   state: AppState;
   month: string;
@@ -3030,6 +2857,7 @@ function Statements({
   editCosts: () => void;
   editTrips: () => void;
   openCapture: () => void;
+  viewRules: () => void;
 }) {
   const [reviewMonth, setReviewMonth] = useState<string | null>(null);
   const reportHeading = useRef<HTMLElement>(null);
@@ -3147,7 +2975,8 @@ function Statements({
   return (
     <>
       <MonthWorkspace state={state} month={month} statement={currentStatement} startEntry={startEntry} editCosts={editCosts} editTrips={editTrips} openCapture={openCapture}
-        openStatement={() => {if (existing) setReviewMonth(month); else create(true);}} />
+        openStatement={() => {if (existing) setReviewMonth(month); else create(true);}}
+        checks={<MonthChecks state={state} month={month} update={update} notify={notify} editTrips={editTrips} editCosts={editCosts} viewRules={viewRules} />} />
       {reviewMonth === month && <>
       <button className="ghost workspace-hide-report" onClick={() => setReviewMonth(null)}>Zurück zur Erfassung</button>
       <section className="statement-head" ref={reportHeading} tabIndex={-1} aria-label="Abrechnung prüfen">
@@ -3365,6 +3194,8 @@ function Reports({ state, month }: { state: AppState; month: string }) {
   );
   const max = Math.max(1, ...[...byCustomer.values()]);
   return (
+    <>
+    <details className="card previous-dashboard-statistics"><summary>Bisherige Monatskennzahlen und Kostenaufteilung</summary><DashboardStatistics state={state} month={month} statement={data} /></details>
     <div className="report-grid">
       <section className="card">
         <p className="eyebrow">Kosten nach Kunde</p>
@@ -3443,6 +3274,7 @@ function Reports({ state, month }: { state: AppState; month: string }) {
         </div>
       </section>
     </div>
+    </>
   );
 }
 
