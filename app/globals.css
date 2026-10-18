@@ -2767,3 +2767,13 @@ button:focus-visible { outline: 3px solid #5a93d0; outline-offset: 3px; }
 .filing-formats { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px 12px; margin: 14px 0; display: flex; flex-wrap: wrap; gap: 8px 18px; min-width: 0; }
 .filing-formats legend { font-size: 13px; font-weight: 700; padding: 0 4px; max-width: 100%; overflow-wrap: anywhere; }
 .filing-formats label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+
+/* Sicherungsstände */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.folder-backups { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 14px; min-width: 0; }
+.folder-backups-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.folder-backups-head h4 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.backup-table { width: 100%; }
+.backup-table td { overflow-wrap: anywhere; }
+.backup-table td:last-child { text-align: right; white-space: nowrap; }
+button.small { padding: 5px 10px; font-size: 12px; min-height: 0; }

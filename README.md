@@ -664,7 +664,7 @@ Organisatorisch nötig: Ordnerrechte nur für den jeweiligen Mitarbeiter (die Da
 unverschlüsselt) und eine Sicherung des Laufwerks außerhalb des Servers.
 
 Bekannte Grenze: Belege liegen als Base64 in der Datei; bei vielen Fotos wird sie groß und bei jeder Änderung
-vollständig neu geschrieben. Sicherungsgenerationen (3.3c) folgen.
+vollständig neu geschrieben (Sicherungsstände siehe 3.3c).
 
 ## Schritt 3.3b: Ablage abgeschlossener Abrechnungen
 
@@ -691,3 +691,25 @@ Nach einem erfolgreichen Monatsabschluss (Datenstand im Ordner gesichert) legt S
 npm run build
 PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_EXECUTABLE=/pfad/zu/chromium node tests/folder-storage-browser-check.mjs
 ```
+
+## Schritt 3.3c: Sicherungsstände im SpesenKit-Ordner
+
+`SpesenKit\Sicherungen\` enthält vollständige Stände im Format der JSON-Sicherung:
+
+| Datei | Wann | Aufbewahrung |
+|---|---|---|
+| `spesenkit_auto_<Datum>_<Zeit>.json` | erste Änderung eines Tages – gesichert wird der Stand **davor** | letzte 14 + je Monat eine für 12 Monate |
+| `spesenkit_abschluss_<Monat>_V<n>_….json` | nach jedem Monatsabschluss | dauerhaft |
+| `spesenkit_manuell_….json` | „Jetzt sichern“ | dauerhaft |
+| `spesenkit_vor_wiederherstellung_….json` | vor jeder Wiederherstellung | dauerhaft |
+| `spesenkit_browserstand_/ordnerstand_/ungueltig_….json` | Konflikte bzw. unlesbare Datei (3.3a) | dauerhaft |
+
+- Automatisch gelöscht werden ausschließlich Tagessicherungen mit genau diesem Namensmuster.
+- Eine fehlgeschlagene Sicherung blockiert das Speichern nicht; der Hinweis steht unter *Datensicherung*.
+- *Datensicherung → SpesenKit-Ordner* listet die Sicherungen (Zeitpunkt, Art, Größe). **Wiederherstellen** prüft die
+  Datei wie „JSON auswählen“, fragt ausdrücklich nach, nennt abgeschlossene Abrechnungen, die danach nicht mehr im
+  aktuellen Stand wären, und sichert vorher den aktuellen Stand. Danach wird wie bei jeder Änderung lokal und im
+  Ordner gespeichert. Bereits abgelegte PDFs in `Spesen` bleiben unberührt.
+- „JSON auswählen“ fragt jetzt ebenfalls vor dem Ersetzen nach (mit derselben Abschluss-Warnung) und sichert bei
+  verbundenem Ordner vorher den aktuellen Stand.
+- Platzbedarf: Jede Sicherung enthält die Belege (Base64). Bei vielen Fotos entsprechend Laufwerksplatz einplanen.

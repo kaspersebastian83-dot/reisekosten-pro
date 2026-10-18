@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FolderOpen, HardDrive, Printer, RefreshCw } from "lucide-react";
 import {
-  DATA_DIR, DATA_FILE, FOLDER_NAME, FolderError, decideReconcile, isEmptyState, readDataFile, resolveAppFolder,
+  COPY_DIR, DATA_DIR, DATA_FILE, FOLDER_NAME, FolderError, decideReconcile, isEmptyState, readDataFile, resolveAppFolder,
   stateHash, stateSummary, writeDataFile, writeSafetyCopy, type FolderFile, type FolderLink,
 } from "../lib/folder-store";
 import { folderSupported, pickFolder, suiteLinks, withFolderLock } from "../lib/suite-link";
 import { defaultFilingFormats, filedStatus, fileStatement, filingFormatLabels, type FilingFormat, type FilingFormats, type FilingReport } from "../lib/statement-filing";
 import { printPdf } from "../lib/exports";
+import { backupKindLabels, closingBackup, dailyBackup, droppedClosings, listBackups, readBackup, type BackupEntry } from "../lib/folder-backups";
 import type { StatementSnapshot } from "../lib/types";
 import { appRelease } from "../lib/release";
 import type { AppState } from "../lib/types";
@@ -56,6 +57,15 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   const [filingIssue, setFilingIssue] = useState<{ snapshotId: string; label: string; message: string } | null>(null);
   /** Zählt Ablagevorgänge, damit Anzeigen des Ablagestands danach neu prüfen. */
   const [filingRun, setFilingRun] = useState(0);
+  /** Hinweis, wenn eine Sicherung nicht angelegt werden konnte (blockiert das Speichern nicht). */
+  const [backupNote, setBackupNote] = useState("");
+  const [backupRun, setBackupRun] = useState(0);
+  /** Datendatei schreiben; beim ersten Speichern des Tages vorher den bisherigen Stand sichern (best effort). */
+  const writeFile = (link: FolderLink, state: AppState, expected: number, options: { replaceInvalid?: boolean } = {}) =>
+    writeDataFile(link.handle, state, expected, appRelease, new Date(), { ...options, beforeReplace: async (current) => {
+      try { const result = await dailyBackup(link.handle, current.state); if (result.written) setBackupRun((n) => n + 1); setBackupNote(""); }
+      catch (error) { setBackupNote(`Tagessicherung konnte nicht angelegt werden: ${message(error)}`); }
+    } });
   /** Lokale Änderungen, die noch nicht im Ordner sind, weil er gerade nicht beschreibbar ist. */
   const unsynced = useRef(false);
 
@@ -82,7 +92,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
           const next = { ...link, revision: decision.file.content.revision, hash: decision.file.hash, savedAt: decision.file.content.savedAt };
           await suiteLinks.set(next); setStatus(okStatus(next));
         } else if (decision.kind === "write-local") {
-          const result = await writeDataFile(link.handle, local, decision.expectedRevision, appRelease);
+          const result = await writeFile(link, local, decision.expectedRevision);
           const next = { ...link, ...result }; await suiteLinks.set(next); setStatus(okStatus(next));
         } else if (decision.kind === "load-file") {
           await adoptState(decision.file.state);
@@ -130,7 +140,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
         if (!link) { setStatus({ kind: "none" }); return; }
         const hash = await stateHash(state);
         if (hash === link.hash) { setStatus(okStatus(link, wanted.current)); return; }
-        const result = await writeDataFile(link.handle, state, link.revision, appRelease);
+        const result = await writeFile(link, state, link.revision);
         const next = { ...link, ...result };
         await suiteLinks.set(next);
         setStatus(okStatus(next, wanted.current));
@@ -216,7 +226,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
           return `Ordnerstand übernommen. Der bisherige Browserstand liegt als Kopie in ${copy}.`;
         }
         const copy = await writeSafetyCopy(link.handle, "ordnerstand", file.state);
-        const result = await writeDataFile(link.handle, local, file.content.revision, appRelease);
+        const result = await writeFile(link, local, file.content.revision);
         const next = { ...link, ...result }; await suiteLinks.set(next); setStatus(okStatus(next));
         return `Browserstand im Ordner gespeichert. Der bisherige Ordnerstand liegt als Kopie in ${copy}.`;
       });
@@ -234,7 +244,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     try {
       await waitForLocal();
       await withFolderLock(async () => {
-        const result = await writeDataFile(link.handle, committed()!, 0, appRelease, new Date(), { replaceInvalid: statusRef.current.kind === "invalid" });
+        const result = await writeFile(link, committed()!, 0, { replaceInvalid: statusRef.current.kind === "invalid" });
         const next = { ...link, ...result }; await suiteLinks.set(next); setStatus(okStatus(next));
       });
       notify("SpesenKit-Datei aus dem Browserstand neu angelegt.");
@@ -299,7 +309,54 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     return filedStatus(current.handle, committed()!, snapshotId);
   }, [committed]);
 
-  return { status, busy, afterLocalSave, flush, blocking, link, confirmAccess, resolveConflict, recreate, retry, disconnect, filingFormats, setFilingFormats, fileVersion, checkFiled, filingIssue, deferFiling, filingRun };
+  const okLink = async () => {
+    if (statusRef.current.kind !== "ok") throw new Error(blockingText(statusRef.current) || "Kein verbundener, beschreibbarer SpesenKit-Ordner.");
+    const current = await suiteLinks.get();
+    if (!current) throw new Error("Kein SpesenKit-Ordner verbunden.");
+    return current;
+  };
+  const backups = useCallback(async (): Promise<BackupEntry[]> => listBackups((await okLink()).handle), []);
+  const backupNow = useCallback(async (label: "manuell" | "vor_wiederherstellung" = "manuell") => {
+    const current = await okLink();
+    await waitForLocal();
+    const name = await withFolderLock(() => writeSafetyCopy(current.handle, label, committed()!));
+    setBackupRun((n) => n + 1);
+    return name;
+  }, [committed, waitForLocal]);
+  /** Nach einem Abschluss: benannte Sicherung (best effort, Hinweis bei Fehler). */
+  const backupAfterClosing = useCallback(async (snapshotId: string) => {
+    try {
+      const current = await okLink();
+      await withFolderLock(() => closingBackup(current.handle, committed()!, snapshotId));
+      setBackupRun((n) => n + 1);
+    } catch (error) { setBackupNote(`Sicherung nach dem Abschluss konnte nicht angelegt werden: ${message(error)}`); }
+  }, [committed]);
+  /** Sicherung lesen und prüfen, ohne etwas zu ändern: Zusammenfassung und wegfallende Abschlüsse. */
+  const previewBackup = useCallback(async (name: string) => {
+    const current = await okLink();
+    const restored = await readBackup(current.handle, name);
+    return { restored, summary: stateSummary(restored), dropped: droppedClosings(committed()!, restored) };
+  }, [committed]);
+  /** Wiederherstellen: aktueller Stand wird vorher gesichert, dann wie jede Änderung lokal und im Ordner gespeichert. */
+  const restoreBackup = useCallback(async (name: string) => {
+    const current = await okLink();
+    setBusy(true);
+    try {
+      await waitForLocal();
+      const copy = await withFolderLock(async () => {
+        const restored = await readBackup(current.handle, name);
+        const before = await writeSafetyCopy(current.handle, "vor_wiederherstellung", committed()!);
+        await adoptState(restored);
+        return before;
+      });
+      setBackupRun((n) => n + 1);
+      afterLocalSave();
+      await queue.current;
+      notify(`Sicherung wiederhergestellt. Der vorherige Stand liegt in ${copy}.`);
+    } finally { setBusy(false); }
+  }, [committed, waitForLocal, adoptState, afterLocalSave, notify]);
+
+  return { backups, backupNow, backupAfterClosing, previewBackup, restoreBackup, backupNote, backupRun, status, busy, afterLocalSave, flush, blocking, link, confirmAccess, resolveConflict, recreate, retry, disconnect, filingFormats, setFilingFormats, fileVersion, checkFiled, filingIssue, deferFiling, filingRun };
 }
 export type FolderStorage = ReturnType<typeof useFolderStorage>;
 
@@ -422,6 +479,7 @@ export function FolderCard({ folder }: { folder: FolderStorage }) {
         {status.kind === "error" && <button className="ghost" disabled={busy} onClick={() => void folder.retry()}><RefreshCw size={17} />Erneut speichern</button>}
         {linked && <button className="ghost" disabled={busy} onClick={() => void folder.disconnect()}>Verbindung trennen</button>}
       </div>
+      {status.kind === "ok" && <FolderBackups folder={folder} />}
       <p className="muted">Wichtig: Nur du solltest Zugriff auf diesen Ordner haben – die Datei enthält deine Reisen und Belege unverschlüsselt. Bitte das Laufwerk zusätzlich regelmäßig außerhalb des Servers sichern lassen.</p>
     </>}
   </section>;
@@ -454,4 +512,41 @@ export function StatementFiling({ folder, snapshot, label, print }: { folder: Fo
       <p className="muted">Vorhandene Dateien werden nie überschrieben. Eine Korrektur wird als neue Version daneben abgelegt.</p>
     </>}
   </section>;
+}
+
+const size = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).toLocaleString("de-DE", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("de-DE")} KB`;
+const dateDe = (date: string, clock: string) => `${date.slice(8, 10)}.${date.slice(5, 7)}.${date.slice(0, 4)} ${clock.slice(0, 5)}`;
+
+/** Sicherungsstände im Ordner: Liste, „Jetzt sichern“, Wiederherstellen mit ausdrücklicher Bestätigung. */
+function FolderBackups({ folder }: { folder: FolderStorage }) {
+  const [entries, setEntries] = useState<BackupEntry[] | null>(null);
+  const [all, setAll] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [note, setNote] = useState("");
+  const { backups, backupRun } = folder;
+  useEffect(() => { backups().then(setEntries, (error) => { setEntries([]); setNote(message(error)); }); }, [backups, backupRun]);
+  const restore = async (entry: BackupEntry) => {
+    setWorking(true); setNote("");
+    try {
+      const preview = await folder.previewBackup(entry.name);
+      const s = preview.summary;
+      const warning = preview.dropped.length ? `\n\nACHTUNG: Diese abgeschlossenen Abrechnungen sind in der Sicherung nicht enthalten und wären danach nicht mehr im aktuellen Stand: ${preview.dropped.join(", ")}. Bereits abgelegte PDFs bleiben im Ordner „Spesen“.` : "";
+      if (!confirm(`Stand vom ${dateDe(entry.date, entry.time)} wiederherstellen (${backupKindLabels[entry.kind]})?\n\nInhalt: ${s.trips} Reisen, ${s.expenses} Kosten, ${s.statements} Abrechnungsversionen.\nDer aktuelle Stand wird vorher als Sicherung „Vor Wiederherstellung“ abgelegt.${warning}`)) return;
+      await folder.restoreBackup(entry.name);
+    } catch (error) { setNote(`Nicht wiederhergestellt: ${message(error)}`); }
+    finally { setWorking(false); }
+  };
+  const shown = entries ? (all ? entries : entries.slice(0, 10)) : [];
+  return <div className="folder-backups">
+    <div className="folder-backups-head"><h4>Sicherungen in <code>{`${FOLDER_NAME}\\${COPY_DIR}`}</code></h4>
+      <button className="ghost" disabled={working || folder.busy} onClick={async () => { setWorking(true); setNote(""); try { await folder.backupNow(); setNote("Sicherung angelegt."); } catch (error) { setNote(message(error)); } finally { setWorking(false); } }}>Jetzt sichern</button></div>
+    <p className="muted">Automatisch: einmal täglich der Stand vor der ersten Änderung (die letzten 14 Tage, dazu je Monat einer für 12 Monate) und nach jedem Monatsabschluss (bleibt dauerhaft).</p>
+    {folder.backupNote && <p className="error-text" role="status">{folder.backupNote}</p>}
+    {entries === null ? <p className="muted">Sicherungen werden gelesen …</p> : entries.length === 0 ? <p className="muted">Noch keine Sicherungen vorhanden.</p> :
+      <div className="table-wrap"><table className="backup-table"><thead><tr><th>Zeitpunkt</th><th>Art</th><th>Größe</th><th><span className="sr-only">Aktion</span></th></tr></thead>
+        <tbody>{shown.map((entry) => <tr key={entry.name} title={entry.name}><td>{dateDe(entry.date, entry.time)}</td><td>{backupKindLabels[entry.kind]}{entry.detail ? ` ${entry.detail}` : ""}</td><td>{size(entry.size)}</td>
+          <td>{entry.restorable && <button className="ghost small" disabled={working || folder.busy} onClick={() => void restore(entry)}>Wiederherstellen</button>}</td></tr>)}</tbody></table></div>}
+    {entries && entries.length > 10 && <button className="ghost" onClick={() => setAll(!all)}>{all ? "Weniger anzeigen" : `Alle ${entries.length} anzeigen`}</button>}
+    {note && <p className="muted" role="status">{note}</p>}
+  </div>;
 }

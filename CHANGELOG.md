@@ -1,5 +1,12 @@
 # Release Notes
 
+## Sicherungsstände im SpesenKit-Ordner (Schritt 3.3c)
+
+- Tägliche Sicherung des Stands vor der ersten Änderung des Tages; Aufbewahrung 14 Tage + 12 Monatsstände.
+- Sicherung nach jedem Monatsabschluss, manuelle Sicherung, Sicherung vor jeder Wiederherstellung.
+- Liste unter Datensicherung mit Wiederherstellen (Bestätigung, Warnung bei wegfallenden Abschlüssen).
+- „JSON auswählen“ fragt vor dem Ersetzen nach und sichert den aktuellen Stand.
+
 ## Ablage abgeschlossener Abrechnungen (Schritt 3.3b)
 
 - Nach dem Abschluss: PDF und ZIP (optional Excel) automatisch in `SpesenKit/Spesen/Jahr/Monat`, gleiche Inhalte und
