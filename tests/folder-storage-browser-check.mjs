@@ -208,7 +208,7 @@ try {
     await workspace.getByRole('button', { name: /^Abrechnung (fortsetzen|ansehen)$/ }).click();
     await until(async () => /abgelegt/.test(await section.innerText({ timeout: 1000 }).catch(() => '')), 'Ablageanzeige');
     assert.match(await section.innerText(), /SpesenKit\\Spesen\\2026\\06/);
-    assert.equal(await section.getByRole('button', { name: 'Im SpesenKit-Ordner ablegen' }).count(), 0, 'nichts fehlt');
+    assert.equal(await section.getByRole('button', { name: 'Im SpesenKit-Ordner ablegen' }).count(), 0, 'nichts fehlt: ' + await section.innerText());
     // Excel zusätzlich wählen, dann in der Abrechnung nachträglich ablegen.
     await nav(page, 'Datensicherung');
     await page.locator('.filing-formats').getByLabel('Excel').check();

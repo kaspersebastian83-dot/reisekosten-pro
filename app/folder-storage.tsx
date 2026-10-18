@@ -54,6 +54,8 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   const [filingFormats, setFilingFormatsState] = useState<FilingFormats>(defaultFilingFormats);
   /** Abgeschlossen, aber Dateien noch nicht abgelegt: bleibt sichtbar, bis es geklappt hat. */
   const [filingIssue, setFilingIssue] = useState<{ snapshotId: string; label: string; message: string } | null>(null);
+  /** Zählt Ablagevorgänge, damit Anzeigen des Ablagestands danach neu prüfen. */
+  const [filingRun, setFilingRun] = useState(0);
   /** Lokale Änderungen, die noch nicht im Ordner sind, weil er gerade nicht beschreibbar ist. */
   const unsynced = useRef(false);
 
@@ -284,7 +286,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     } catch (error) {
       setFilingIssue({ snapshotId, label, message: message(error) });
       throw error;
-    }
+    } finally { setFilingRun((n) => n + 1); }
   }, [committed]);
 
   /** Abschluss steht lokal, Ordner war nicht beschreibbar: Ablage merken, Hinweis erscheint, sobald der Ordner wieder bereit ist. */
@@ -297,7 +299,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     return filedStatus(current.handle, committed()!, snapshotId);
   }, [committed]);
 
-  return { status, busy, afterLocalSave, flush, blocking, link, confirmAccess, resolveConflict, recreate, retry, disconnect, filingFormats, setFilingFormats, fileVersion, checkFiled, filingIssue, deferFiling };
+  return { status, busy, afterLocalSave, flush, blocking, link, confirmAccess, resolveConflict, recreate, retry, disconnect, filingFormats, setFilingFormats, fileVersion, checkFiled, filingIssue, deferFiling, filingRun };
 }
 export type FolderStorage = ReturnType<typeof useFolderStorage>;
 
@@ -432,7 +434,8 @@ export function StatementFiling({ folder, snapshot, label, print }: { folder: Fo
   const [note, setNote] = useState("");
   const { status, checkFiled, fileVersion, filingFormats } = folder;
   const refresh = useCallback(() => { checkFiled(snapshot.id).then(setFiled, () => setFiled(null)); }, [checkFiled, snapshot.id]);
-  useEffect(() => { setNote(""); refresh(); }, [refresh, status.kind, folder.filingIssue]);
+  useEffect(() => { refresh(); }, [refresh, status.kind, folder.filingIssue, folder.filingRun]);
+  useEffect(() => { setNote(""); }, [snapshot.id]);
   const formats = (Object.keys(filingFormatLabels) as FilingFormat[]);
   const missing = filed ? formats.filter((f) => filingFormats[f] && !filed.present[f]) : [];
   return <section className="card statement-filing" aria-label="Ablage im SpesenKit-Ordner">
