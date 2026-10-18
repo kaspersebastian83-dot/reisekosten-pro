@@ -1,4 +1,6 @@
-# Reisekosten Pro
+# SpesenKit
+
+Dienstreisen · Spesen · Abrechnungen
 
 GitHub-Pages-Ausgabe · Die Release-Version kommt aus [package.json](package.json).
 
@@ -231,3 +233,48 @@ Verpflegungspauschale, Reisezuordnung einer Ausgabe mit Bildbeleg,
 Monatsabrechnung, PDF/Excel, nachträglichen Import und Offline-Neuladen bei
 1440, 820 und 390 Pixel Breite. Physische iPhone-/iPad-Geräte und reale
 Kamera-/OCR-Qualität sind damit nicht abgedeckt.
+
+
+## Produktname und Projektzentrale
+
+Die sichtbare Anwendung heißt **SpesenKit** (bisher Reisekosten Pro), mit dem
+Untertitel **Dienstreisen · Spesen · Abrechnungen**. Die Projektzentrale kann
+diesen Namen, Untertitel und die vorhandenen Icons verwenden. Andere
+Anwendungen und Repositories werden durch diese Umbenennung nicht geändert.
+
+- Repository bleibt **kaspersebastian83-dot/reisekosten-pro**:
+  https://github.com/kaspersebastian83-dot/reisekosten-pro
+- GitHub-Pages-URL bleibt **https://kaspersebastian83-dot.github.io/reisekosten-pro/**.
+- Vorhandene Benutzerdaten bleiben erhalten: IndexedDB `reisekosten-pro`,
+  Version `1`, Store `state`, Schlüssel `main` und alle Datenformate bleiben bestehen.
+- Bestehende Installationen werden nicht absichtlich zurückgesetzt. Manifest-
+  `id`, `start_url` und `scope` bleiben jeweils `.`; Service Worker und Offline-
+  Cache-Bezeichner werden nicht umbenannt. Für die Umbenennung keine
+  Websitedaten löschen und die PWA nicht neu installieren.
+- Je nach Betriebssystem kann der neue PWA-Name oder das Icon erst nach einer
+  Aktualisierung der Installationsmetadaten durch Browser oder Betriebssystem erscheinen.
+- Fachliche Begriffe, Dokumenttitel, Exportdateinamen, Abrechnungsnummern und
+  gespeicherte Abrechnungen bleiben unverändert. Neu erzeugte Excel-Dateien
+  nennen SpesenKit als Software-Ersteller.
+
+Das SK-Symbol liegt als Vektor in `public/favicon.svg`. Die PNG-Ableitungen
+`icon-192.png` und `icon-512.png` behalten ihre Pfade und Größen; das 192er-Icon
+bleibt zugleich das Apple-Touch-Icon. Der Schriftzug liegt im sicheren inneren
+Bereich des vollflächigen Symbols, damit maskierbare PWA-Icons lesbar bleiben.
+
+
+Der zusätzliche Update-Test `tests/branding-browser-check.mjs` erwartet über
+`LEGACY_DIST` einen unveränderten Produktionsbuild vor der Umbenennung
+(z. B. aus Commit `be44696`, der PR #3 enthält). Er lädt ausschließlich
+synthetische Daten in einem isolierten Browserprofil und prüft das reguläre
+Service-Worker-Update auf SpesenKit einschließlich identischem Datenbestand,
+freigegebener Abrechnung mit Beleg-Snapshot, alten JSON-Backups, PDF/Excel und
+Offline-Neuladen. Aufruf nach dem aktuellen Build:
+
+```sh
+LEGACY_DIST=/pfad/zum/alten/dist PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_EXECUTABLE=/pfad/zu/chromium node tests/branding-browser-check.mjs
+```
+
+Mit `BROWSER_ENGINE=webkit` und passendem `BROWSER_EXECUTABLE` läuft derselbe
+Update-Test in WebKit. Die vorhandenen Datenbank- und Cache-Namen bleiben
+bewusst `reisekosten-pro`; kein Lauf darf echte Browserprofile verwenden.

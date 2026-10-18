@@ -68,6 +68,7 @@ button:disabled {
   padding: 0 8px 28px;
 }
 .brand-mark {
+  flex-shrink: 0;
   width: 42px;
   height: 42px;
   border-radius: 13px;

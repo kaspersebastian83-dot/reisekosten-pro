@@ -325,7 +325,7 @@ const rowsForExport = (data: StatementData, state: AppState) =>
 export async function exportExcel(data: StatementData, state: AppState) {
   const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Reisekosten Pro";
+  workbook.creator = "SpesenKit";
   workbook.created = new Date();
   const vehicles = vehiclesForStatement(data, state);
   const overview = workbook.addWorksheet("Übersicht");
