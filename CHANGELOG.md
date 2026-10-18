@@ -1,5 +1,14 @@
 # Release Notes
 
+## Prüfen und Abschließen (Fluss, Schritt 3)
+
+- Abschlussprüfung gruppiert gleichartige Hinweise (z. B. „Projektzuordnung ist unklar · 11 Einträge“); große Gruppen
+  eingeklappt, blockierende Fehler immer offen; Bearbeiten-Knopf je Eintrag in einer Zeile.
+- Monatsabrechnung zeigt den Weg „1 Erfassen · 2 Prüfen · 3 Abschließen“ mit Stand; die Zahlen stammen aus derselben
+  Prüfung wie der Abschluss (Vorschau ohne Entwurf, nichts wird angelegt).
+- Oben steht jetzt der Status des gewählten Monats (wie in der Jahresleiste) statt einer monatsübergreifenden Zahl.
+- Abschlussdialog fasst verbleibende Hinweise als Gruppen zusammen.
+
 ## Monats-Zeitleiste (Fluss, Schritt 2)
 
 - Neuer Abschnitt „Monat im Überblick“ in der Monatsübersicht: je Tag Datum und Verpflegungspauschale (aus der

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { checkStatementForClosing, type ClosingCheck, type ClosingConfirmation, type ClosingIssue } from '../lib/statement-closing';
+import { checkStatementForClosing, groupClosingIssues, type ClosingCheck, type ClosingConfirmation, type ClosingIssue } from '../lib/statement-closing';
 import { monthLabel } from '../lib/month-navigation';
 import { usePendingWork } from '../lib/pending-work';
 import type { AppState, StatementSnapshot } from '../lib/types';
@@ -27,7 +27,15 @@ export function StatementClosing({ state, month, snapshot, commit, edit }: {
     return () => { if (dialog) opener.current?.focus(); };
   }, [dialog]);
   useEffect(() => { setDialog(null); }, [month]);
-  const issueList = (items: ClosingIssue[], editable: boolean) => <ul className="closing-issues">{items.map((item, index) => <li key={`${item.code}-${index}`}><span>{item.message}</span>{editable && item.target && <button className="ghost" onClick={() => edit(item.target!)}>{item.target.kind === 'trip' ? 'Reise bearbeiten' : 'Kosten bearbeiten'}</button>}</li>)}</ul>;
+  // Gleichartige Hinweise zusammengefasst; große Gruppen eingeklappt (Fehler immer offen).
+  const groupedList = (items: ClosingIssue[], openUpTo: number) => <div className="issue-groups">{groupClosingIssues(items).map(group => {
+    const list = <ul className="closing-issues">{group.items.map(({ label, issue }, index) => <li key={`${issue.code}-${index}`}><span>{label || issue.message}</span>{issue.target && <button className="ghost" onClick={() => edit(issue.target!)}>{issue.target.kind === 'trip' ? 'Reise bearbeiten' : 'Kosten bearbeiten'}</button>}</li>)}</ul>;
+    const count = <span className="issue-count">{group.items.length === 1 ? '1 Eintrag' : `${group.items.length} Einträge`}</span>;
+    return group.items.length <= openUpTo
+      ? <div className="issue-group" key={group.title}><h5>{group.title}{count}</h5>{list}</div>
+      : <details className="issue-group" key={group.title}><summary><span>{group.title}</span>{count}</summary>{list}</details>;
+  })}</div>;
+  const groupSummary = (items: ClosingIssue[]) => <ul className="closing-issues compact">{groupClosingIssues(items).map(group => <li key={group.title}><span>{group.title}</span><span className="issue-count">{group.items.length}×</span></li>)}</ul>;
   const close = () => { if (!busy.current) setDialog(null); };
   const submit = async () => {
     if (!dialog || busy.current || !reviewed || (dialog.result.warnings.length > 0 && !accepted)) return;
@@ -43,8 +51,8 @@ export function StatementClosing({ state, month, snapshot, commit, edit }: {
   return <section className="card closing-review" aria-label="Abschlussprüfung">
     <h3>Abschlussprüfung</h3>
     <p>Der gespeicherte Entwurf wird geprüft. Abschluss und Auszahlung sind getrennte Aktionen.</p>
-    {result.errors.length > 0 && <div className="closing-errors"><h4>{result.errors.length} blockierende Fehler</h4>{issueList(result.errors, true)}<p>Bei einem veralteten oder älteren Entwurf oben „Neue Version erstellen“ verwenden. Die bisherige Version bleibt erhalten.</p></div>}
-    {result.warnings.length > 0 && <div className="closing-warnings"><h4>{result.warnings.length} bestätigbare Hinweise</h4>{issueList(result.warnings, true)}</div>}
+    {result.errors.length > 0 && <div className="closing-errors"><h4>{result.errors.length} blockierende Fehler – vor dem Abschluss beheben</h4>{groupedList(result.errors, Infinity)}<p>Bei einem veralteten oder älteren Entwurf oben „Neue Version erstellen“ verwenden. Die bisherige Version bleibt erhalten.</p></div>}
+    {result.warnings.length > 0 && <div className="closing-warnings"><h4>{result.warnings.length} bestätigbare Hinweise in {groupClosingIssues(result.warnings).length} Gruppen</h4><p className="muted">Hinweise blockieren nicht. Prüfe sie und behebe, was du beheben kannst; den Rest bestätigst du beim Abschluss.</p>{groupedList(result.warnings, 2)}</div>}
     {!result.errors.length && !result.warnings.length && <p>Keine bekannten Prüfprobleme.</p>}
     <button className="primary" ref={opener} disabled={!!result.errors.length || !snapshot} onClick={() => { setReviewed(false); setAccepted(false); setError(''); setDialog({ snapshot: structuredClone(snapshot!), result }); }}>Monatsabrechnung abschließen</button>
     {dialog && <div className="modal-backdrop closing-backdrop"><div className="modal closing-dialog" role="dialog" aria-modal="true" aria-labelledby="closing-title" tabIndex={-1} ref={panel} onKeyDown={event => {
@@ -69,7 +77,7 @@ export function StatementClosing({ state, month, snapshot, commit, edit }: {
           <div><dt>{correction ? 'Persönlicher Erstattungsbetrag laut Entwurfsstand' : 'Offene persönliche Erstattung'}</dt><dd>{euro(dialog.snapshot.data.totals.openAmount)}</dd></div>
         </dl>
         {correction && <p className="correction-payment-note">Dies ist eine neue vollständige Abrechnungsversion. Ihr Betrag und die rechnerische Differenz zum früheren Abschluss sind keine tatsächliche Restzahlung oder Rückforderung. Ein früherer Auszahlungsstatus wird nicht übertragen.</p>}
-        {dialog.result.warnings.length ? <><h3>{dialog.result.warnings.length} verbleibende Hinweise</h3>{issueList(dialog.result.warnings, false)}</> : <p>Keine bekannten Prüfprobleme.</p>}
+        {dialog.result.warnings.length ? <><h3>{dialog.result.warnings.length} verbleibende Hinweise</h3>{groupSummary(dialog.result.warnings)}</> : <p>Keine bekannten Prüfprobleme.</p>}
         <label className="closing-confirmation"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} disabled={saving} /><span>Ich habe diese Monatsabrechnung geprüft und alle mir bekannten erstattungsfähigen Ausgaben erfasst.</span></label>
         {dialog.result.warnings.length > 0 && <label className="closing-confirmation"><input type="checkbox" checked={accepted} onChange={event => setAccepted(event.target.checked)} disabled={saving} /><span>Ich habe die verbleibenden Hinweise gesehen und möchte die Abrechnung trotzdem abschließen.</span></label>}
         {changed && <p className="error-box" role="alert">Seit der angezeigten Bestätigung haben sich Daten geändert. Bitte abbrechen und die Abschlussprüfung erneut öffnen.</p>}

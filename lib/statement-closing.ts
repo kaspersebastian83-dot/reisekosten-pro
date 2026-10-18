@@ -159,3 +159,27 @@ export function changeStatementStatus(state: AppState, id: string, status: Revie
   next.changes.push(change);
   return next;
 }
+
+/** Gleichartige Prüfprobleme zusammenfassen (z. B. „Projektzuordnung ist unklar“ bei 14 Reisen). Reine Darstellung. */
+export interface ClosingIssueGroup { title: string; items: { label: string; issue: ClosingIssue }[] }
+export function groupClosingIssues(issues: ClosingIssue[]): ClosingIssueGroup[] {
+  const groups = new Map<string, ClosingIssueGroup>();
+  for (const issue of issues) {
+    const split = issue.target ? issue.message.indexOf(': ') : -1;
+    const label = split > 0 ? issue.message.slice(0, split) : '';
+    const title = split > 0 ? issue.message.slice(split + 2) : issue.message;
+    const group = groups.get(title) || { title, items: [] };
+    group.items.push({ label, issue });
+    groups.set(title, group);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Vorschau vor dem Entwurf: dieselbe Prüfung wie beim Abschluss, ohne die Fehler, die nur den (noch nicht
+ * vorhandenen) Entwurf selbst betreffen. Ändert nichts.
+ */
+export function closingPreview(state: AppState, month: string) {
+  const result = checkStatementForClosing(state, month, undefined);
+  return { errors: result.errors.filter(item => !['draft', 'protected', 'snapshot', 'legacy', 'stale'].includes(item.code)), warnings: result.warnings };
+}
