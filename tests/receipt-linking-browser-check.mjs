@@ -135,7 +135,7 @@ try {
       });
       await check(`${engine} ${viewport.width}: legacy inbox without payment remains unknown and non-reimbursable`,async()=>{
         const before=await state(page);const legacy={id:'legacy-inbox',receipt:{...before.receiptInbox[0].receipt,id:'legacy-file',hash:'legacy-unique-hash',name:'synthetic-legacy.pdf'},capturedAt:'2026-10-30',status:'neu',suggestion:{date:'2026-10-30',gross:20,category:'Parken',confidence:0},notes:''};
-        await writeState(page,{...before,receiptInbox:[...before.receiptInbox,legacy]});await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(page,'Kosten & Belege');
+        await writeState(page,{...before,receiptInbox:[...before.receiptInbox,legacy]});await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-10');await nav(page,'Kosten & Belege');
         await page.locator('.receipt-inbox').getByRole('button',{name:'Prüfen',exact:true}).click();
         assert.equal(await modal.getByLabel('Zahlungsart',{exact:true}).inputValue(),'unbekannt');await save();
         const saved=await waitState(page,s=>s?.expenses.length===before.expenses.length+1);

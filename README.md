@@ -393,3 +393,85 @@ Backup-Kompatibilität, unveränderte Reisen/Berichte) und optional
 `tests/receipt-linking-browser-check.mjs` mit synthetischen Belegen bei 390/820/1440 px
 in Chromium und WebKit. Physische Kamera, tatsächliche OCR-Qualität und die konkrete
 fachliche Frühstücks-/Übernachtungsbehandlung bitte vor praktischer Nutzung prüfen.
+
+### Jahresübersicht und Monatsnavigation (Schritt 3.1)
+
+**Monatsabrechnungen** zeigt links eine Jahresübersicht mit allen zwölf Monaten;
+auf iPad/iPhone steht eine kompakte Übersicht oberhalb der bisherigen Abrechnung.
+Monate sind direkt auswählbar, die aktive Auswahl ist hervorgehoben. Farben werden
+durch Symbole und Texte ergänzt; auf dem iPhone erklären eine sichtbare Legende
+und vollständige zugängliche Beschriftungen die kompakten Monatsschaltflächen.
+Jahrespfeile blättern nur in der Übersicht. Die ausgewählte Abrechnung bleibt
+bestehen, bis tatsächlich ein Monat angeklickt wird; „Ausgewählt“ zeigt sie weiterhin an.
+
+Beim Start wird der **vorherige lokale Kalendermonat** vorgeschlagen, einschließlich
+Januar → Dezember des Vorjahres. Die Auswahl liegt ausschließlich im bereits
+bestehenden gemeinsamen React-Zustand von `Home`, ohne neue dauerhafte Einstellung.
+Sie bleibt beim Wechsel zwischen Reisen, Kosten & Belege, Monatsabrechnungen,
+Übersicht und den weiteren bestehenden Bereichen erhalten. Ein vollständiges
+Neuladen/erneutes Öffnen startet wieder mit dem dann gültigen lokalen Vormonat;
+innerhalb der geöffneten Anwendung setzt kein Automatismus eine bewusste Auswahl
+zurück. Der bestehende globale Monatswähler bleibt nutzbar; leere/ungültige
+Monatswerte ersetzen die Auswahl nicht.
+
+**Status ist eine reine Anzeige vorhandener Daten:**
+
+- **Grün / ✓ Abgeschlossen:** Die jüngste gespeicherte Version ist `locked: true`
+  und hat den vorhandenen Status `freigegeben` oder `ausgezahlt`. Eine gespeicherte
+  Berechnung, ein Entwurf oder PDF-/Excel-Export genügt nicht.
+- **Orange / ◐ In Bearbeitung:** Relevante Reisen oder Ausgaben sind vorhanden,
+  ohne ausdrücklichen Abschluss der jüngsten Version und ohne unten genannte
+  bereits gespeicherte konkrete Prüfhinweise.
+- **Grau / ○ Offen:** Kein solcher Abschluss und keine relevanten Einträge. Ein
+  leerer Abrechnungsentwurf allein erzeugt keinen Rückstand.
+- **Rot / ! Prüfung erforderlich:** Konkrete bereits gespeicherte Hinweise wie
+  fehlender Reisegrund/Reiseziel, bestätigungsbedürftige Abwesenheit, negative/
+  unplausible Kilometer, fehlender Beleg, Tankbeleg ohne Fahrzeug, Duplikatverdacht
+  oder vorhandener Kilometerkostenkonflikt. Auch eine stornierte jüngste Version
+  oder widersprüchliche Freigabe-/Sperrmerkmale werden so angezeigt. Allgemeine
+  Steuer-/Geltungsbereichshinweise und der Status `ungeprüft` allein reichen nicht.
+  Die konkrete Ursache steht bei der ausgewählten Abrechnung und im Tooltip.
+
+Die Darstellung verwendet dieselbe Versionsreihenfolge wie die bestehende
+Abrechnungsansicht. Bei einer neuen offenen Korrekturversion ist diese maßgeblich,
+auch wenn eine ältere Version gesperrt bleibt. Abgeschlossene Versionen werden
+nicht neu berechnet oder auf spätere Änderungen untersucht. Grün bestätigt den
+vorhandenen gespeicherten Abschluss, keine neue Vollständigkeits-/Steuerprüfung.
+Für abgeschlossene Monate stammen die eindeutigen Reise-IDs aus den eingefrorenen
+Tageszeilen; aktuelle Änderungen verfälschen damit nicht die historische Reiseanzahl.
+
+Relevante Aktivität folgt den vorhandenen Monatszuordnungen: nicht stornierte
+Dienstreisen mit Überlappung zum Monat und nicht stornierte Ausgaben nach deren
+Rechnungsdatum. Mehrtägige Reisen zählen je betroffenem Monat einmal, nicht je
+Tageszeile. Private Fahrten, Arbeitswege und stornierte Einträge zählen nicht als
+Reiseaktivität. Eine spätere Hotelrechnung wird durch die Navigation nicht in den
+Reisemonat verschoben.
+
+**„Ältesten offenen Monat bearbeiten“** berücksichtigt jahresübergreifend nur
+Monate vor dem aktuellen lokalen Monat mit solchen Reisen oder Ausgaben und ohne
+Abschluss der maßgeblichen Version. Leere, aktuelle und zukünftige Monate sind
+keine Rückstände. Die älteste Monatskennung bestimmt „Mit … beginnen“; die Anzahl
+zeigt betroffene Monate, nicht Reisen. Nach einem regulären Abschluss wird der
+nächste offene Monat angeboten, ohne die bewusste Auswahl automatisch weiterzusetzen.
+Ohne Rückstände erscheint ein freundlicher Hinweis.
+
+Es werden weder Abschlusszustände gespeichert noch bestehende Snapshots,
+Reise-/Belegzuordnungen, Datenmodelle, IndexedDB-Schlüssel, Tarife, Berechnungen,
+Import, Exportformate oder Service Worker verändert. Keine Migration, neue
+Abhängigkeit, zusätzliche Speicherung oder externe Verbindung. Die bestehende
+Abrechnung bleibt innerhalb der Navigation unverändert nutzbar.
+
+Gezielte Tests: `tests/month-navigation.test.ts` sowie optional
+`tests/month-navigation-browser-check.mjs`. Der Browsertest verwendet ausschließlich
+synthetische Daten, lokale Produktionsbuilds unter `/reisekosten-pro/` und simulierte
+Kalenderdaten in Europe/Berlin sowie Pacific/Kiritimati zum UTC-/Jahreswechsel.
+Er prüft zusätzlich Navigation ohne Speicheränderung, historischen Snapshot-Erhalt,
+PDF/Excel ohne Abschluss, ausdrückliche Freigabe, offene Monate, gemeinsame Auswahl,
+Touch-Flächen, Layout und Offline-Neuladen in 390/820/1440 px.
+
+**Für Schritt 3.2 offen:** Verlässliche Vollständigkeitskriterien, Erkennung und
+Bewertung nachträglicher Änderungen und Umgang mit korrigierten Abschlüssen.
+Diese Navigation erfindet dafür keine neuen Prüfregeln, Sperren oder Freigaben.
+Vorhandene leere/ältere Hinweisfelder können noch keine vollständige Problemprüfung
+liefern; ungeprüfte Monate erscheinen daher gegebenenfalls orange. Keine Prüfung
+auf physischen iPhone-/iPad-Geräten; WebKit-Nachweise stammen von macOS.
