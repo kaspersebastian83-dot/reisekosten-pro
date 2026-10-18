@@ -74,6 +74,7 @@ import { StatementClosing } from "./statement-closing";
 import { StatementChanges } from "./statement-changes";
 import { compareClosedStatementWithCurrent, isClosedStatement, persistCorrectionDraft, relatedTripsForSnapshot, snapshotHistoryLimitations, stateForStatementVersion } from "../lib/statement-comparison";
 import { droppedClosings } from "../lib/folder-backups";
+import { MonthTimeline } from "./month-timeline";
 import { FolderBanner, FolderCard, FolderConflictDialog, FolderStatusLine, StatementFiling, useFolderStorage, type FolderStorage } from "./folder-storage";
 import { changeStatementStatus, persistStatementClosing, type ClosingConfirmation, type ClosingIssue } from "../lib/statement-closing";
 import { MonthNavigation } from "./month-navigation";
@@ -3046,6 +3047,7 @@ function Statements({
         openStatement={() => {if (latest) openVersion(); else create(true);}}
         comparison={comparison}
         changes={<StatementChanges comparison={comparison} creating={correctionSaving} error={correctionError} create={() => void correct()} resume={openVersion} />}
+        timeline={<MonthTimeline state={state} month={month} statement={currentStatement} edit={editClosingIssue} />}
         checks={<MonthChecks state={state} month={month} update={update} notify={notify} editTrips={editTrips} editCosts={editCosts} viewRules={viewRules} />} />
       {reviewMonth === month && <>
       <button className="ghost workspace-hide-report" onClick={() => setReviewMonth(null)}>Zurück zur Erfassung</button>
