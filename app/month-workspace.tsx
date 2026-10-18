@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
-import { Camera, Plus } from 'lucide-react';
+import { Camera, Import, Inbox, Plus } from 'lucide-react';
 import type { AppState, StatementData } from '../lib/types';
 import { latestStatement, monthLabel, monthOverview } from '../lib/month-navigation';
 import { round2 } from '../lib/calculations';
@@ -7,11 +7,15 @@ import { isClosedStatement, type StatementComparison } from '../lib/statement-co
 import { closingPreview, groupClosingIssues } from '../lib/statement-closing';
 
 const euro = (value: number) => value.toLocaleString('de-DE', {style:'currency', currency:'EUR'});
-export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement, checks, comparison, changes, timeline}: {
+export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement, checks, comparison, changes, timeline, openImport, inboxCount = 0, startInbox}: {
   state: AppState; month: string; statement: StatementData;
   startEntry: (kind: 'trip' | 'Hotel' | 'Parken') => void;
   editCosts: () => void; editTrips: () => void; openCapture: () => void; openStatement: () => void; checks: ReactNode;
   comparison?: StatementComparison; changes?: ReactNode; timeline?: ReactNode;
+  /** Fahrtenbuch-Import (CSV). */
+  openImport?: () => void;
+  /** Offene Belege im Beleg-Eingang (alle Monate) und Einstieg in die Zuordnung der Reihe nach. */
+  inboxCount?: number; startInbox?: () => void;
 }) {
   const existing = latestStatement(state, month);
   const overview = useMemo(() => monthOverview(state, month, comparison), [state, month, comparison]);
@@ -39,11 +43,18 @@ export function MonthWorkspace({state, month, statement, startEntry, editCosts, 
       <div className="workspace-title"><p className="eyebrow">Monatsarbeitsbereich</p><h2>{monthLabel(month)}</h2><span className={`status-pill month-${overview.status}`}>{overview.label}</span></div>
       <section className="workspace-toolbar" aria-label="Spesen erfassen">
         <button className="primary workspace-trip-entry" onClick={() => startEntry('trip')}><Plus size={18}/> Dienstreise erfassen</button>
-        <button className="ghost" onClick={() => startEntry('Hotel')}><Plus size={17}/> Hotelrechnung erfassen</button>
-        <button className="ghost" onClick={() => startEntry('Parken')}><Plus size={17}/> Sonstige Kosten erfassen</button>
-        <button className="ghost" onClick={openCapture} title="Beleg fotografieren oder Datei wählen; Text wird lokal erkannt"><Camera size={17}/> Beleg fotografieren / OCR</button>
+        {/* Sichtbar kurz, vorgelesen vollständig (der sichtbare Text ist Teil des Namens). */}
+        <button className="ghost" onClick={() => startEntry('Hotel')} aria-label="Hotelrechnung erfassen"><Plus size={17}/> Hotelrechnung</button>
+        <button className="ghost" onClick={() => startEntry('Parken')} aria-label="Sonstige Kosten erfassen"><Plus size={17}/> Sonstige Kosten</button>
+        <button className="ghost" onClick={openCapture} aria-label="Beleg fotografieren / OCR" title="Beleg fotografieren oder Datei wählen; Text wird lokal erkannt"><Camera size={17}/> Beleg fotografieren</button>
+        {openImport && <button className="ghost" onClick={openImport} title="Fahrten aus einer CSV-Datei (z. B. Vimcar) übernehmen"><Import size={17}/> Fahrtenbuch importieren</button>}
       </section>
     </header>
+    {inboxCount > 0 && startInbox && <section className="workspace-inbox" aria-label="Beleg-Eingang">
+      <Inbox size={18} aria-hidden="true" />
+      <span><b>{inboxCount === 1 ? '1 Beleg wartet' : `${inboxCount} Belege warten`} auf Zuordnung</b> <small>im Beleg-Eingang (alle Monate)</small></span>
+      <button className="primary" onClick={startInbox}>Nacheinander zuordnen</button>
+    </section>}
     <div className="workspace-layout">
       <div className="workspace-main">
         {timeline}

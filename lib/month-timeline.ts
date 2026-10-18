@@ -40,3 +40,28 @@ export function monthTimeline(state: AppState, month: string, statement: Stateme
   }
   return [...days.values()].filter((d) => d.date.startsWith(month)).sort((a, b) => a.date.localeCompare(b.date));
 }
+
+/** Filter für „Prüfen“: nur Einträge, die zur jeweiligen Prüfzeile gehören (gleiche Kriterien wie die Zählung dort). */
+export type TimelineFilter = "trips" | "expenses" | "receipts" | "duplicates";
+export const timelineFilterLabels: Record<TimelineFilter, string> = {
+  trips: "Ungeprüfte Reisen / Reisehinweise",
+  expenses: "Ungeprüfte Kosten / Kostenhinweise",
+  receipts: "Fehlende Belege",
+  duplicates: "Mögliche Duplikate",
+};
+export function matchesTimelineFilter(entry: TimelineEntry, filter: TimelineFilter): boolean {
+  if (entry.kind === "trip") {
+    const t = entry.trip;
+    if (filter === "trips") return t.warnings.length > 0 || t.status === "ungeprüft" || t.status === "importiert";
+    if (filter === "duplicates") return t.warnings.some((w) => w.toLowerCase().includes("duplikat"));
+    return false;
+  }
+  const e = entry.expense;
+  if (filter === "expenses") return e.warnings.length > 0 || e.status === "ungeprüft";
+  if (filter === "receipts") return !e.receipt;
+  return false;
+}
+export function filterTimeline(days: TimelineDay[], filter: TimelineFilter | null): TimelineDay[] {
+  if (!filter) return days;
+  return days.map((d) => ({ ...d, entries: d.entries.filter((e) => matchesTimelineFilter(e, filter)) })).filter((d) => d.entries.length > 0);
+}

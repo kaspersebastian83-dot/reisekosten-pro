@@ -96,6 +96,8 @@ import { appRelease } from "../lib/release";
 import { DayDetails, MonthDetails } from "./calculation-details";
 import { UpdateNotice } from "./update-notice";
 import { nextExpenseDraft, nextTripDraft } from "../lib/batch-entry";
+import { openInboxItems, removeExpense, removeTrip } from "../lib/entry-removal";
+import type { TimelineFilter } from "../lib/month-timeline";
 
 type Tab =
   | "Fahrten importieren"
@@ -260,6 +262,20 @@ export default function Home() {
   };
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [receiptCaptureOpen, setReceiptCaptureOpen] = useState(false);
+  // Beleg-Eingang der Reihe nach abarbeiten (Monatsübersicht): Liste der Eingangs-IDs zu Beginn festhalten.
+  const [inboxQueue, setInboxQueue] = useState<{ ids: string[]; total: number } | null>(null);
+  useEffect(() => {
+    // Inzwischen anderweitig zugeordnete oder entfernte Belege überspringen.
+    if (!inboxQueue) return;
+    const open = new Set(openInboxItems(state).map((item) => item.id));
+    if (open.has(inboxQueue.ids[0])) return;
+    const ids = inboxQueue.ids.filter((id) => open.has(id));
+    setInboxQueue(ids.length ? { ...inboxQueue, ids } : null);
+  }, [inboxQueue, state]);
+  const startInbox = () => {
+    const ids = openInboxItems(state).map((item) => item.id);
+    if (ids.length) setInboxQueue({ ids, total: ids.length });
+  };
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const readLocalState = () => {
@@ -508,6 +524,8 @@ export default function Home() {
               commitClosing={commitClosing}
               commitCorrection={commitCorrection}
               folder={folder}
+              openImport={() => {setWorkspaceEntry({month}); setTab("Fahrten importieren");}}
+              startInbox={startInbox}
               editClosingIssue={target => {
                 // Hinweise aus der Abschlussprüfung direkt hier bearbeiten; danach bleibt die Prüfung sichtbar.
                 if (target.kind === "trip") setEditingTrip(state.trips.find(trip => trip.id === target.id) || null);
@@ -561,6 +579,18 @@ export default function Home() {
           close={() => setQuickOpen(false)}
         />
       )}
+      {inboxQueue && (() => {
+        const item = state.receiptInbox.find((entry) => entry.id === inboxQueue.ids[0]);
+        if (!item) return null;
+        const advance = () => setInboxQueue((queue) => {
+          const ids = queue ? queue.ids.slice(1) : [];
+          if (!ids.length) { notify("Beleg-Eingang abgearbeitet."); return null; }
+          return { ...queue!, ids };
+        });
+        return <ReceiptCapture key={item.id} state={state} month={month} update={update} notify={notify}
+          initial={structuredClone(item)} close={() => setInboxQueue(null)} onDone={advance}
+          position={`Beleg ${inboxQueue.total - inboxQueue.ids.length + 1} von ${inboxQueue.total}`} />;
+      })()}
       {receiptCaptureOpen && tab !== "Auswertungen" && (
         <ReceiptCapture
           state={state}
@@ -593,10 +623,13 @@ export default function Home() {
   );
 }
 
-function MonthChecks({state, month, update, notify, editTrips, editCosts, viewRules}: {
+function MonthChecks({state, month, update, notify, editTrips, editCosts, viewRules, showIssues, startInbox}: {
   state: AppState; month: string;
   update: (f: (s: AppState) => AppState) => void; notify: (s: string) => void;
   editTrips: () => void; editCosts: () => void; viewRules: () => void;
+  /** Monatsübersicht: passende Einträge in der Zeitleiste zeigen statt in die Listen zu wechseln. */
+  showIssues?: (filter: TimelineFilter) => void;
+  startInbox?: () => void;
 }) {
   const monthTrips = state.trips.filter(
     (t) => t.date.startsWith(month) && t.tripType === "dienstlich",
@@ -643,12 +676,12 @@ function MonthChecks({state, month, update, notify, editTrips, editCosts, viewRu
       <p>{tripIssues || expenseIssues || missingReceipts || duplicates || reasons.length ? "Vorhandene Hinweise und noch ungeprüfte Einträge dieses Monats." : "Keine bekannten Prüfhinweise für diesen Monat. Dies ersetzt keine vollständige Abschlussprüfung."}</p>
       {!!reasons.length && <ul className="month-review">{reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
       <div className="check-list">
-        <CheckRow label="Ungeprüfte Reisen / Reisehinweise" value={tripIssues} go={editTrips} />
-        <CheckRow label="Ungeprüfte Kosten / Kostenhinweise" value={expenseIssues} go={editCosts} />
-        <CheckRow label="Fehlende Belege" value={missingReceipts} go={editCosts} />
-        <CheckRow label="Mögliche Duplikate" value={duplicates} go={editTrips} />
+        <CheckRow label="Ungeprüfte Reisen / Reisehinweise" value={tripIssues} go={showIssues ? () => showIssues("trips") : editTrips} />
+        <CheckRow label="Ungeprüfte Kosten / Kostenhinweise" value={expenseIssues} go={showIssues ? () => showIssues("expenses") : editCosts} />
+        <CheckRow label="Fehlende Belege" value={missingReceipts} go={showIssues ? () => showIssues("receipts") : editCosts} />
+        <CheckRow label="Mögliche Duplikate" value={duplicates} go={showIssues ? () => showIssues("duplicates") : editTrips} />
       </div>
-      <p>{state.receiptInbox.filter(item => item.status !== "zugeordnet").length} Belege im Eingang insgesamt. <button className="ghost" onClick={editCosts}>Belege prüfen</button></p>
+      <p>{openInboxItems(state).length} Belege im Eingang insgesamt. <button className="ghost" onClick={startInbox && openInboxItems(state).length ? startInbox : editCosts}>Belege prüfen</button></p>
     </details>
     {confirmable.length > 0 && <div className="batch-confirm"><span><b>{confirmable.length} vollständige Fahrten</b> können gemeinsam bestätigt werden.</span><button className="primary" onClick={confirmClearTrips}>Eindeutige Zeiten bestätigen</button></div>}
     <button className="link" onClick={viewRules}>Tarife und Regeln ansehen</button>
@@ -910,6 +943,8 @@ function ReceiptCapture({
   notify,
   close,
   initial,
+  onDone,
+  position,
 }: {
   state: AppState;
   month: string;
@@ -917,6 +952,10 @@ function ReceiptCapture({
   notify: (s: string, undo?: () => void) => void;
   close: () => void;
   initial?: ReceiptInboxItem;
+  /** Eingang der Reihe nach: nach „übernehmen“ oder „im Eingang lassen“ weiter zum nächsten Beleg statt schließen. */
+  onDone?: () => void;
+  /** z. B. „Beleg 2 von 5“ */
+  position?: string;
 }) {
   const now = new Date().toISOString().slice(0, 10);
   const [receipt, setReceipt] = useState(initial?.receipt);
@@ -1052,7 +1091,7 @@ function ReceiptCapture({
         return s;
       }),
     );
-    close();
+    if (onDone) onDone(); else close();
   };
 
   const createExpenseFromReceipt = () => {
@@ -1167,7 +1206,7 @@ function ReceiptCapture({
         return s;
       }),
     );
-    close();
+    if (onDone) onDone(); else close();
   };
 
   return (
@@ -1181,7 +1220,7 @@ function ReceiptCapture({
       >
         <header>
           <div>
-            <p className="eyebrow">Beleg-Eingang</p>
+            <p className="eyebrow">Beleg-Eingang{position ? ` · ${position}` : ""}</p>
             <h2>
               {initial ? "Beleg prüfen" : "Fotografieren – den Rest später"}
             </h2>
@@ -1887,23 +1926,15 @@ function Trips({
     onSaved?.();
   };
   const del = (id: string) =>
-    update((s) => {
-      const old = s.trips.find((t) => t.id === id);
-      if (old)
-        s.changes.push({
-          id: uid(),
-          entityType: "trip",
-          entityId: id,
-          field: "Status",
-          oldValue: old,
-          newValue: "gelöscht",
-          reason: "Manuell gelöscht",
-          user: s.settings.profileName || "Lokales Profil",
-          changedAt: new Date().toISOString(),
-        });
-      s.trips = s.trips.filter((t) => t.id !== id);
-      return s;
-    });
+    update((s) => removeTrip(s, id, { id: uid(), user: s.settings.profileName || "Lokales Profil", at: new Date().toISOString() }));
+  // Aus dem Bearbeitungsfenster: mit Rückfrage, danach schließen.
+  const deleteEditing = () => {
+    if (!editing || !state.trips.some((t) => t.id === editing.id)) return;
+    if (!window.confirm(`Reise vom ${dateDe(editing.date)}${editing.destination ? ` nach ${editing.destination}` : ""} löschen? Gespeicherte Abrechnungen bleiben unverändert.`)) return;
+    del(editing.id);
+    setEditing(null);
+    notify("Reise gelöscht. Die Löschung steht im Änderungsprotokoll.");
+  };
   const mealOnDay = (
     trip: Trip,
     date: string,
@@ -2132,6 +2163,7 @@ function Trips({
           />
           <div className="modal-actions">
             <BatchCount count={batch} noun={["Reise", "Reisen"]} />
+            {state.trips.some((t) => t.id === editing.id) && <button className="ghost danger modal-delete" onClick={deleteEditing}><Trash2 size={16} /> Reise löschen</button>}
             <button className="ghost" onClick={() => setEditing(null)}>
               Abbrechen
             </button>
@@ -2569,6 +2601,14 @@ function Expenses({
     notify(message);
     onSaved?.();
   };
+  const deleteEditing = () => {
+    if (!editing || !state.expenses.some((e) => e.id === editing.id)) return;
+    if (!window.confirm(`Kostenposition „${editing.description || editing.category}“ über ${euro(editing.gross)} löschen? Gespeicherte Abrechnungen bleiben unverändert.`)) return;
+    const returned = state.receiptInbox.some((item) => item.expenseId === editing.id);
+    update((s) => removeExpense(s, editing.id, { id: uid(), user: s.settings.profileName || "Lokales Profil", at: new Date().toISOString() }).state);
+    setEditing(null);
+    notify(returned ? "Kostenposition gelöscht. Der Beleg liegt wieder im Beleg-Eingang." : "Kostenposition gelöscht. Die Löschung steht im Änderungsprotokoll.");
+  };
   const receipt = async (file?: File) => {
     if (!file || !editing) return;
     const revision = ++receiptRevision.current;
@@ -2932,6 +2972,7 @@ function Expenses({
           </div>
           <div className="modal-actions">
             <BatchCount count={batch} noun={["Kostenposition", "Kostenpositionen"]} />
+            {state.expenses.some((e) => e.id === editing.id) && <button className="ghost danger modal-delete" onClick={deleteEditing}><Trash2 size={16} /> Löschen</button>}
             <button className="ghost" onClick={() => setEditing(null)}>
               Abbrechen
             </button>
@@ -2967,8 +3008,10 @@ function Statements({
   update,
   notify,
   startEntry, editCosts, editTrips, openCapture, viewRules,
-  commitClosing, editClosingIssue, commitCorrection, folder,
+  commitClosing, editClosingIssue, commitCorrection, folder, openImport, startInbox,
 }: {
+  openImport?: () => void;
+  startInbox?: () => void;
   state: AppState;
   month: string;
   statement: ReturnType<typeof buildStatement>;
@@ -2985,6 +3028,9 @@ function Statements({
   folder: FolderStorage;
 }) {
   const [reviewMonth, setReviewMonth] = useState<string | null>(null);
+  // Filter der Zeitleiste aus „Prüfen“; beim Monatswechsel zurücksetzen.
+  const [timelineFilter, setTimelineFilter] = useState<TimelineFilter | null>(null);
+  useEffect(() => setTimelineFilter(null), [month]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [correctionSaving, setCorrectionSaving] = useState(false);
   const [correctionError, setCorrectionError] = useState("");
@@ -3100,8 +3146,10 @@ function Statements({
         openStatement={() => {if (latest) openVersion(); else create(true);}}
         comparison={comparison}
         changes={<StatementChanges comparison={comparison} creating={correctionSaving} error={correctionError} create={() => void correct()} resume={openVersion} />}
-        timeline={<MonthTimeline state={state} month={month} statement={currentStatement} edit={editClosingIssue} startTrip={() => startEntry('trip')} />}
-        checks={<MonthChecks state={state} month={month} update={update} notify={notify} editTrips={editTrips} editCosts={editCosts} viewRules={viewRules} />} />
+        openImport={openImport} inboxCount={openInboxItems(state).length} startInbox={startInbox}
+        timeline={<MonthTimeline state={state} month={month} statement={currentStatement} edit={editClosingIssue} startTrip={() => startEntry('trip')} filter={timelineFilter} setFilter={setTimelineFilter} />}
+        checks={<MonthChecks state={state} month={month} update={update} notify={notify} editTrips={editTrips} editCosts={editCosts} viewRules={viewRules} startInbox={startInbox}
+          showIssues={filter => { setTimelineFilter(filter); requestAnimationFrame(() => document.querySelector('.month-timeline')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }} />} />
       {reviewMonth === month && <>
       <button className="ghost workspace-hide-report" onClick={() => setReviewMonth(null)}>Zurück zur Erfassung</button>
       <section className="statement-head" ref={reportHeading} tabIndex={-1} aria-label="Abrechnung prüfen">

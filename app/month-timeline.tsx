@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { AlertTriangle, Car, ReceiptText } from 'lucide-react';
 import type { AppState, StatementData } from '../lib/types';
-import { monthTimeline, type TimelineEntry } from '../lib/month-timeline';
+import { filterTimeline, monthTimeline, timelineFilterLabels, type TimelineEntry, type TimelineFilter } from '../lib/month-timeline';
+import { DayDetails } from './calculation-details';
 import { paymentLabel } from '../lib/receipt-linking';
 
 const euro = (value: number) => value.toLocaleString('de-DE', {style: 'currency', currency: 'EUR'});
@@ -9,14 +10,18 @@ const dayLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateStri
 const short = (date: string) => `${date.slice(8, 10)}.${date.slice(5, 7)}.`;
 
 /** Kompakte Monatsansicht: je Tag eine Zeile mit Verpflegung, darunter je Reise/Kostenposition eine Zeile. Klick bearbeitet. */
-export function MonthTimeline({state, month, statement, edit, startTrip}: {
+export function MonthTimeline({state, month, statement, edit, startTrip, filter = null, setFilter}: {
   state: AppState; month: string; statement: StatementData;
   edit: (target: {kind: 'trip' | 'expense'; id: string}) => void;
   /** Leerer Monat: direkter Einstieg. */
   startTrip?: () => void;
+  /** Aus „Prüfen“: nur passende Einträge zeigen. */
+  filter?: TimelineFilter | null; setFilter?: (filter: TimelineFilter | null) => void;
 }) {
-  const days = useMemo(() => monthTimeline(state, month, statement), [state, month, statement]);
-  const counts = days.flatMap(d => d.entries).reduce((n, e) => e.kind === 'trip' ? (e.continued ? n : {...n, trips: n.trips + 1}) : {...n, expenses: n.expenses + 1}, {trips: 0, expenses: 0});
+  const allDays = useMemo(() => monthTimeline(state, month, statement), [state, month, statement]);
+  const days = useMemo(() => filterTimeline(allDays, filter), [allDays, filter]);
+  const rows = useMemo(() => new Map(statement.rows.map(row => [row.date, row])), [statement]);
+  const counts = allDays.flatMap(d => d.entries).reduce((n, e) => e.kind === 'trip' ? (e.continued ? n : {...n, trips: n.trips + 1}) : {...n, expenses: n.expenses + 1}, {trips: 0, expenses: 0});
   const row = (entry: TimelineEntry) => {
     if (entry.kind === 'trip') {
       const t = entry.trip; const warnings = [...new Set(t.warnings)];
@@ -41,10 +46,12 @@ export function MonthTimeline({state, month, statement, edit, startTrip}: {
   };
   return <section className="month-timeline" aria-label="Monat im Überblick">
     <h3>Monat im Überblick <small>{counts.trips} {counts.trips === 1 ? 'Dienstreise' : 'Dienstreisen'} · {counts.expenses} {counts.expenses === 1 ? 'Kostenposition' : 'Kostenpositionen'}</small></h3>
-    {days.length === 0 ? <div className="timeline-empty"><p>Für diesen Monat ist noch nichts erfasst.</p>{startTrip && <button className="ghost" onClick={startTrip}>Erste Dienstreise erfassen</button>}</div> :
+    {filter && <p className="timeline-filter" role="status">Gefiltert: <b>{timelineFilterLabels[filter]}</b> · {days.flatMap(d => d.entries).length} Einträge <button type="button" className="link" onClick={() => setFilter?.(null)}>Alle anzeigen</button></p>}
+    {filter && days.length === 0 ? <p className="muted">Keine passenden Einträge in diesem Monat.</p> : days.length === 0 ? <div className="timeline-empty"><p>Für diesen Monat ist noch nichts erfasst.</p>{startTrip && <button className="ghost" onClick={startTrip}>Erste Dienstreise erfassen</button>}</div> :
       <ol className="timeline-days">{days.map(d => <li key={d.date} className="timeline-day">
         <div className="timeline-date"><b>{dayLabel(d.date)}</b>{d.allowance !== null && <small title={d.allowanceReason}>{d.allowance > 0 ? `Verpflegung ${euro(d.allowance)}` : 'keine Pauschale'}</small>}</div>
         <ul>{d.entries.map(entry => <li key={entry.kind === 'trip' ? `t-${entry.trip.id}` : `e-${entry.expense.id}`}>{row(entry)}</li>)}</ul>
+        {d.allowance !== null && rows.get(d.date) && <div className="timeline-calc"><DayDetails day={rows.get(d.date)!} summary="Rechenweg" /></div>}
       </li>)}</ol>}
     {days.length > 0 && <p className="muted">Ein Klick auf eine Zeile öffnet sie zum Bearbeiten. Die Verpflegung je Tag stammt aus der Monatsberechnung (mehrere Reisen eines Tages teilen sich eine Pauschale).</p>}
   </section>;

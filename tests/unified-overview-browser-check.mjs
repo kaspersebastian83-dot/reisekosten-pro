@@ -65,9 +65,12 @@ try {
       await check(`${engine} ${viewport.width}: former checklist, missing receipts, duplicate hints and routes retain selected month`,async()=>{
         const before=await state(page);assert.match(await page.locator('.month-checks summary').innerText(),/Hinweise vorhanden/);await page.locator('.month-checks summary').click();const checks=page.getByRole('region',{name:'Prüfen',exact:true});assert.match(await checks.innerText(),/Reiseziel fehlt/);
         for(const label of ['Ungeprüfte Reisen / Reisehinweise','Ungeprüfte Kosten / Kostenhinweise','Fehlende Belege','Mögliche Duplikate'])assert.equal(await checks.getByRole('button',{name:new RegExp('^'+label)}).count(),1);
-        await checks.getByRole('button',{name:/^Ungeprüfte Reisen/}).click();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();assert.equal(await picker.inputValue(),'2026-06');assert.equal(await page.locator('.workspace-return').count(),1);
-        await page.getByRole('button',{name:'Zurück zum Monatsarbeitsbereich',exact:true}).click();assert.equal(await page.locator('.workspace-return').count(),0);
-        await page.locator('.month-checks summary').click();await page.getByRole('region',{name:'Prüfen',exact:true}).getByRole('button',{name:/^Fehlende Belege/}).click();await page.getByRole('heading',{name:'Kosten & Belege',exact:true}).waitFor();assert.equal(await page.locator('.expense-card').count(),1);
+        // Prüfzeilen filtern die Zeitleiste in der Monatsübersicht, statt in die Listen zu wechseln.
+        const timeline=page.getByRole('region',{name:'Monat im Überblick',exact:true});
+        await checks.getByRole('button',{name:/^Ungeprüfte Reisen/}).click();await timeline.locator('.timeline-filter').waitFor();assert.match(await timeline.locator('.timeline-filter').innerText(),/Ungeprüfte Reisen/);
+        assert.equal(await picker.inputValue(),'2026-06');assert.equal(await page.locator('.workspace-return').count(),0);assert.equal(await timeline.locator('.timeline-entry.expense').count(),0);assert.ok(await timeline.locator('.timeline-entry.trip').count()>=1);
+        await checks.getByRole('button',{name:/^Fehlende Belege/}).click();assert.match(await timeline.locator('.timeline-filter').innerText(),/Fehlende Belege/);assert.equal(await timeline.locator('.timeline-entry').count(),1);assert.match(await timeline.locator('.timeline-entry').innerText(),/Beleg fehlt/);
+        await timeline.getByRole('button',{name:'Alle anzeigen',exact:true}).click();assert.equal(await timeline.locator('.timeline-filter').count(),0);
         await nav(page,'Monatsübersicht');assert.equal(await picker.inputValue(),'2026-06');assert.equal(await page.locator('.workspace-return').count(),0);assert.deepEqual(await state(page),before);
       });
       await check(`${engine} ${viewport.width}: original batch confirmation changes only eligible trips and never creates a statement`,async()=>{
