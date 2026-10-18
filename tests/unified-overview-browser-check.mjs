@@ -28,7 +28,7 @@ const output=await mkdtemp(path.join(tmpdir(),'reisekosten-browser-'));
 const results=[];
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
-const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Monatsübersicht');await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
@@ -47,7 +47,7 @@ try {
     try {
       await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await check(`${engine} ${viewport.width}: one unified startup, twelve months, correct previous local month and read-only navigation`,async()=>{
-        const labels=['Monatsübersicht','Reisen','Kosten & Belege','Auswertungen','Einstellungen','Datensicherung'];
+        const labels=['Monatsübersicht','Auswertungen','Einstellungen','Datensicherung'];
         assert.deepEqual(await page.locator('.sidebar nav button span').allTextContents(),labels);assert.equal(await picker.inputValue(),'2026-11');assert.equal(await page.locator('.year-month').count(),12);
         assert.equal(await page.locator('.sidebar nav [aria-current=page]').innerText(),'Monatsübersicht');assert.equal(await page.locator('.workspace-return').count(),0);
         assert.equal(await workspace.count(),1);assert.equal(await workspace.locator('.workspace-figures').count(),1);assert.equal(await page.locator('.hero-actions,.month-command').count(),0);
@@ -93,7 +93,7 @@ try {
         const before=await state(page);await workspace.getByRole('button',{name:'Hotelrechnung erfassen',exact:true}).click();const modal=page.locator('.modal');await modal.getByLabel('Beschreibung',{exact:true}).fill('Ungespeicherter synthetischer Hotelentwurf');
         // Das Formular liegt jetzt über der Monatsübersicht; Wechsel in einen anderen Bereich oder Monat bleibt gesperrt.
         assert.equal(await page.locator('.topbar h1').innerText(),'Monatsübersicht');
-        await rawNav('Kosten & Belege');assert.equal(await page.locator('.topbar h1').innerText(),'Monatsübersicht');assert.equal(await modal.getByLabel('Beschreibung',{exact:true}).inputValue(),'Ungespeicherter synthetischer Hotelentwurf');
+        await rawNav('Einstellungen');assert.equal(await page.locator('.topbar h1').innerText(),'Monatsübersicht');assert.equal(await modal.getByLabel('Beschreibung',{exact:true}).inputValue(),'Ungespeicherter synthetischer Hotelentwurf');
         assert.equal(await modal.count(),1);await picker.fill('2026-07');assert.equal(await picker.inputValue(),'2026-06');
         assert.deepEqual(await state(page),before);await modal.getByRole('button',{name:'Abbrechen',exact:true}).click();await nav(page,'Monatsübersicht');assert.equal(await page.locator('.workspace-return').count(),0);assert.equal(await picker.inputValue(),'2026-06');assert.deepEqual(await state(page),before);
       });

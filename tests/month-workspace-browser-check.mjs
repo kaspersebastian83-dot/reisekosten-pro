@@ -29,7 +29,7 @@ const output=await mkdtemp(path.join(tmpdir(),'reisekosten-browser-'));
 const results=[];
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
-const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Monatsübersicht');await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
@@ -104,7 +104,7 @@ try {
         await editor.getByLabel('Beschreibung',{exact:true}).fill('Synthetisches Parken');await editor.getByLabel('Brutto (€)',{exact:true}).fill('25');await saveCost();
         const saved=await waitState(page,s=>s?.expenses.length===2);await assertJune();assert.equal(saved.statements.length,0);
         assert.match(await workspace.innerText(),/Weitere Kosten inkl. Tanken · erfasst\s+25,00/);assert.match(await workspace.innerText(),/Voraussichtliche persönliche Erstattung\s+53,00/);
-        await clickAction('Alle Kosten & Belege bearbeiten');await page.locator('.expense-card').getByRole('button',{name:'Bearbeiten',exact:true}).click();
+        await page.getByRole('region',{name:'Monat im Überblick',exact:true}).locator('.timeline-entry.expense').filter({hasText:'Synthetisches Parken'}).click();
         await editor.getByLabel('Brutto (€)',{exact:true}).fill('30');await saveCost();await waitState(page,s=>s?.expenses.find(e=>e.category==='Parken')?.gross===30);await assertJune();
         assert.match(await workspace.innerText(),/Weitere Kosten inkl. Tanken · erfasst\s+30,00/);await fits();
         await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-workspace.png`),fullPage:true});

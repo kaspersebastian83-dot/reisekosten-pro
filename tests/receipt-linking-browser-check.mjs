@@ -29,7 +29,7 @@ const output=await mkdtemp(path.join(tmpdir(),'reisekosten-browser-'));
 const results=[];
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
-const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Monatsübersicht');await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
@@ -41,9 +41,11 @@ try {
     const {context,page}=await open({viewport});const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await context.route(/https?:\/\/(?!127\.0\.0\.1)/,r=>r.abort());
     const modal=page.locator('.receipt-capture');
-    // Beleg-Erfassung: Kamera-Knopf (Handy), oben „Beleg“ oder – in der Monatsübersicht – im Monatsarbeitsbereich.
-    const openReceipt=async()=>{for(const sel of ['.camera-fab','.receipt-top']){if(await page.locator(sel).isVisible())return page.locator(sel).click();}return page.locator('.month-entry-workspace').getByRole('button',{name:'Beleg fotografieren / OCR',exact:true}).click();};
-    const openQuick=async()=>{if(!(await page.locator('.quick-fab').isVisible())&&!(await page.locator('.quick-top').isVisible()))await nav(page,'Kosten & Belege');await page.locator(await page.locator('.quick-fab').isVisible()?'.quick-fab':'.quick-top').click();};
+    // Beleg-Erfassung und Beleg-Eingang sitzen im Monatsarbeitsbereich der Monatsübersicht.
+    const workspace=page.locator('.month-entry-workspace');const editor=page.locator('.modal');const timeline=page.getByRole('region',{name:'Monat im Überblick',exact:true});
+    const toMonth=async()=>{if(!(await workspace.isVisible()))await nav(page,'Monatsübersicht');await workspace.waitFor();};
+    const openReceipt=async()=>{await toMonth();await workspace.getByRole('button',{name:'Beleg fotografieren / OCR',exact:true}).click();};
+    const openInbox=async()=>{await toMonth();await page.getByRole('region',{name:'Beleg-Eingang',exact:true}).getByRole('button',{name:'Nacheinander zuordnen',exact:true}).click();};
     const begin=async n=>{await openReceipt();await modal.locator('input[type=file]').first().setInputFiles(fakePdf(n));await modal.getByLabel('Betrag (€)',{exact:true}).waitFor();};
     const fields=async({amount=115,project='26.0123',start='2026-10-20',end='2026-10-21',payment='Unternehmen',invoice='INV-001'}={})=>{
       await modal.getByLabel('Kategorie',{exact:true}).selectOption('Hotel');
@@ -84,14 +86,13 @@ try {
         const locked=await waitState(page,s=>s?.statements[0].locked);frozen=locked.statements[0];baseline=frozen.data.totals.openAmount;
         assert.equal(frozen.data.totals.companyPaid,115);
       });
-      await check(`${engine} ${viewport.width}: quick parking, multiple receipts per trip and ambiguous hotel candidates`,async()=>{
-        await openQuick();const quick=page.locator('.quick-sheet');
-        await quick.locator('.quick-amount input').fill('12');
-        await quick.getByRole('button',{name:'Datum, Zahlungsart oder Reise ändern',exact:true}).click();await quick.getByLabel('Datum',{exact:true}).fill('2026-10-20');
-        await quick.getByLabel('Projekt',{exact:true}).fill('26.0123');await quick.getByRole('button',{name:'Zuordnung bestätigen',exact:true}).click();
+      await check(`${engine} ${viewport.width}: parking with receipt, multiple receipts per trip and ambiguous hotel candidates`,async()=>{
+        await toMonth();await workspace.getByRole('button',{name:'Sonstige Kosten erfassen',exact:true}).click();await editor.waitFor();
+        await editor.getByLabel('Datum',{exact:true}).fill('2026-10-20');await editor.getByLabel('Brutto (€)',{exact:true}).fill('12');
+        await editor.getByLabel('Projekt',{exact:true}).fill('26.0123');await editor.getByRole('button',{name:'Zuordnung bestätigen',exact:true}).click();
         const png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=8;c.height=8;return c.toDataURL('image/png').split(',')[1];}),'base64');
-        await quick.locator('input[type=file]').setInputFiles({name:'synthetic-parking.png',mimeType:'image/png',buffer:png});await quick.getByText('synthetic-parking.png',{exact:true}).waitFor();
-        await quick.getByRole('button',{name:'Speichern',exact:true}).click();await waitState(page,s=>s?.expenses.length===2);
+        await editor.locator('input[type=file]').setInputFiles({name:'synthetic-parking.png',mimeType:'image/png',buffer:png});await editor.getByText('synthetic-parking.png',{exact:true}).first().waitFor();
+        await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();await waitState(page,s=>s?.expenses.length===2);await editor.waitFor({state:'detached'});
         await begin(2);await fields({amount:80,project:'26.0124',payment:'privat vorgestreckt',invoice:'INV-002'});
         assert.equal(await modal.locator('.trip-candidate').count(),2);assert.equal(await modal.getByLabel('Passende Reise',{exact:true}).inputValue(),'');
         await modal.locator('.trip-candidate').first().getByRole('button',{name:'Zuordnung bestätigen',exact:true}).click();await save();
@@ -102,7 +103,7 @@ try {
         let s=await waitState(page,s=>s?.expenses.length===4);assert.equal(s.expenses[3].tripId,undefined);
         await begin(4);await fields({amount:75,start:'2026-11-20',end:'2026-11-21',invoice:'INV-004'});await modal.getByRole('button',{name:'Nur im Eingang speichern',exact:true}).click();
         await waitState(page,s=>s?.receiptInbox.some(i=>i.status!=='zugeordnet'&&i.paymentType==='Unternehmen'));
-        await nav(page,'Kosten & Belege');await page.locator('.receipt-inbox').getByRole('button',{name:'Prüfen',exact:true}).click();
+        await openInbox();
         assert.equal(await modal.getByLabel('Zahlungsart',{exact:true}).inputValue(),'Unternehmen');assert.equal(await modal.getByLabel('Übernachtungsbeginn',{exact:true}).inputValue(),'2026-11-20');
         await modal.getByRole('button',{name:'Zuordnung bestätigen',exact:true}).click();await save();s=await waitState(page,s=>s?.expenses.length===5);assert.equal(s.expenses[4].tripId,'trip-b');assert.deepEqual(s.statements[0],frozen);
       });
@@ -111,15 +112,16 @@ try {
         await begin(6);await fields({project:'',start:'',end:''});await save();await page.getByText('Diese Rechnung ist bereits als Ausgabe erfasst.',{exact:false}).waitFor();assert.equal((await state(page)).expenses.length,5);await modal.getByRole('button',{name:'Schließen',exact:true}).click();
       });
       await check(`${engine} ${viewport.width}: trip costs, local receipt view, reassign/detach and stable references`,async()=>{
-        await nav(page,'Reisen');const details=page.locator('.trip-linked-expenses').first();await details.locator(':scope > summary').click();
-        assert.match(await details.innerText(),/Vom Unternehmen bezahlt/);assert.match(await details.innerText(),/Privat bezahlt/);
-        await details.locator('.receipt-attachment').first().locator('summary').click();assert.equal(await details.locator('a[download]:visible').count(),1);
-        await details.getByRole('button',{name:'Kosten / Zuordnung bearbeiten',exact:true}).first().click();const editor=page.locator('.modal');
+        // Kosten einer Reise stehen in der Zeitleiste am Rechnungstag; Beleg und Zuordnung im Kostenfenster.
+        await toMonth();await page.locator('input[type=month]').fill('2026-10');await timeline.waitFor();
+        assert.match(await timeline.innerText(),/Vom Unternehmen bezahlt/);assert.match(await timeline.innerText(),/Privat bezahlt/);
+        const hotel=timeline.locator('.timeline-entry.expense').filter({hasText:'115,00'});
+        await hotel.click();await editor.waitFor();await editor.locator('.receipt-attachment summary').click();assert.equal(await editor.locator('a[download]:visible').count(),1);
         await editor.getByLabel('Reisezuordnung',{exact:true}).selectOption('trip-b');await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
         let s=await waitState(page,s=>s?.expenses.find(e=>e.id===hotelId)?.tripId==='trip-b');assert.equal(s.receiptInbox.find(i=>i.expenseId===hotelId).tripId,'trip-b');assert.deepEqual(s.statements[0],frozen);
-        const card=page.locator('.expense-card').filter({hasText:'115,00'});await card.getByRole('button',{name:'Bearbeiten',exact:true}).click();await editor.getByRole('button',{name:'Zuordnung lösen',exact:true}).click();await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
+        await editor.waitFor({state:'detached'});await hotel.click();await editor.getByRole('button',{name:'Zuordnung lösen',exact:true}).click();await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
         s=await waitState(page,s=>s?.expenses.find(e=>e.id===hotelId)?.tripId===undefined);assert.equal(s.receiptInbox.find(i=>i.expenseId===hotelId).tripId,undefined);
-        await card.getByRole('button',{name:'Bearbeiten',exact:true}).click();await editor.getByLabel('Reisezuordnung',{exact:true}).selectOption('trip-a');await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();await waitState(page,s=>s?.expenses.find(e=>e.id===hotelId)?.tripId==='trip-a');await fits();
+        await editor.waitFor({state:'detached'});await hotel.click();await editor.getByLabel('Reisezuordnung',{exact:true}).selectOption('trip-a');await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();await waitState(page,s=>s?.expenses.find(e=>e.id===hotelId)?.tripId==='trip-a');await fits();
       });
       await check(`${engine} ${viewport.width}: frozen report, personal payout, exports, backup and offline reload`,async()=>{
         await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();assert.deepEqual((await state(page)).statements[0],frozen);
@@ -139,8 +141,7 @@ try {
       });
       await check(`${engine} ${viewport.width}: legacy inbox without payment remains unknown and non-reimbursable`,async()=>{
         const before=await state(page);const legacy={id:'legacy-inbox',receipt:{...before.receiptInbox[0].receipt,id:'legacy-file',hash:'legacy-unique-hash',name:'synthetic-legacy.pdf'},capturedAt:'2026-10-30',status:'neu',suggestion:{date:'2026-10-30',gross:20,category:'Parken',confidence:0},notes:''};
-        await writeState(page,{...before,receiptInbox:[...before.receiptInbox,legacy]});await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-10');await nav(page,'Kosten & Belege');
-        await page.locator('.receipt-inbox').getByRole('button',{name:'Prüfen',exact:true}).click();
+        await writeState(page,{...before,receiptInbox:[...before.receiptInbox,legacy]});await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-10');await openInbox();
         assert.equal(await modal.getByLabel('Zahlungsart',{exact:true}).inputValue(),'unbekannt');await save();
         const saved=await waitState(page,s=>s?.expenses.length===before.expenses.length+1);
         assert.equal(saved.expenses.at(-1).paymentType,'unbekannt');assert.equal(saved.expenses.at(-1).paidBy,'');assert.equal(saved.expenses.at(-1).reimbursementStatus,'nicht erstattungsfähig');

@@ -33,7 +33,7 @@ const results=[];
 let syntheticBackup;
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
-const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Monatsübersicht');await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
 const writeState=(page,value)=>page.evaluate(value=>new Promise((resolve,reject)=>{const r=indexedDB.open('reisekosten-pro',1);r.onsuccess=()=>{const tx=r.result.transaction('state','readwrite');tx.objectStore('state').put(value,'main');tx.oncomplete=()=>{r.result.close();resolve();};tx.onabort=()=>reject(tx.error);};}),value);
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
@@ -86,8 +86,9 @@ try {
     await page.locator('input[type=month]').fill('2026-03');await nav(page,'Einstellungen');
     await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('privatwagen');
     await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s.settings.vehicles[0].ownership==='privatwagen');
-    await nav(page,'Reisen');await page.locator('.day-card > .calculation-details summary').click();assert.match(await page.locator('.day-card > .calculation-details').innerText(),/14,00/);
-    await page.locator('.trip-rows .calculation-details summary').first().click();assert.match(await page.locator('.trip-rows .calculation-details').first().innerText(),/11,48/);
+    // Rechenweg je Tag steht in der Zeitleiste der Monatsübersicht (Verpflegung und Kilometer des Tages).
+    await nav(page,'Monatsübersicht');const dayCalc=page.locator('.month-timeline .timeline-calc').first();await dayCalc.locator('summary').click();
+    assert.match(await dayCalc.innerText(),/14,00/);assert.match(await dayCalc.innerText(),/11,48/);
     await nav(page,'Monatsübersicht');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung ansehen)$/}).click();await page.locator('.monthly-details summary').click();await page.locator('.statement-day-details .calculation-details summary').click();
     await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,'calculation-details-desktop.png'),fullPage:true});
     await waitState(page,s=>s.statements.length===1);

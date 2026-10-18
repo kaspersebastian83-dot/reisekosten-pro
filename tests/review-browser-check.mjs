@@ -31,14 +31,14 @@ const results=[];
 const failures = [];
 const check=async(name,fn)=>{try { await fn(); results.push(name); console.log('PASS',name); } catch (error) { failures.push({name,error:String(error)});console.error('FAIL',name,String(error)); }};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
-const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Monatsübersicht');await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
 const header='Abfahrt_datum;Abfahrt_uhrzeit;Ankunft_datum;Ankunft_uhrzeit;Betrieb_km;Arbeitsweg_km;Privat_km;Start Adresse;End Adresse;Anlass der Fahrt';
 const csv=[header,'09.03.2026;08:30;09.03.2026;09:00;12,5;0;0;Start;Testziel;Hinfahrt','09.03.2026;17:00;09.03.2026;17:30;25,75;0;0;Testziel;Start;Rückfahrt'].join('\n');
 const importTrips=async(page,text=csv)=>{await nav(page,'Fahrten importieren');await page.locator('input[type=file]').setInputFiles({name:'synthetic-review.csv',mimeType:'text/csv',buffer:Buffer.from(text)});await page.getByRole('button',{name:'Weiter',exact:true}).click();await page.getByRole('button',{name:'Weiter',exact:true}).click();await page.getByRole('button',{name:/^\d+ Fahrten importieren$/}).click();await page.getByRole('heading',{name:'Import abgeschlossen'}).waitFor();};
-const start=async()=>{const result=await open();await result.page.goto(url);await result.page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(result.page,'Reisen');return result;};
+const start=async()=>{const result=await open();await result.page.goto(url);await result.page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();return result;};
 const writeState=(page,value)=>page.evaluate(value=>new Promise((resolve,reject)=>{const r=indexedDB.open('reisekosten-pro',1);r.onsuccess=()=>{const tx=r.result.transaction('state','readwrite');tx.objectStore('state').put(value,'main');tx.oncomplete=()=>{r.result.close();resolve();};tx.onabort=()=>reject(tx.error);};}),value);
 try {
   await check('stale tab autosave cannot overwrite imported trips or receipts',async()=>{
@@ -60,7 +60,7 @@ try {
     workerRevision=0;const {context,page}=await start();
     try {
       await importTrips(page);const before=await state(page);
-      await nav(page,'Reisen');await nav(page,'Fahrten importieren');await page.locator('input[type=file]').setInputFiles({name:'synthetic-next.csv',mimeType:'text/csv',buffer:Buffer.from(csv.replaceAll('09.03.2026','10.03.2026'))});
+      await nav(page,'Fahrten importieren');await page.locator('input[type=file]').setInputFiles({name:'synthetic-next.csv',mimeType:'text/csv',buffer:Buffer.from(csv.replaceAll('09.03.2026','10.03.2026'))});
       await page.getByRole('button',{name:'Weiter',exact:true}).click();await page.getByRole('button',{name:'Weiter',exact:true}).click();
       await page.evaluate(()=>{window.originalPut=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args){const request=window.originalPut.apply(this,args);if(this.name==='state')request.addEventListener('success',()=>this.transaction.abort());return request;};});
       await page.getByRole('button',{name:'2 Fahrten importieren',exact:true}).click();await page.getByRole('alert').getByText(/Import nicht gespeichert/).waitFor();
@@ -106,16 +106,17 @@ try {
       assert.deepEqual(await state(page),JSON.parse(JSON.stringify(backup)));
     } finally {await context.close();}
   });
-  await check('filtering changes visibility without changing day totals or trip explanations',async()=>{
+  // Tagessummen und Rechenweg stehen in der Zeitleiste der Monatsübersicht (frühere Reisen-Liste).
+  await check('timeline keeps day totals and explanations, also across the month boundary',async()=>{
     workerRevision=0;const {context,page}=await start();
     try {
-      await importTrips(page);await page.locator('input[type=month]').fill('2026-03');await nav(page,'Reisen');
-      await page.getByPlaceholder('Ziel, Zweck oder Kunde suchen').fill('Hinfahrt');
-      assert.match(await page.locator('.day-card .allowance').innerText(),/14,00/);
-      await page.locator('.trip-rows .calculation-details summary').first().click();assert.match(await page.locator('.trip-rows .calculation-details').first().innerText(),/14,00.*Spesen/s);
+      await importTrips(page);await page.locator('input[type=month]').fill('2026-03');await nav(page,'Monatsübersicht');
+      const timeline=page.getByRole('region',{name:'Monat im Überblick',exact:true});
+      assert.match(await timeline.locator('.timeline-day').first().locator('.timeline-date').innerText(),/14,00/);
+      await timeline.locator('.timeline-calc summary').first().click();assert.match(await timeline.locator('.timeline-calc').first().innerText(),/14,00.*Spesen/s);
       const saved=await state(page);saved.trips=[{...saved.trips[0],date:'2026-02-28',endDate:'2026-03-02',overnight:true}];await writeState(page,saved);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
-      await page.locator('input[type=month]').fill('2026-03');await nav(page,'Reisen');assert.equal(await page.locator('.day-card').count(),2);
-      assert.match(await page.locator('.day-card .allowance').first().innerText(),/28,00/);
+      await page.locator('input[type=month]').fill('2026-03');await nav(page,'Monatsübersicht');assert.equal(await timeline.locator('.timeline-day').count(),2);
+      assert.match(await timeline.locator('.timeline-day').first().locator('.timeline-date').innerText(),/28,00/);
     } finally {await context.close();}
   });
   await check('ready tabs cannot accept new edits while another tab delays its update acknowledgement',async()=>{

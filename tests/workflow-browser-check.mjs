@@ -28,7 +28,7 @@ const output=await mkdtemp(path.join(tmpdir(),'reisekosten-browser-'));
 const results=[];
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
-const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Monatsübersicht');await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
@@ -42,7 +42,7 @@ try {
       assert.equal(overflow,null,'page overflow: '+JSON.stringify(overflow));
     };
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(page,'Reisen');
+      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       assert.equal(await page.title(),'SpesenKit');
       assert.equal(await page.locator('.brand b').innerText(),'SpesenKit');
       assert.equal(await page.locator('.brand-mark img').evaluate(img=>img.complete&&img.naturalWidth>0),true,'brand icon loads');
@@ -51,18 +51,18 @@ try {
       assert.equal(await page.locator('.brand-mark').evaluate(el=>el.offsetWidth===el.offsetHeight),true,'brand symbol keeps its square proportions');
       assert.equal(await page.locator('.brand small').innerText(),'Dienstreisen · Spesen · Abrechnungen');
       await check(`${engine} ${viewport.width}: navigation, import access and empty dashboard actions`,async()=>{
-        const names=['Monatsübersicht','Reisen','Kosten & Belege','Auswertungen','Einstellungen','Datensicherung'];
+        // „Reisen“ und „Kosten & Belege“ sind in der Monatsübersicht aufgegangen.
+        const names=['Monatsübersicht','Auswertungen','Einstellungen','Datensicherung'];
         assert.deepEqual(await page.locator('.sidebar nav button span').allTextContents(),names);
-        const create=page.locator('.trip-actions .primary');
+        const create=page.locator('.month-entry-workspace').getByRole('button',{name:'Dienstreise erfassen',exact:true});
         assert.equal(await create.evaluate(button=>getComputedStyle(button).fontSize),'14px');
         assert.ok((await create.boundingBox()).height>=44);
         await create.click();await fits();await page.locator('.modal').getByRole('button',{name:'Abbrechen',exact:true}).click();
         assert.equal(await page.locator('.sidebar nav').getByRole('button',{name:'Fahrten importieren',exact:true}).count(),0);
         for(const name of names){await nav(page,name);await page.getByRole('heading',{name,exact:true}).waitFor();await fits();}
         await nav(page,'Fahrten importieren');await page.getByRole('heading',{name:'Fahrtenbuch auswählen'}).waitFor();
-        assert.equal(await page.locator('.sidebar nav [aria-current=page]').innerText(),'Reisen');
-        await fits();await page.getByRole('button',{name:'Zurück zu Reisen',exact:true}).click();
-        await nav(page,'Monatsübersicht');
+        assert.equal(await page.locator('.sidebar nav [aria-current=page]').innerText(),'Monatsübersicht');
+        await fits();await page.getByRole('button',{name:'Zurück zum Monatsarbeitsbereich',exact:true}).click();await page.locator('.month-entry-workspace').waitFor();
         // Der Fahrtenbuch-Import ist seit der Zusammenführung genau einmal in der Werkzeugleiste des Monats erreichbar.
         assert.equal(await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).count(),1);assert.doesNotMatch(await page.locator('.month-entry-workspace').innerText(),/Datei importieren/);
         // In der Monatsübersicht gibt es keine doppelten Schnellknöpfe mehr; Kosten werden dort über den Arbeitsbereich erfasst.
@@ -74,7 +74,7 @@ try {
         assert.equal(await state(page),undefined);
       });
       await check(`${engine} ${viewport.width}: validation, midnight, multiday meals and project suggestions`,async()=>{
-        await nav(page,'Reisen');await page.locator('.trip-actions .primary').click();
+        await nav(page,'Monatsübersicht');await page.locator('.month-entry-workspace').getByRole('button',{name:'Dienstreise erfassen',exact:true}).click();
         const modal=page.locator('.modal');const save=modal.getByRole('button',{name:'Speichern & fertig',exact:true});
         assert.equal(await save.isDisabled(),true);
         await modal.getByLabel('Projekt *',{exact:true}).fill('26.0123 Musterstadt');
@@ -125,20 +125,19 @@ try {
         await fits();await page.locator('.modal-body').evaluate(node=>node.scrollTop=0);await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-manual.png`),fullPage:true});
         await modal.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
         const saved=await waitState(page,s=>s?.trips.length===1);assert.equal(saved.profiles.length,0);assert.equal(saved.trips[0].order,'26.0123 Musterstadt');assert.equal(saved.trips[0].status,'ungeprüft');
-        await nav(page,'Reisen');await page.locator('.trip-actions .primary').click();
+        await page.locator('.month-entry-workspace').getByRole('button',{name:'Dienstreise erfassen',exact:true}).click();
         assert.deepEqual(await page.locator('#trip-projects option').evaluateAll(nodes=>nodes.map(n=>n.value)),['26.0123 Musterstadt']);
         await page.locator('.modal').getByRole('button',{name:'Abbrechen',exact:true}).click();
         await page.locator('input[type=month]').fill('2026-03');
-        assert.match(await page.locator('.day-list').innerText(),/14,00/);
+        assert.match(await page.getByRole('region',{name:'Monat im Überblick',exact:true}).innerText(),/14,00/);
         const id=saved.trips[0].id;
-        await nav(page,'Kosten & Belege');await page.locator('.quick-top:visible, .quick-fab:visible').click();
-        const quick=page.locator('.quick-sheet');await quick.locator('.quick-amount input').fill('12.50');
-        await quick.getByRole('button',{name:'Datum, Zahlungsart oder Reise ändern',exact:true}).click();
-        await quick.getByLabel('Datum',{exact:true}).fill('2026-03-09');await quick.getByLabel(/^Reise/).selectOption(id);
+        await page.locator('.month-entry-workspace').getByRole('button',{name:'Sonstige Kosten erfassen',exact:true}).click();
+        const costs=page.locator('.modal');await costs.getByLabel('Brutto (€)',{exact:true}).fill('12.50');
+        await costs.getByLabel('Datum',{exact:true}).fill('2026-03-09');await costs.getByLabel('Reisezuordnung',{exact:true}).selectOption(id);
         const png=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=20;c.height=40;return c.toDataURL('image/png').split(',')[1];}),'base64');
-        await quick.locator('input[type=file]').setInputFiles({name:'synthetic-receipt.png',mimeType:'image/png',buffer:png});
-        await quick.getByText('synthetic-receipt.png',{exact:true}).waitFor();
-        await quick.getByRole('button',{name:'Speichern',exact:true}).click();
+        await costs.locator('input[type=file]').setInputFiles({name:'synthetic-receipt.png',mimeType:'image/png',buffer:png});
+        await costs.getByText('synthetic-receipt.png',{exact:true}).first().waitFor();
+        await costs.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
         const withExpense=await waitState(page,s=>s?.expenses.length===1);
         assert.equal(withExpense.expenses[0].tripId,id);assert.equal(withExpense.expenses[0].receipt.type,'image/png');
         await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();
@@ -160,13 +159,13 @@ try {
         await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
         await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
         assert.deepEqual(await state(page),after);await nav(page,'Fahrten importieren');await page.getByRole('heading',{name:'Fahrtenbuch auswählen'}).waitFor();
-        await context.setOffline(false);await nav(page,'Reisen');await fits();
+        await context.setOffline(false);await nav(page,'Monatsübersicht');await fits();
         await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-trips.png`),fullPage:true});
         assert.deepEqual(errors,[]);
       });
       await check(`${engine} ${viewport.width}: multiday and existing project survive reload without changing frozen reports`,async()=>{
         const before=await state(page);
-        await page.locator('.trip-actions .primary').click();const modal=page.locator('.modal');
+        await page.locator('.month-entry-workspace').getByRole('button',{name:'Dienstreise erfassen',exact:true}).click();const modal=page.locator('.modal');
         await modal.getByLabel('Projekt *',{exact:true}).fill('26.0123 Musterstadt');
         await modal.getByLabel('Reisegrund *',{exact:true}).fill('Synthetische mehrtägige Reise');
         await modal.getByLabel('Abfahrt Datum *',{exact:true}).fill('2026-03-20');
@@ -182,9 +181,8 @@ try {
         await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
         assert.deepEqual(await state(page),saved);
         await page.locator('input[type=month]').fill('2026-03');
-        await nav(page,'Reisen');
-        const row=page.locator('.trip-rows > div').filter({hasText:'Synthetische mehrtägige Reise'}).first();
-        await row.getByRole('button',{name:'Bearbeiten',exact:true}).click();
+        await nav(page,'Monatsübersicht');const timeline=page.getByRole('region',{name:'Monat im Überblick',exact:true});
+        await timeline.locator('.timeline-entry.trip').filter({hasText:'Synthetische mehrtägige Reise'}).first().click();
         assert.equal(await modal.getByLabel('Projekt *',{exact:true}).inputValue(),'26.0123 Musterstadt');
         assert.equal(await modal.getByRole('checkbox',{name:/Alle 2 auswärtigen/}).isChecked(),true);
         assert.equal(await modal.locator('fieldset').nth(1).getByRole('checkbox',{name:'Frühstück',exact:true}).isChecked(),true);
@@ -192,7 +190,7 @@ try {
         assert.equal(await modal.getByRole('button',{name:'Speichern & fertig',exact:true}).isDisabled(),true);
         await modal.getByRole('button',{name:'Abbrechen',exact:true}).click();
         // Imported legacy rows need no forced project migration to remain editable.
-        await page.locator('.trip-rows > div').filter({hasText:'Import-Testtermin'}).first().getByRole('button',{name:'Bearbeiten',exact:true}).click();
+        await timeline.locator('.timeline-entry.trip').filter({hasText:'Import-Testtermin'}).first().click();
         assert.equal(await modal.getByRole('button',{name:'Speichern & fertig',exact:true}).isEnabled(),true);
         await modal.getByRole('button',{name:'Abbrechen',exact:true}).click();await fits();
         assert.deepEqual(errors,[]);

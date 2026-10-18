@@ -1,5 +1,15 @@
 # Release Notes
 
+## Reiter „Reisen“ und „Kosten & Belege“ entfernt (Schritt 2 von 2)
+
+- Menü: Monatsübersicht, Auswertungen, Einstellungen, Datensicherung.
+- Import kehrt nach Abschluss in die Monatsübersicht zurück („Zur Monatsübersicht“).
+- Schnellerfassung „Ausgabe“ und schwebende Beleg-/Ausgabe-Knöpfe entfallen; Kosten über „Sonstige Kosten“ bzw.
+  „Beleg fotografieren“ in der Monatsübersicht.
+- „Prüfen“ zeigt Belege im Eingang mit „Belege nacheinander zuordnen“.
+- Browserchecks auf die Monatsübersicht umgestellt (Zeitleiste statt Listen).
+- Daten, Speicherformat, Berechnung und Exporte unverändert.
+
 ## Alles aus der Monatsübersicht (Schritt 1 von 2)
 
 - Fahrtenbuch-Import in der Werkzeugleiste; Werkzeugleiste mit kürzeren Beschriftungen.

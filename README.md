@@ -791,3 +791,11 @@ Was bisher nur unter „Reisen“ bzw. „Kosten & Belege“ ging, ist jetzt auc
 - **Prüfen:** Die Prüfzeilen filtern die Zeitleiste (z. B. nur fehlende Belege) statt in die Listen zu wechseln.
 
 Browsercheck: `tests/month-functions-browser-check.mjs`.
+
+## Navigation ohne „Reisen“ und „Kosten & Belege“
+
+Das Menü enthält nur noch Monatsübersicht, Auswertungen, Einstellungen und Datensicherung. Reisen und Kosten werden
+ausschließlich über die Monatsübersicht erfasst, bearbeitet und gelöscht (Zeitleiste und Werkzeugleiste); der
+Fahrtenbuch-Import öffnet sich aus der Werkzeugleiste und kehrt danach in den Monat zurück. Entfallen sind die beiden
+Listen, die Schnellerfassung „Ausgabe“ (ersetzt durch „Sonstige Kosten“) und die schwebenden Knöpfe auf den übrigen
+Seiten. Daten, Speicherformat, Berechnung und Exporte sind unverändert.
