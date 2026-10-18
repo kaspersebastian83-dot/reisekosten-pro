@@ -300,6 +300,51 @@ try {
     assert.deepEqual(tripIds(await idbState(page)), tripIds(before.file.state));
   });
 
+  await check('Sicherungen: Tagessicherung, Abschluss-Sicherungen, „Jetzt sichern“, Wiederherstellen nur nach Bestätigung', async () => {
+    const names = async () => (await readFolder(page)).copies.map((c) => c.name);
+    const before = await names();
+    assert.equal(before.filter((n) => /^spesenkit_auto_\d{4}-\d{2}-\d{2}_\d{6}\.json$/.test(n)).length, 1, 'genau eine Tagessicherung heute');
+    assert.ok(before.some((n) => n.startsWith('spesenkit_abschluss_2026-06_V01_')), 'Sicherung nach Abschluss Juni');
+    assert.ok(before.some((n) => n.startsWith('spesenkit_abschluss_2026-05_V01_')), 'Sicherung nach Abschluss Mai (trotz Ablagefehler)');
+    await nav(page, 'Datensicherung');
+    const list = page.locator('.folder-backups');
+    await until(async () => /Tagessicherung/.test(await list.innerText()), 'Liste');
+    assert.match(await list.innerText(), /Monatsabschluss 2026-06 V01/);
+    await list.getByRole('button', { name: 'Jetzt sichern' }).click();
+    await until(async () => /Manuell/.test(await list.innerText()), 'manuelle Sicherung');
+    const current = await idbState(page);
+    // Ältere Tagessicherung: Warnung nennt die wegfallenden Abschlüsse; Abbrechen ändert nichts.
+    let message = '';
+    page.once('dialog', (dialog) => { message = dialog.message(); void dialog.dismiss(); });
+    await list.locator('tr', { hasText: 'Tagessicherung' }).getByRole('button', { name: 'Wiederherstellen' }).click();
+    await until(async () => message, 'Bestätigung');
+    assert.match(message, /ACHTUNG: .*2026-05 V01.*2026-06 V01/);
+    assert.deepEqual(await idbState(page), current, 'abgebrochen: nichts geändert');
+    // Manuelle Sicherung wiederherstellen: aktueller Stand wird vorher gesichert, Ordnerdatei folgt.
+    const revision = (await readFolder(page)).file.revision;
+    page.once('dialog', (dialog) => { message = dialog.message(); void dialog.accept(); });
+    await list.locator('tr', { hasText: 'Manuell' }).getByRole('button', { name: 'Wiederherstellen' }).click();
+    await until(async () => (await names()).some((n) => n.startsWith('spesenkit_vor_wiederherstellung_')), 'Vorher-Sicherung');
+    assert.doesNotMatch(message, /ACHTUNG/);
+    await until(async () => (await readFolder(page)).file.revision > revision, 'Ordnerdatei aktualisiert');
+    assert.deepEqual(tripIds(await idbState(page)), tripIds(current));
+    assert.equal(await folderStatus(page), 'ok');
+    await fits(page);
+    await list.screenshot({ path: path.join(output, 'sicherungen-1440.png') });
+  });
+
+  await check('„JSON auswählen“ fragt vor dem Ersetzen und sichert den aktuellen Stand', async () => {
+    const current = await idbState(page);
+    const file = path.join(output, 'fremd.json');
+    await (await import('node:fs/promises')).writeFile(file, JSON.stringify({ ...current, trips: [], statements: [] }));
+    let message = '';
+    page.once('dialog', (dialog) => { message = dialog.message(); void dialog.dismiss(); });
+    await page.locator('input[type=file][accept=".json"]').setInputFiles(file);
+    await until(async () => message, 'Bestätigung');
+    assert.match(message, /ersetzen\?/); assert.match(message, /ACHTUNG/);
+    assert.deepEqual(await idbState(page), current, 'abgebrochen: nichts geändert');
+  });
+
   assert.deepEqual(errors, []);
   await context.close();
 

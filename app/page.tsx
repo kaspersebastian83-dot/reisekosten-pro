@@ -73,6 +73,7 @@ import { MonthWorkspace } from "./month-workspace";
 import { StatementClosing } from "./statement-closing";
 import { StatementChanges } from "./statement-changes";
 import { compareClosedStatementWithCurrent, isClosedStatement, persistCorrectionDraft, relatedTripsForSnapshot, snapshotHistoryLimitations, stateForStatementVersion } from "../lib/statement-comparison";
+import { droppedClosings } from "../lib/folder-backups";
 import { FolderBanner, FolderCard, FolderConflictDialog, FolderStatusLine, StatementFiling, useFolderStorage, type FolderStorage } from "./folder-storage";
 import { changeStatementStatus, persistStatementClosing, type ClosingConfirmation, type ClosingIssue } from "../lib/statement-closing";
 import { MonthNavigation } from "./month-navigation";
@@ -179,6 +180,7 @@ export default function Home() {
       if (filed.linked) {
         try { const report = await folder.fileVersion(confirmation.snapshotId, label); filing = report.written.length || report.existing.length ? ` Abgelegt in ${report.folder}.` : ""; }
         catch { filing = " Die Dateien sind noch nicht abgelegt – siehe Hinweis oben."; }
+        await folder.backupAfterClosing(confirmation.snapshotId);
       }
       notify(filed.linked ? `Monatsabrechnung abgeschlossen und im SpesenKit-Ordner gespeichert.${filing}` : "Monatsabrechnung lokal gespeichert und abgeschlossen.");
     } catch (failure) {
@@ -3763,12 +3765,22 @@ function Backup({
     if (!file) return;
     setRestoring(true);
     try {
-      const parsed = JSON.parse(await file.text()) as AppState;
-      if (!parsed.settings || !Array.isArray(parsed.trips)) throw new Error();
-      setState(normalizeState(parsed));
+      let restored: AppState;
+      try {
+        const parsed = JSON.parse(await file.text()) as AppState;
+        if (!parsed.settings || !Array.isArray(parsed.trips)) throw new Error();
+        restored = normalizeState(parsed);
+      } catch { notify("Ungültige Datensicherung"); return; }
+      // Ausdrücklich bestätigen; abgeschlossene Abrechnungen, die dabei wegfielen, werden genannt.
+      const dropped = droppedClosings(state, restored);
+      const linked = folder.status.kind === "ok";
+      if (!confirm(`Aktuellen Datenbestand durch „${file.name}“ ersetzen?\n\nInhalt: ${restored.trips.length} Reisen, ${restored.expenses.length} Kosten, ${restored.statements.length} Abrechnungsversionen.${linked ? "\nDer aktuelle Stand wird vorher im SpesenKit-Ordner gesichert." : "\nOhne SpesenKit-Ordner gibt es keine automatische Sicherung des aktuellen Stands – vorher „Sicherung herunterladen“ verwenden."}${dropped.length ? `\n\nACHTUNG: Diese abgeschlossenen Abrechnungen sind in der Datei nicht enthalten: ${dropped.join(", ")}.` : ""}`)) return;
+      if (linked) {
+        try { await folder.backupNow("vor_wiederherstellung"); }
+        catch (error) { notify(`Nicht wiederhergestellt: Der aktuelle Stand konnte nicht gesichert werden (${error instanceof Error ? error.message : "Fehler"}).`); return; }
+      }
+      setState(restored);
       notify("Datensicherung wiederhergestellt");
-    } catch {
-      notify("Ungültige Datensicherung");
     } finally { setRestoring(false); }
   };
   const reset = async () => {
