@@ -2456,3 +2456,17 @@ button:focus-visible { outline: 3px solid #5a93d0; outline-offset: 3px; }
 
 /* Keep the backup log inside its scroll container on narrow screens. */
 .backup-grid > * { min-width: 0; }
+
+.manual-trip .trip-summary,
+.manual-trip .trip-preview,
+.manual-trip .trip-errors {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg, #f3f6fb);
+  overflow-wrap: anywhere;
+}
+.manual-trip .trip-errors { background: #fff3e8; color: #803d10; }
+.manual-trip p { margin: 6px 0; }
+.trip-preview article { padding: 12px 0; border-bottom: 1px solid #dce4ee; }
+.manual-trip details > summary { padding: 12px 0; cursor: pointer; }
+.manual-trip input, .manual-trip textarea { min-width: 0; max-width: 100%; }
