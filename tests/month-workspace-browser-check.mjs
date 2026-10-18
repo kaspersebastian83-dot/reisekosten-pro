@@ -46,7 +46,7 @@ try {
     const selectMonth=async(month)=>{await page.locator('input[type=month]').fill(month);};
     const assertJune=async()=>{assert.equal(await page.locator('input[type=month]').inputValue(),'2026-06');await workspace.waitFor();};
     const clickAction=async(name)=>workspace.getByRole('button',{name,exact:true}).click();
-    const saveCost=async()=>editor.getByRole('button',{name:'Speichern',exact:true}).click();
+    const saveCost=async()=>editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
     const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'page overflow');
     let frozen,tripId;
     try {
@@ -75,7 +75,7 @@ try {
         assert.equal(await editor.getByLabel('Rückkehr Datum *',{exact:true}).inputValue(),'2026-06-01');
         await editor.getByLabel('Projekt *',{exact:true}).fill('26.0123 Musterstadt');await editor.getByLabel('Reisegrund *',{exact:true}).fill('Synthetischer Termin');
         await editor.getByLabel('Abfahrt Datum *',{exact:true}).fill('2026-06-10');await editor.getByLabel('Rückkehr Datum *',{exact:true}).fill('2026-06-11');
-        await editor.getByLabel(/Alle 1 auswärtigen Übernachtungen/).check();await editor.getByRole('checkbox',{name:/Abwesenheitsdauer bestätigt/}).check();await editor.getByRole('button',{name:'Speichern',exact:true}).click();
+        await editor.getByLabel(/Alle 1 auswärtigen Übernachtungen/).check();await editor.getByRole('checkbox',{name:/Abwesenheitsdauer bestätigt/}).check();await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
         const saved=await waitState(page,s=>s?.trips.length===1);tripId=saved.trips[0].id;await assertJune();
         assert.equal(saved.trips[0].date,'2026-06-10');assert.equal(saved.statements.length,0);assert.match(await workspace.innerText(),/Dienstreisen\s+1/);
         assert.match(await workspace.innerText(),/Verpflegungspauschalen · Vorschau\s+28,00/);

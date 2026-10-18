@@ -111,11 +111,11 @@ try {
         assert.match(await details.innerText(),/Vom Unternehmen bezahlt/);assert.match(await details.innerText(),/Privat bezahlt/);
         await details.locator('.receipt-attachment').first().locator('summary').click();assert.equal(await details.locator('a[download]:visible').count(),1);
         await details.getByRole('button',{name:'Kosten / Zuordnung bearbeiten',exact:true}).first().click();const editor=page.locator('.modal');
-        await editor.getByLabel('Reisezuordnung',{exact:true}).selectOption('trip-b');await editor.getByRole('button',{name:'Speichern',exact:true}).click();
+        await editor.getByLabel('Reisezuordnung',{exact:true}).selectOption('trip-b');await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
         let s=await waitState(page,s=>s?.expenses.find(e=>e.id===hotelId)?.tripId==='trip-b');assert.equal(s.receiptInbox.find(i=>i.expenseId===hotelId).tripId,'trip-b');assert.deepEqual(s.statements[0],frozen);
-        const card=page.locator('.expense-card').filter({hasText:'115,00'});await card.getByRole('button',{name:'Bearbeiten',exact:true}).click();await editor.getByRole('button',{name:'Zuordnung lösen',exact:true}).click();await editor.getByRole('button',{name:'Speichern',exact:true}).click();
+        const card=page.locator('.expense-card').filter({hasText:'115,00'});await card.getByRole('button',{name:'Bearbeiten',exact:true}).click();await editor.getByRole('button',{name:'Zuordnung lösen',exact:true}).click();await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
         s=await waitState(page,s=>s?.expenses.find(e=>e.id===hotelId)?.tripId===undefined);assert.equal(s.receiptInbox.find(i=>i.expenseId===hotelId).tripId,undefined);
-        await card.getByRole('button',{name:'Bearbeiten',exact:true}).click();await editor.getByLabel('Reisezuordnung',{exact:true}).selectOption('trip-a');await editor.getByRole('button',{name:'Speichern',exact:true}).click();await waitState(page,s=>s?.expenses.find(e=>e.id===hotelId)?.tripId==='trip-a');await fits();
+        await card.getByRole('button',{name:'Bearbeiten',exact:true}).click();await editor.getByLabel('Reisezuordnung',{exact:true}).selectOption('trip-a');await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();await waitState(page,s=>s?.expenses.find(e=>e.id===hotelId)?.tripId==='trip-a');await fits();
       });
       await check(`${engine} ${viewport.width}: frozen report, personal payout, exports, backup and offline reload`,async()=>{
         await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();assert.deepEqual((await state(page)).statements[0],frozen);

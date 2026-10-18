@@ -95,6 +95,7 @@ import { PendingWork, usePendingWork } from "../lib/pending-work";
 import { appRelease } from "../lib/release";
 import { DayDetails, MonthDetails } from "./calculation-details";
 import { UpdateNotice } from "./update-notice";
+import { nextExpenseDraft, nextTripDraft } from "../lib/batch-entry";
 
 type Tab =
   | "Fahrten importieren"
@@ -1845,7 +1846,10 @@ function Trips({
   const groups = monthly.rows.filter((row) => row.trips.some((trip) =>
     [trip.destination, trip.purpose, trip.customer, trip.order].join(" ").toLowerCase().includes(query.toLowerCase()),
   )).map((row) => [row.date, [...row.trips].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))] as const);
-  const save = () => {
+  // Stapelerfassung: Anzahl der in dieser Runde gespeicherten Reisen; endet, wenn das Fenster schließt.
+  const [batch, setBatch] = useState(0);
+  useEffect(() => { if (!editing) setBatch(0); }, [editing]);
+  const save = (next = false) => {
     if (!editing || manualTripErrors(editing, state.trips.find(t => t.id === editing.id)?.order).length) return;
     const t = {
       ...editing,
@@ -1871,6 +1875,13 @@ function Trips({
       } else s.trips.push(t);
       return s;
     });
+    if (next) {
+      setEditing(nextTripDraft(t, blankTrip(state.settings)));
+      setBatch((n) => n + 1);
+      focusFirstField();
+      notify("Reise gespeichert – weiter mit der nächsten.");
+      return;
+    }
     setEditing(null);
     notify("Reise gespeichert. Eine Hotelrechnung bei Bedarf über „Hotelrechnung erfassen“ ergänzen; es wird keine Übernachtungspauschale hinzugefügt.");
     onSaved?.();
@@ -2109,20 +2120,27 @@ function Trips({
               : "Neue Dienstreise"
           }
           close={() => setEditing(null)}
+          onSubmitShortcut={() => save(true)}
         >
           <TripForm
+            key={editing.id}
             trip={editing}
             setTrip={setEditing}
             settings={state.settings}
             trips={state.trips}
           />
           <div className="modal-actions">
+            <BatchCount count={batch} noun={["Reise", "Reisen"]} />
             <button className="ghost" onClick={() => setEditing(null)}>
               Abbrechen
             </button>
-            <button className="primary" onClick={save} disabled={!!manualTripErrors(editing, state.trips.find(t => t.id === editing.id)?.order).length}>
+            <button className="ghost batch-next" onClick={() => save(true)} disabled={!!manualTripErrors(editing, state.trips.find(t => t.id === editing.id)?.order).length} title="Strg+Enter">
+              <Plus size={17} />
+              Speichern & nächste
+            </button>
+            <button className="primary" onClick={() => save()} disabled={!!manualTripErrors(editing, state.trips.find(t => t.id === editing.id)?.order).length}>
               <Save size={17} />
-              Speichern
+              Speichern & fertig
             </button>
           </div>
         </Modal>
@@ -2458,7 +2476,9 @@ function Expenses({
   const mileageConflict =
     !!editing &&
     expenseConflictsWithMileageAllowance(state.settings, state.trips, editing);
-  const save = () => {
+  const [batch, setBatch] = useState(0);
+  useEffect(() => { if (!editing) setBatch(0); }, [editing]);
+  const save = (next = false) => {
     if (!editing || readingReceipt || saving.current) return;
     const problem = linkingErrors(editing)[0] || (!validDate(editing.date) || !Number.isFinite(editing.gross) || editing.gross <= 0 ? "Bitte Rechnungsdatum und positiven Betrag prüfen" : "") || duplicateMessage(state, editing);
     if (problem) return notify(problem);
@@ -2522,10 +2542,18 @@ function Expenses({
       syncExpenseLink(s, e);
       return s;
     });
-    setEditing(null);
-    notify(workspaceMonth && !e.date.startsWith(workspaceMonth)
+    const message = workspaceMonth && !e.date.startsWith(workspaceMonth)
       ? `Kostenposition gespeichert. Rechnungsdatum ${dateDe(e.date)}: Die Ausgabe erscheint in ${monthLabel(e.date.slice(0,7))}; der Arbeitsmonat bleibt ${monthLabel(workspaceMonth)}.`
-      : "Kostenposition gespeichert");
+      : "Kostenposition gespeichert";
+    if (next) {
+      setEditing(nextExpenseDraft(e, blankExpense()));
+      setBatch((n) => n + 1);
+      focusFirstField();
+      notify(message === "Kostenposition gespeichert" ? "Kostenposition gespeichert – weiter mit der nächsten." : message);
+      return;
+    }
+    setEditing(null);
+    notify(message);
     onSaved?.();
   };
   const receipt = async (file?: File) => {
@@ -2656,7 +2684,7 @@ function Expenses({
       </div>
       </>}
       {editing && (
-        <Modal title="Kosten & Beleg" close={() => setEditing(null)}>
+        <Modal title="Kosten & Beleg" close={() => setEditing(null)} onSubmitShortcut={() => save(true)}>
           {workspaceMonth && <p className="notice" role="status">Arbeitsmonat: {monthLabel(workspaceMonth)}. Rechnungsdatum bitte am Beleg prüfen.{validDate(editing.date) && !editing.date.startsWith(workspaceMonth) && ` Diese Ausgabe erscheint wegen ihres Rechnungsdatums in ${monthLabel(editing.date.slice(0,7))}.`}</p>}
           <div className="form-grid">
             <label>
@@ -2883,12 +2911,17 @@ function Expenses({
             </div>
           )}
           <div className="modal-actions">
+            <BatchCount count={batch} noun={["Kostenposition", "Kostenpositionen"]} />
             <button className="ghost" onClick={() => setEditing(null)}>
               Abbrechen
             </button>
-            <button className="primary" onClick={save} disabled={readingReceipt}>
+            <button className="ghost batch-next" onClick={() => save(true)} disabled={readingReceipt} title="Strg+Enter">
+              <Plus size={17} />
+              Speichern & nächste
+            </button>
+            <button className="primary" onClick={() => save()} disabled={readingReceipt}>
               <Save size={17} />
-              Speichern
+              Speichern & fertig
             </button>
           </div>
         </Modal>
@@ -3949,14 +3982,30 @@ function Backup({
   );
 }
 
+/** Nach „Speichern & nächste“: Fokus auf das erste Eingabefeld des (neu gerenderten) Formulars. */
+function focusFirstField() {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.querySelector<HTMLElement>(".modal-body input:not([type=hidden]):not([disabled]), .modal-body select, .modal-body textarea")?.focus();
+  }));
+}
+
+/** Zähler der Stapelerfassung im Fenster. */
+function BatchCount({ count, noun }: { count: number; noun: [string, string] }) {
+  if (!count) return null;
+  return <span className="batch-count" role="status">{count} {count === 1 ? noun[0] : noun[1]} in dieser Runde erfasst</span>;
+}
+
 function Modal({
   title,
   close,
   children,
+  onSubmitShortcut,
 }: {
   title: string;
   close: () => void;
   children: React.ReactNode;
+  /** Strg+Enter (macOS: ⌘+Enter) im Fenster. */
+  onSubmitShortcut?: () => void;
 }) {
   return (
     <div
@@ -3965,7 +4014,12 @@ function Modal({
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="modal">
+      <div
+        className="modal"
+        onKeyDown={onSubmitShortcut ? (e) => {
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); onSubmitShortcut(); }
+        } : undefined}
+      >
         <header>
           <h2>{title}</h2>
           <button className="icon" onClick={close}>

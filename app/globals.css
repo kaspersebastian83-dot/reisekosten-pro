@@ -2839,3 +2839,9 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .issue-group summary::-webkit-details-marker { display: none; }
 .issue-group summary > span:first-child::before { content: "▸"; display: inline-block; width: 1.1em; color: var(--muted); }
 .issue-group[open] summary > span:first-child::before { content: "▾"; }
+
+/* Stapelerfassung: Zähler links, Aktionen rechts */
+.modal-actions { flex-wrap: wrap; align-items: center; }
+.batch-count { margin-right: auto; font-size: 13px; font-weight: 700; color: var(--green); }
+.batch-next { border-color: var(--green); }
+@media(max-width:600px){ .batch-count { width: 100%; } .modal-actions:has(.batch-next) button { flex: 1 1 auto; } }
