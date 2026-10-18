@@ -475,3 +475,52 @@ Diese Navigation erfindet dafür keine neuen Prüfregeln, Sperren oder Freigaben
 Vorhandene leere/ältere Hinweisfelder können noch keine vollständige Problemprüfung
 liefern; ungeprüfte Monate erscheinen daher gegebenenfalls orange. Keine Prüfung
 auf physischen iPhone-/iPad-Geräten; WebKit-Nachweise stammen von macOS.
+
+## Schritt 3.1b: Abrechnungsmonat als Arbeitsbereich
+
+Unter **Monatsabrechnungen** öffnet jeder ausgewählte Monat zunächst einen
+Arbeitsbereich. „Bisher erfasst“ zeigt die aktuellen, aus `buildStatement`
+abgeleiteten Daten: eindeutige Dienstreisen, Verpflegungsvorschau, erfasste
+Hotel-/weitere Kosten, Unternehmenszahlungen und die offene persönliche
+Erstattung. Diese Anzeige speichert keine Summen und erzeugt keinen Snapshot.
+Bei einem abgeschlossenen Monat zeigt der Arbeitsbereich weiterhin die aktuellen
+Eingaben; „Abrechnung ansehen“ öffnet den bestehenden eingefrorenen Bericht.
+
+Die Aktionen **Dienstreise erfassen**, **Hotelrechnung erfassen** und
+**Sonstige Kosten erfassen** öffnen die vorhandene Reise- beziehungsweise
+Kostenmaske. Vergangene/zukünftige Arbeitsmonate verwenden den Monatsersten als
+Datums-Vorschlag, der aktuelle Monat den lokalen heutigen Tag. Hotel ist bereits
+vorausgewählt. Das Rechnungsdatum bleibt editierbar und entscheidet weiterhin
+über die Zuordnung der Ausgabe zu einem Monat. Bei einer Abweichung erscheint
+ein Hinweis vor und nach dem Speichern. Übernachtungszeitraum, Projekt,
+bestätigte Reisezuordnung, Zahlungsart und lokale Belegdateien nutzen dieselben
+Felder und Speicherwege wie bisher. Die vorhandene Kamera-/OCR-Erfassung ist
+auch vom Arbeitsbereich erreichbar.
+
+Gespeicherte Reisen/Kosten können über **Reisen bearbeiten** und **Kosten &
+Belege bearbeiten** ergänzt werden. Nach dem Speichern im Monatsablauf öffnet
+sich wieder der Arbeitsbereich. Die gemeinsame React-Monatsauswahl bleibt dabei
+erhalten. Es gibt keine neue dauerhafte Auswahl- oder Entwurfsspeicherung;
+Neuladen startet wie bisher im lokalen Vormonat, gespeicherte Eingaben bleiben
+erhalten und der gewünschte Arbeitsmonat kann erneut ausgewählt werden.
+
+**Spesenabrechnung erstellen** nutzt die vorhandene Snapshot-Erstellung für den
+gewählten Monat und öffnet die vorhandene Prüf-/Exportansicht. Der bestehende
+Status `vollständig` mit `locked: false` bedeutet weiterhin einen bearbeitbaren
+Entwurf. Freigabe/Auszahlung erfolgt gesondert über die bestehende Statusauswahl.
+**Abrechnung fortsetzen** und **Abrechnung ansehen** öffnen die jüngste vorhandene
+Version ohne einen weiteren Snapshot. „Neue Version erstellen“ behält den
+vorhandenen expliziten Korrekturweg bei. Schritt 3.2 (zusätzliche Abschluss- oder
+Änderungsprüfungen) ist nicht Bestandteil dieser Änderung.
+
+Zusätzliche synthetische Browserprüfung, mit derselben optionalen externen
+Playwright-Installation wie die anderen Browserchecks (keine neue Abhängigkeit):
+
+```sh
+PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_EXECUTABLE=/pfad/zum/browser node tests/month-workspace-browser-check.mjs
+```
+
+Sie prüft den Juni-Arbeitsablauf bei 390/820/1440 px, die Juli-Rechnung zu einer
+Juni-Reise, Unternehmenszahlungen, lokale Belege/Zuordnungen, aktualisierte
+Kennzahlen, explizite Entwurfserstellung, Wiederaufnahme ohne Duplikat,
+unveränderte abgeschlossene Snapshots, PDF/Excel und Offline-Neuladen.

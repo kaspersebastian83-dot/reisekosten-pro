@@ -53,13 +53,13 @@ try {
     assert.match(await page.locator('.result-grid').innerText(),/1\s+Duplikate/);
     await importCsv();assert.match(await page.locator('.result-grid').innerText(),/3\s+Duplikate/);
     await nav(page,'Reisen');assert.match(await page.locator('.day-list').innerText(),/9:00/);
-    await nav(page,'Monatsabrechnungen');assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+0,00/);
+    await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung fortsetzen|Abrechnung ansehen)$/}).click();assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+0,00/);
   });
   await check('settings persist and private-car reimbursement',async()=>{
     await nav(page,'Einstellungen');await page.getByLabel('Firma',{exact:true}).fill('Synthetischer Test');
     await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('privatwagen');
     await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s?.settings.company==='Synthetischer Test');await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-03');
-    await nav(page,'Monatsabrechnungen');assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+11,48/);
+    await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung fortsetzen|Abrechnung ansehen)$/}).click();assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+11,48/);
   });
   // OCR asset loading is deliberately blocked; manual capture must remain usable.
   await context.route(/https?:\/\/(?!127\.0\.0\.1)/,r=>r.abort());
@@ -76,7 +76,7 @@ try {
     assert.equal(s.expenses[0].tripId,undefined);assert.equal(s.receiptInbox[0].status,'zugeordnet');assert.equal(s.expenses[0].receipt.type,'image/png');
   });
   await check('PDF with image attachment, Excel, CSV, ZIP exports and frozen approved statement',async()=>{
-    await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===1);
+    await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung fortsetzen',exact:true}).click();await waitState(page,s=>s?.statements.length===1);
     await page.locator('.statement-actions select').selectOption('freigegeben');const snapshot=await waitState(page,s=>s?.statements[0].locked);
     assert.equal(snapshot.statements[0].expensesSnapshot.length,1);
     const pdf=await download(page,'PDF');assert.equal(pdf.bytes.subarray(0,4).toString(),'%PDF');assert.ok((pdf.bytes.toString('latin1').match(/\/Type \/Page\b/g)||[]).length>=3);assert.ok(/\/Subtype \/Image/.test(pdf.bytes.toString('latin1')),'PDF embeds receipt image');assert.ok(pdf.bytes.toString('latin1').includes('Privatwagen'),'PDF uses reimbursed vehicle profile');
@@ -85,7 +85,7 @@ try {
     const csv=await download(page,'CSV');assert.match(csv.bytes.toString(),/11\.48/);assert.match(csv.bytes.toString(),/12\.5/);
     const zip=await download(page,'ZIP + Belege');assert.equal(zip.bytes.subarray(0,2).toString(),'PK');
     await nav(page,'Einstellungen');await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('dienstwagen');await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s?.settings.vehicles[0].ownership==='dienstwagen');
-    await nav(page,'Monatsabrechnungen');assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+11,48/);
+    await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung fortsetzen|Abrechnung ansehen)$/}).click();assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+11,48/);
     await page.getByRole('button',{name:'Neue Version erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===2);assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+0,00/);
   });
   await check('JSON backup/restore round trip and rejection without overwriting data',async()=>{
@@ -96,7 +96,7 @@ try {
   await check('offline reload including lazy Excel chunk and foreign-cache preservation',async()=>{
     await page.evaluate(async()=>{const c=await caches.open('other-app-cache');await c.put('/other-app/test',new Response('keep'));await navigator.serviceWorker.ready;});
     assert.ok((await page.evaluate(()=>caches.keys())).includes('other-app-cache'));
-    await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-03');await nav(page,'Monatsabrechnungen');await download(page,'Excel');await context.setOffline(false);
+    await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-03');await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung fortsetzen',exact:true}).click();await download(page,'Excel');await context.setOffline(false);
   });
   await check('mobile layout and menu, import, settings and receipt modal at 390px',async()=>{
     await page.setViewportSize({width:390,height:844});for(const name of ['Übersicht','Fahrten importieren','Kosten & Belege','Einstellungen']){await nav(page,name);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal page overflow in '+name);}

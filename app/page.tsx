@@ -69,8 +69,9 @@ import { manualTripErrors, manualTripInterval, manualTripReviewNotes, projectPla
 import { cleanContext, duplicateMessage, linkingErrors, paymentLabel, paymentPayer, similarExpense, syncExpenseLink, validDate } from "../lib/receipt-linking";
 import { readReceiptFile } from "../lib/receipt-file";
 import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
+import { MonthWorkspace } from "./month-workspace";
 import { MonthNavigation } from "./month-navigation";
-import { isMonth, previousCalendarMonth } from "../lib/month-navigation";
+import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel } from "../lib/month-navigation";
 import { demoState } from "../lib/demo";
 import { applyMerchantRule, recognizeReceiptLocally } from "../lib/receipt-ocr";
 import {
@@ -156,6 +157,19 @@ export default function Home() {
   const [undoAction, setUndoAction] = useState<(() => void) | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [workspaceEntry, setWorkspaceEntry] = useState<{month: string} | null>(null);
+  const [expenseDraft, setExpenseDraft] = useState<Expense | null>(null);
+  const returnToWorkspace = () => {if (workspaceEntry) setMonth(workspaceEntry.month); setWorkspaceEntry(null); setExpenseDraft(null); setEditingTrip(null); setTab("Monatsabrechnungen");};
+  const startMonthEntry = (kind: "trip" | "Hotel" | "Parken") => {
+    const today = new Date().toLocaleDateString("sv-SE");
+    const date = localCalendarMonth() === month ? today : `${month}-01`;
+    setWorkspaceEntry({month});
+    if (kind === "trip") {
+      setEditingTrip({...blankTrip(state.settings), date, endDate: date}); setTab("Reisen");
+    } else {
+      setExpenseDraft({...blankExpense(), date, category: kind}); setTab("Kosten & Belege");
+    }
+  };
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const openTrip = () => {
     setTab("Reisen");
@@ -359,8 +373,10 @@ export default function Home() {
             />
             </>
           )}
+          {workspaceEntry && <div className="notice workspace-return"><span>Arbeitsmonat: <b>{monthLabel(workspaceEntry.month)}</b></span><button className="ghost" onClick={returnToWorkspace}>Zurück zum Monatsarbeitsbereich</button></div>}
           {tab === "Reisen" && (
             <Trips
+              onSaved={workspaceEntry ? returnToWorkspace : undefined}
               editing={editingTrip}
               setEditing={setEditingTrip}
               openImport={() => setTab("Fahrten importieren")}
@@ -378,6 +394,10 @@ export default function Home() {
               update={update}
               notify={notify}
               openCapture={() => setReceiptCaptureOpen(true)}
+              initialDraft={expenseDraft}
+              clearInitialDraft={() => setExpenseDraft(null)}
+              workspaceMonth={workspaceEntry?.month}
+              onSaved={workspaceEntry ? returnToWorkspace : undefined}
               initialExpenseId={editingExpenseId}
               clearInitialExpense={() => setEditingExpenseId(null)}
             />
@@ -390,6 +410,10 @@ export default function Home() {
               statement={statement}
               update={update}
               notify={notify}
+              startEntry={startMonthEntry}
+              editCosts={() => {setWorkspaceEntry({month}); setTab("Kosten & Belege");}}
+              editTrips={() => {setWorkspaceEntry({month}); setTab("Reisen");}}
+              openCapture={() => setReceiptCaptureOpen(true)}
             />
             </MonthNavigation>
           )}
@@ -1934,6 +1958,7 @@ function Trips({
   setEditing,
   openImport,
   openExpense,
+  onSaved,
 }: {
   state: AppState;
   month: string;
@@ -1943,6 +1968,7 @@ function Trips({
   setEditing: (trip: Trip | null) => void;
   openImport: () => void;
   openExpense: (id: string) => void;
+  onSaved?: () => void;
 }) {
   usePendingWork(!!editing);
   const [query, setQuery] = useState("");
@@ -1978,6 +2004,7 @@ function Trips({
     });
     setEditing(null);
     notify("Reise erfasst. Hotelbeleg später in Kosten & Belege ergänzen; keine Übernachtungspauschale hinzugefügt.");
+    onSaved?.();
   };
   const del = (id: string) =>
     update((s) => {
@@ -2501,6 +2528,7 @@ function Expenses({
   openCapture,
   initialExpenseId,
   clearInitialExpense,
+  initialDraft, clearInitialDraft, workspaceMonth, onSaved,
 }: {
   state: AppState;
   month: string;
@@ -2509,8 +2537,15 @@ function Expenses({
   openCapture: () => void;
   initialExpenseId: string | null;
   clearInitialExpense: () => void;
+  initialDraft?: Expense | null;
+  clearInitialDraft?: () => void;
+  workspaceMonth?: string;
+  onSaved?: () => void;
 }) {
   const [editing, setEditing] = useState<Expense | null>(null);
+  useEffect(() => {
+    if (initialDraft) {setEditing(initialDraft); clearInitialDraft?.();}
+  }, [initialDraft, clearInitialDraft]);
   useEffect(() => {
     if (!initialExpenseId) return;
     const expense = state.expenses.find(e => e.id === initialExpenseId);
@@ -2601,7 +2636,10 @@ function Expenses({
       return s;
     });
     setEditing(null);
-    notify("Kostenposition gespeichert");
+    notify(workspaceMonth && !e.date.startsWith(workspaceMonth)
+      ? `Kostenposition gespeichert. Rechnungsdatum ${dateDe(e.date)}: Die Ausgabe erscheint in ${monthLabel(e.date.slice(0,7))}; der Arbeitsmonat bleibt ${monthLabel(workspaceMonth)}.`
+      : "Kostenposition gespeichert");
+    onSaved?.();
   };
   const receipt = async (file?: File) => {
     if (!file || !editing) return;
@@ -2730,6 +2768,7 @@ function Expenses({
       </div>
       {editing && (
         <Modal title="Kosten & Beleg" close={() => setEditing(null)}>
+          {workspaceMonth && <p className="notice" role="status">Arbeitsmonat: {monthLabel(workspaceMonth)}. Rechnungsdatum bitte am Beleg prüfen.{validDate(editing.date) && !editing.date.startsWith(workspaceMonth) && ` Diese Ausgabe erscheint wegen ihres Rechnungsdatums in ${monthLabel(editing.date.slice(0,7))}.`}</p>}
           <div className="form-grid">
             <label>
               Datum
@@ -2980,13 +3019,22 @@ function Statements({
   statement: currentStatement,
   update,
   notify,
+  startEntry, editCosts, editTrips, openCapture,
 }: {
   state: AppState;
   month: string;
   statement: ReturnType<typeof buildStatement>;
   update: (f: (s: AppState) => AppState) => void;
   notify: (s: string) => void;
+  startEntry: (kind: "trip" | "Hotel" | "Parken") => void;
+  editCosts: () => void;
+  editTrips: () => void;
+  openCapture: () => void;
 }) {
+  const [reviewMonth, setReviewMonth] = useState<string | null>(null);
+  const reportHeading = useRef<HTMLElement>(null);
+  useEffect(() => {if (reviewMonth === month) {reportHeading.current?.focus(); reportHeading.current?.scrollIntoView({block:"start"});}}, [reviewMonth, month]);
+  useEffect(() => setReviewMonth(null), [month]);
   const existing = state.statements
     .filter((s) => s.month === month)
     .sort((a, b) => b.version - a.version)[0];
@@ -3047,11 +3095,12 @@ function Statements({
         }),
     ]).values(),
   ];
-  const create = () => {
+  const create = (reuseDraft = false) => {
     update((s) => {
       const latest = s.statements
         .filter((x) => x.month === month)
         .sort((a, b) => b.version - a.version)[0];
+      if (reuseDraft && latest) return s;
       const snap: StatementSnapshot = {
         id: uid(),
         month,
@@ -3067,6 +3116,7 @@ function Statements({
       s.statements.push(snap);
       return s;
     });
+    setReviewMonth(month);
     notify("Abrechnung mit Tarifstand gespeichert");
   };
   const setStatus = (status: ReviewStatus) =>
@@ -3096,7 +3146,11 @@ function Statements({
     });
   return (
     <>
-      <section className="statement-head">
+      <MonthWorkspace state={state} month={month} statement={currentStatement} startEntry={startEntry} editCosts={editCosts} editTrips={editTrips} openCapture={openCapture}
+        openStatement={() => {if (existing) setReviewMonth(month); else create(true);}} />
+      {reviewMonth === month && <>
+      <button className="ghost workspace-hide-report" onClick={() => setReviewMonth(null)}>Zurück zur Erfassung</button>
+      <section className="statement-head" ref={reportHeading} tabIndex={-1} aria-label="Abrechnung prüfen">
         <div>
           <p className="eyebrow">Abrechnung {number}</p>
           <h2>
@@ -3112,7 +3166,7 @@ function Statements({
           </p>
         </div>
         <div className="statement-actions">
-          <button className="primary" onClick={create}>
+          <button className="primary" onClick={() => create()}>
             <Save size={18} />
             {existing ? "Neue Version erstellen" : "Abrechnung erstellen"}
           </button>
@@ -3293,6 +3347,7 @@ function Statements({
           </button>
         </div>
       </section>
+      </>}
     </>
   );
 }

@@ -1,0 +1,51 @@
+import { Camera, Plus } from 'lucide-react';
+import type { AppState, StatementData } from '../lib/types';
+import { latestStatement, monthLabel, monthOverview } from '../lib/month-navigation';
+import { round2 } from '../lib/calculations';
+
+const euro = (value: number) => value.toLocaleString('de-DE', {style:'currency', currency:'EUR'});
+export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement}: {
+  state: AppState; month: string; statement: StatementData;
+  startEntry: (kind: 'trip' | 'Hotel' | 'Parken') => void;
+  editCosts: () => void; editTrips: () => void; openCapture: () => void; openStatement: () => void;
+}) {
+  const existing = latestStatement(state, month);
+  const overview = monthOverview(state, month);
+  const totals = statement.totals;
+  const trips = new Set(statement.rows.flatMap(row => row.trips.map(trip => trip.id))).size;
+  return <section className="card month-entry-workspace" aria-label="Monatsarbeitsbereich">
+    <header><p className="eyebrow">Monatsarbeitsbereich</p><h2>{monthLabel(month)}</h2><span className="status-pill">{overview.label}</span></header>
+    <section aria-label="Bisher erfasst">
+      <h3>Bisher erfasst</h3>
+      <dl className="workspace-figures">
+        <div><dt>Dienstreisen</dt><dd>{trips}</dd></div>
+        <div><dt>Verpflegungspauschalen · Vorschau</dt><dd>{euro(totals.allowance)}</dd></div>
+        <div><dt>Hotelkosten · erfasst</dt><dd>{euro(totals.accommodation)}</dd></div>
+        <div><dt>Weitere Kosten inkl. Tanken · erfasst</dt><dd>{euro(round2(totals.other + totals.fuel))}</dd></div>
+        <div><dt>Vom Unternehmen bezahlt</dt><dd>{euro(totals.companyPaid)}</dd></div>
+        <div><dt>Offene persönliche Erstattung · Vorschau</dt><dd>{euro(totals.openAmount)}</dd></div>
+      </dl>
+      <p className="muted">Aktueller Erfassungsstand nach den bestehenden Regeln. Erfasste Kosten sind nicht automatisch persönlich erstattungsfähig. Diese Vorschau erstellt keinen Abrechnungsentwurf.</p>
+      {existing?.locked && <p className="notice">Die Übersicht zeigt aktuelle Eingaben. Der bereits abgeschlossene Bericht bleibt unverändert und ist über „Abrechnung ansehen“ erreichbar.</p>}
+    </section>
+    <section aria-label="Spesen erfassen">
+      <h3>Spesen erfassen</h3>
+      <div className="workspace-entry-actions">
+        <button className="ghost" onClick={() => startEntry('trip')}><Plus size={18}/> Dienstreise erfassen</button>
+        <button className="ghost" onClick={() => startEntry('Hotel')}><Plus size={18}/> Hotelrechnung erfassen</button>
+        <button className="ghost" onClick={() => startEntry('Parken')}><Plus size={18}/> Sonstige Kosten erfassen</button>
+      </div>
+      <div className="workspace-edit-actions">
+        <button className="ghost" onClick={editTrips}>Reisen bearbeiten</button>
+        <button className="ghost" onClick={editCosts}>Kosten & Belege bearbeiten</button>
+        <button className="ghost" onClick={openCapture}><Camera size={17}/> Beleg fotografieren / OCR</button>
+      </div>
+      <p className="muted">Eingaben werden lokal gespeichert und können später weiterbearbeitet werden. Bei Rechnungen zählt das tatsächliche Rechnungsdatum für die Monatszuordnung.</p>
+    </section>
+    <section className="workspace-statement-action" aria-label="Monatsabrechnung">
+      <h3>Monatsabrechnung</h3>
+      <p>{existing ? `Version ${existing.version} · ${existing.status}. Prüfung und Freigabe erfolgen in der bestehenden Abrechnung.` : 'Erst nach der Erfassung bewusst einen Entwurf erstellen. Freigabe und Abschluss erfolgen anschließend separat.'}</p>
+      <button className="primary" onClick={openStatement}>{existing ? existing.locked ? 'Abrechnung ansehen' : 'Abrechnung fortsetzen' : 'Spesenabrechnung erstellen'}</button>
+    </section>
+  </section>;
+}
