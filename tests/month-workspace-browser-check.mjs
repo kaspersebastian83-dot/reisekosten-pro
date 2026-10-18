@@ -7,6 +7,7 @@ import { readFile, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
+import { closeStatementInBrowser } from './close-statement-browser.mjs';
 const require = createRequire(import.meta.url);
 const engines = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const engine = process.env.BROWSER_ENGINE || 'chromium';
@@ -74,7 +75,7 @@ try {
         assert.equal(await editor.getByLabel('Rückkehr Datum *',{exact:true}).inputValue(),'2026-06-01');
         await editor.getByLabel('Projekt *',{exact:true}).fill('26.0123 Musterstadt');await editor.getByLabel('Reisegrund *',{exact:true}).fill('Synthetischer Termin');
         await editor.getByLabel('Abfahrt Datum *',{exact:true}).fill('2026-06-10');await editor.getByLabel('Rückkehr Datum *',{exact:true}).fill('2026-06-11');
-        await editor.getByLabel(/Alle 1 auswärtigen Übernachtungen/).check();await editor.getByRole('button',{name:'Speichern',exact:true}).click();
+        await editor.getByLabel(/Alle 1 auswärtigen Übernachtungen/).check();await editor.getByRole('checkbox',{name:/Abwesenheitsdauer bestätigt/}).check();await editor.getByRole('button',{name:'Speichern',exact:true}).click();
         const saved=await waitState(page,s=>s?.trips.length===1);tripId=saved.trips[0].id;await assertJune();
         assert.equal(saved.trips[0].date,'2026-06-10');assert.equal(saved.statements.length,0);assert.match(await workspace.innerText(),/Dienstreisen\s+1/);
         assert.match(await workspace.innerText(),/Verpflegungspauschalen · Vorschau\s+28,00/);
@@ -119,12 +120,13 @@ try {
         await page.getByRole('button',{name:'Zurück zum Monatsarbeitsbereich',exact:true}).click();await assertJune();assert.deepEqual(await state(page),before);
       });
       await check(`${engine} ${viewport.width}: explicit June draft creation, continuation and PDF/Excel export never auto-close or duplicate drafts`,async()=>{
-        await workspace.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).dblclick();const saved=await waitState(page,s=>s?.statements.length===1);
+        // Dispatch both activations to the same control; opening the report scrolls the page.
+        await workspace.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).evaluate(button=>{button.click();button.click();});const saved=await waitState(page,s=>s?.statements.length===1);
         assert.equal(saved.statements[0].month,'2026-06');assert.equal(saved.statements[0].locked,false);assert.equal(saved.statements[0].status,'vollständig');assert.equal(saved.changes.length,1);
         await page.locator('.statement-head').waitFor();assert.match(await page.locator('.statement-head').innerText(),/Juni 2026/);
         await page.getByRole('button',{name:'Zurück zur Erfassung',exact:true}).click();await clickAction('Abrechnung fortsetzen');assert.equal((await state(page)).statements.length,1);
         assert.equal((await download(page,'PDF')).bytes.subarray(0,4).toString(),'%PDF');assert.equal((await download(page,'Excel')).bytes.subarray(0,2).toString(),'PK');assert.deepEqual((await state(page)).statements,saved.statements);
-        await page.locator('.statement-actions select').selectOption('freigegeben');frozen=(await waitState(page,s=>s?.statements[0].locked)).statements[0];
+        await closeStatementInBrowser(page);frozen=(await waitState(page,s=>s?.statements[0].locked)).statements[0];
         await fits();
       });
       await check(`${engine} ${viewport.width}: closed report survives later entry, workspace uses live figures and viewing preserves snapshot`,async()=>{

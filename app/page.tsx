@@ -69,6 +69,8 @@ import { buildAnnualAnalysis } from "../lib/annual-reports";
 import { readReceiptFile } from "../lib/receipt-file";
 import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
 import { MonthWorkspace } from "./month-workspace";
+import { StatementClosing } from "./statement-closing";
+import { changeStatementStatus, persistStatementClosing, type ClosingConfirmation, type ClosingIssue } from "../lib/statement-closing";
 import { MonthNavigation } from "./month-navigation";
 import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel, monthOverview } from "../lib/month-navigation";
 import { demoState } from "../lib/demo";
@@ -138,6 +140,24 @@ export default function Home() {
       stateRef.current = committed.state;
       setState(committed.state);
       return committed;
+    } finally { importBusy.current = false; setTransactionSaving(false); }
+  };
+  const commitClosing = async (confirmation: ClosingConfirmation) => {
+    if (importBusy.current) throw new Error("Ein lokaler Speichervorgang läuft bereits.");
+    importBusy.current = true; setTransactionSaving(true);
+    try {
+      await saveQueue.current;
+      const current = stateRef.current;
+      if (current !== lastSaved.current) throw new Error("Bitte zuerst offene Änderungen erfolgreich lokal speichern und die Abschlussprüfung erneut öffnen.");
+      const committed = await persistStatementClosing(current, confirmation, { id: uid(), at: new Date().toISOString() }, saveState);
+      lastSaved.current = committed;
+      stateRef.current = committed;
+      setState(committed);
+      setSaveError("");
+      notify("Monatsabrechnung lokal gespeichert und abgeschlossen.");
+    } catch (failure) {
+      setSaveError(`Der Monatsabschluss wurde nicht bestätigt. ${failure instanceof Error ? failure.message : "Lokales Speichern fehlgeschlagen."}`);
+      throw failure;
     } finally { importBusy.current = false; setTransactionSaving(false); }
   };
   const canUpdate = async (discard: boolean) => {
@@ -254,7 +274,7 @@ export default function Home() {
     );
   return (
     <PendingWork.Provider value={reportPending}>
-    {transactionSaving && <div className="import-saving" role="status">Import wird vollständig gespeichert …</div>}
+    {transactionSaving && <div className="import-saving" role="status">Lokale Änderungen werden vollständig gespeichert …</div>}
     {updatePreparing && <div className="import-saving" role="status">Update wird vorbereitet · bitte kurz warten …</div>}
     <div className="app-shell" inert={transactionSaving || updatePreparing}>
       <aside className={`sidebar ${sidebar ? "open" : ""}`}>
@@ -411,6 +431,12 @@ export default function Home() {
               editTrips={() => {setWorkspaceEntry({month}); setTab("Reisen");}}
               openCapture={() => setReceiptCaptureOpen(true)}
               viewRules={() => setTab("Einstellungen")}
+              commitClosing={commitClosing}
+              editClosingIssue={target => {
+                setWorkspaceEntry({month});
+                if (target.kind === "trip") { setEditingTrip(state.trips.find(trip => trip.id === target.id) || null); setTab("Reisen"); }
+                else { setEditingExpenseId(target.id); setTab("Kosten & Belege"); }
+              }}
             />
             </MonthNavigation>
           )}
@@ -2771,6 +2797,7 @@ function Statements({
   update,
   notify,
   startEntry, editCosts, editTrips, openCapture, viewRules,
+  commitClosing, editClosingIssue,
 }: {
   state: AppState;
   month: string;
@@ -2782,6 +2809,8 @@ function Statements({
   editTrips: () => void;
   openCapture: () => void;
   viewRules: () => void;
+  commitClosing: (confirmation: ClosingConfirmation) => Promise<void>;
+  editClosingIssue: (target: NonNullable<ClosingIssue['target']>) => void;
 }) {
   const [reviewMonth, setReviewMonth] = useState<string | null>(null);
   const reportHeading = useRef<HTMLElement>(null);
@@ -2790,8 +2819,8 @@ function Statements({
   const existing = state.statements
     .filter((s) => s.month === month)
     .sort((a, b) => b.version - a.version)[0];
-  const statement = existing?.locked ? existing.data : currentStatement;
-  const exportState = existing?.locked ? {
+  const statement = existing?.data || currentStatement;
+  const exportState = existing ? {
     ...state,
     settings: existing.settingsSnapshot || state.settings,
     expenses: existing.expensesSnapshot || state.expenses,
@@ -2869,33 +2898,10 @@ function Statements({
       return s;
     });
     setReviewMonth(month);
-    notify("Abrechnung mit Tarifstand gespeichert");
+    notify("Entwurf mit Tarifstand erstellt.");
   };
   const setStatus = (status: ReviewStatus) =>
-    update((s) => {
-      const x = s.statements.find((x) => x.id === existing?.id);
-      if (x) {
-        s.changes.push({
-          id: uid(),
-          entityType: "statement",
-          entityId: x.id,
-          field: "Status",
-          oldValue: x.status,
-          newValue: status,
-          reason: "Status geändert",
-          user: s.settings.profileName || "Lokales Profil",
-          changedAt: new Date().toISOString(),
-        });
-        if (!x.locked) {
-          x.data = structuredClone(currentStatement);
-          x.settingsSnapshot = structuredClone(s.settings);
-          x.expensesSnapshot = structuredClone(s.expenses.filter((expense) => expense.date.startsWith(month)));
-        }
-        x.status = status;
-        x.locked = x.locked || ["freigegeben", "ausgezahlt"].includes(status);
-      }
-      return s;
-    });
+    update((s) => changeStatementStatus(s, existing!.id, status, { id: uid(), at: new Date().toISOString() }));
   return (
     <>
       <MonthWorkspace state={state} month={month} statement={currentStatement} startEntry={startEntry} editCosts={editCosts} editTrips={editTrips} openCapture={openCapture}
@@ -2914,8 +2920,8 @@ function Statements({
           </h2>
           <p>
             {statement.rows.length} Reisetage ·{" "}
-            {state.expenses.filter((e) => e.date.startsWith(month)).length}{" "}
-            Kostenpositionen · Tarifstand wird beim Abschluss eingefroren.
+            {exportState.expenses.filter((e) => e.date.startsWith(month) && e.status !== "storniert").length}{" "}
+            Kostenpositionen · Gespeicherter Entwurfs- und Tarifstand.
           </p>
         </div>
         <div className="statement-actions">
@@ -2925,18 +2931,19 @@ function Statements({
           </button>
           {existing && (
             <select
+              aria-label="Abrechnungsstatus"
               value={existing.status}
               onChange={(e) => setStatus(e.target.value as ReviewStatus)}
             >
-              {!existing.locked && <><option>vollständig</option>
-              <option>zur Freigabe eingereicht</option></>}
-              <option>freigegeben</option>
-              <option>ausgezahlt</option>
+              {!existing.locked && <><option>vollständig</option><option>zur Freigabe eingereicht</option></>}
+              {!["vollständig", "zur Freigabe eingereicht", "storniert", "ausgezahlt"].includes(existing.status) && <option disabled>{existing.status}</option>}
+              {existing.locked && ["freigegeben", "ausgezahlt"].includes(existing.status) && <option>ausgezahlt</option>}
               <option>storniert</option>
             </select>
           )}
         </div>
       </section>
+      <StatementClosing state={state} month={month} snapshot={existing} commit={commitClosing} edit={editClosingIssue} />
       <section className="card statement-profile">
         <div>
           <span>Name</span>
@@ -2965,7 +2972,7 @@ function Statements({
           )}
         </div>
       </section>
-      {existing?.locked && !existing.expensesSnapshot && <div className="notice" role="status">Diese ältere Abrechnung enthält eingefrorene Berechnungen, aber keinen eingefrorenen Beleg- und Profilstand. Ihre Exporte verwenden dafür die aktuellen Belege und Einstellungen.</div>}
+      {existing && (!existing.expensesSnapshot || !existing.settingsSnapshot) && <div className="notice" role="status">Diese ältere Abrechnung enthält eingefrorene Berechnungen, aber keinen vollständigen eingefrorenen Beleg- und Profilstand. Ihre Exporte verwenden dafür teilweise die aktuellen Belege und Einstellungen. Eine ungeprüfte Freigabe ist ausgeschlossen.</div>}
       {existing?.locked && (
         <div className="notice">
           <ShieldCheck />
