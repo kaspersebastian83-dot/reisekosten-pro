@@ -7,6 +7,15 @@ import type { AppState, StatementData } from "./types";
 const euro = (n: number) =>
   n.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 
+export interface StatementExportContext {
+  version: number;
+  correction: boolean;
+}
+export const correctionExportNotice = 'Korrekturversion: Die ausgewiesenen Beträge sind keine automatisch offenen Restzahlungen. Ein tatsächlicher Zahlungsbedarf muss mit bereits erfolgten Zahlungen gesondert abgestimmt werden. Vollständiger Abrechnungsstand, keine zusätzliche Buchung oder Nachzahlung.';
+export const statementAmountLabel = 'Persönlicher Erstattungsbetrag laut Abrechnungsstand';
+const versionSuffix = (context?: StatementExportContext) => context ? `V${String(context.version).padStart(2, '0')}` : 'Entwurf';
+export const statementExportFilename = (month: string, extension: string, context?: StatementExportContext, datev = false) => `${datev ? 'DATEV_' : ''}Reisekosten_${month}_${versionSuffix(context)}.${extension}`;
+
 function vehicleDetails(
   state: AppState,
   trip: StatementData["rows"][number]["trips"][number],
@@ -73,15 +82,18 @@ function download(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-function buildPdfDocument(
+export function buildPdfDocument(
   data: StatementData,
   state: AppState,
   number: string,
+  context?: StatementExportContext,
 ) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   doc.setFont("helvetica", "bold");
   doc.setFontSize(17);
   doc.text("Reisekostenabrechnung", 14, 16);
+  doc.setFontSize(10);
+  doc.text(context ? `Abrechnungsversion: Version ${context.version}` : 'Nicht gespeicherter Entwurf', 283, 16, { align: 'right' });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   const monthLabel = new Date(`${data.month}-01T12:00:00`).toLocaleDateString(
@@ -104,8 +116,10 @@ function buildPdfDocument(
     265,
   );
   doc.text(vehicleLines, 14, 33);
+  const noteLines: string[] = context?.correction ? doc.splitTextToSize(correctionExportNotice, 265) : [];
+  if (noteLines.length) doc.text(noteLines, 14, 33 + vehicleLines.length * 4);
   autoTable(doc, {
-    startY: 36 + vehicleLines.length * 4,
+    startY: 36 + vehicleLines.length * 4 + noteLines.length * 4,
     head: [
       [
         "Datum",
@@ -120,7 +134,7 @@ function buildPdfDocument(
         "km-Erstattung",
         "Hotel",
         "Sonstiges",
-        "Offen",
+        "Persönl. Erstattung",
       ],
     ],
     body: data.rows.map((r) => [
@@ -153,23 +167,24 @@ function buildPdfDocument(
       );
     },
   });
-  const y = Math.min(
-    175,
-    ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-      ?.finalY || 100) + 8,
-  );
+  let y = ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || 100) + 8;
+  // Keep the longer neutral amount label and signature clear of a full table.
+  if (y + 22 > doc.internal.pageSize.getHeight() - 10) {
+    doc.addPage('a4', 'landscape'); y = 20;
+  }
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
   doc.text(
-    `Spesen: ${euro(data.totals.allowance)}  |  Kilometer: ${euro(data.totals.mileage)}  |  Gesamtkosten: ${euro(data.totals.grandTotal)}  |  Offener Auszahlungsbetrag: ${euro(data.totals.openAmount)}`,
+    `Spesen: ${euro(data.totals.allowance)}  |  Kilometer: ${euro(data.totals.mileage)}  |  Gesamtkosten: ${euro(data.totals.grandTotal)}`,
     14,
     y,
   );
+  doc.text(`${statementAmountLabel}: ${euro(data.totals.openAmount)}`, 14, y + 5);
   doc.setFont("helvetica", "normal");
   doc.text(
     "Ort/Datum: ____________________   Unterschrift Reisender: ____________________   Sachlich geprüft: ____________________   Freigabe/Buchhaltung: ____________________",
     14,
-    y + 13,
+    y + 18,
   );
   const receipts = state.expenses
     .filter((expense) => expense.date.startsWith(data.month) && expense.receipt)
@@ -279,9 +294,10 @@ export function exportPdf(
   data: StatementData,
   state: AppState,
   number: string,
+  context?: StatementExportContext,
 ) {
-  const doc = buildPdfDocument(data, state, number);
-  doc.save(`Reisekosten_${data.month}_${number}.pdf`);
+  const doc = buildPdfDocument(data, state, number, context);
+  doc.save(statementExportFilename(data.month, 'pdf', context));
 }
 
 const rowsForExport = (data: StatementData, state: AppState) =>
@@ -322,7 +338,7 @@ const rowsForExport = (data: StatementData, state: AppState) =>
     };
   });
 
-export async function exportExcel(data: StatementData, state: AppState) {
+export async function exportExcel(data: StatementData, state: AppState, context?: StatementExportContext) {
   const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "SpesenKit";
@@ -343,6 +359,13 @@ export async function exportExcel(data: StatementData, state: AppState) {
   overview.getRow(1).font = { bold: true, size: 16 };
   overview.getRow(8).font = { bold: true };
   overview.columns = [{ width: 28 }, { width: 28 }, { width: 20 }];
+  overview.addRow([]);
+  overview.addRow(['Abrechnungsversion', context ? `Version ${context.version}` : 'Nicht gespeicherter Entwurf']);
+  for (const text of [statementAmountLabel + ': Die Spalte OffenerBetrag enthält den rechnerischen Betrag dieses Abrechnungsstands, keine dokumentierte Restzahlung.', ...(context?.correction ? [correctionExportNotice] : [])]) {
+    const row = overview.addRow([text]);
+    overview.mergeCells(row.number, 1, row.number, 3);
+    row.alignment = { wrapText: true, vertical: 'top' }; row.height = 60;
+  }
 
   const expenses = workbook.addWorksheet("Reisekosten");
   const rows = rowsForExport(data, state);
@@ -368,11 +391,11 @@ export async function exportExcel(data: StatementData, state: AppState) {
     new Blob([buffer as unknown as BlobPart], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
-    `Reisekosten_${data.month}.xlsx`,
+    statementExportFilename(data.month, 'xlsx', context),
   );
 }
 
-export function exportCsv(data: StatementData, state: AppState, datev = false) {
+export function exportCsv(data: StatementData, state: AppState, datev = false, context?: StatementExportContext) {
   const rows: Record<string, unknown>[] = datev
     ? data.rows.map((r) => ({
         Belegdatum: r.date.replaceAll("-", ""),
@@ -387,9 +410,7 @@ export function exportCsv(data: StatementData, state: AppState, datev = false) {
   const csv = Papa.unparse(rows, { delimiter: ";" });
   download(
     new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }),
-    datev
-      ? `DATEV_Reisekosten_${data.month}.csv`
-      : `Reisekosten_${data.month}.csv`,
+    statementExportFilename(data.month, 'csv', context, datev),
   );
 }
 
@@ -404,15 +425,16 @@ export async function exportZip(
   data: StatementData,
   state: AppState,
   number: string,
+  context?: StatementExportContext,
 ) {
   const zip = new JSZip();
-  const pdf = buildPdfDocument(data, state, number);
+  const pdf = buildPdfDocument(data, state, number, context);
   zip.file(
-    `Reisekosten_${data.month}_${number}.pdf`,
+    statementExportFilename(data.month, 'pdf', context),
     pdf.output("arraybuffer"),
   );
   zip.file(
-    `Abrechnung_${data.month}.json`,
+    `Abrechnung_${data.month}_${versionSuffix(context)}.json`,
     JSON.stringify({ number, data }, null, 2),
   );
   state.expenses
@@ -423,6 +445,6 @@ export async function exportZip(
     });
   download(
     await zip.generateAsync({ type: "blob" }),
-    `Reisekosten_${data.month}_mit_Belegen.zip`,
+    statementExportFilename(data.month, 'zip', context),
   );
 }

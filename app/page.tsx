@@ -83,6 +83,7 @@ import {
   exportExcel,
   exportPdf,
   exportZip,
+  correctionExportNotice,
 } from "../lib/exports";
 
 import { PendingWork, usePendingWork } from "../lib/pending-work";
@@ -2855,6 +2856,7 @@ function Statements({
   const comparison = useMemo(() => compareClosedStatementWithCurrent(state, month, currentStatement), [state, month, currentStatement]);
   const statement = existing?.data || currentStatement;
   const exportState = useMemo(() => existing ? stateForStatementVersion(state, existing) : state, [state, existing]);
+  const exportContext = existing ? { version: existing.version, correction: versions.some(item => item.version < existing.version && isClosedStatement(item)) } : undefined;
   const number =
     existing?.number ||
     `RK-${month.replace("-", "")}-${String(state.statements.length + 1).padStart(3, "0")}`;
@@ -3128,25 +3130,30 @@ function Statements({
             PDF für Unterschrift, Tabellen für Buchhaltung oder Komplettpaket
             mit Belegen.
           </p>
+          <p>Tabellen enthalten den vollständigen ausgewählten Abrechnungsstand. Die bestehende Spalte „OffenerBetrag“ bezeichnet dessen rechnerischen Erstattungsbetrag, keine tatsächliche Restzahlung.</p>
+          {exportContext?.correction && <p className="correction-payment-note">{correctionExportNotice} CSV-/DATEV-Exporte vor einer Übernahme mit der Buchhaltung abstimmen; frühere Versionen nicht zusätzlich buchen.</p>}
         </div>
         <div className="export-buttons">
-          <button onClick={() => exportPdf(statement, exportState, number)}>
+          <button onClick={() => exportPdf(statement, exportState, number, exportContext)}>
             <FileDown />
             PDF
           </button>
-          <button onClick={() => exportExcel(statement, exportState)}>
+          <button onClick={() => exportExcel(statement, exportState, exportContext)}>
             <FileSpreadsheet />
             Excel
           </button>
-          <button onClick={() => exportCsv(statement, exportState)}>
+          <button onClick={() => exportCsv(statement, exportState, false, exportContext)}>
             <Download />
             CSV
           </button>
-          <button onClick={() => exportCsv(statement, exportState, true)}>
+          <button onClick={() => {
+            if (exportContext?.correction && !window.confirm(`${correctionExportNotice}\n\nDiese DATEV-CSV ist keine zusätzliche Differenzbuchung. Vor einer Übernahme frühere Buchungen und Zahlungen gesondert abstimmen. Vollständigen ausgewählten Stand trotzdem exportieren?`)) return;
+            exportCsv(statement, exportState, true, exportContext);
+          }}>
             <FileSpreadsheet />
             DATEV-CSV
           </button>
-          <button onClick={() => exportZip(statement, exportState, number)}>
+          <button onClick={() => exportZip(statement, exportState, number, exportContext)}>
             <Archive />
             ZIP + Belege
           </button>
