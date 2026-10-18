@@ -73,11 +73,16 @@ try {
         const before=await state(page);await page.getByRole('button',{name:'Eindeutige Zeiten bestätigen',exact:true}).click();const saved=await waitState(page,s=>s?.trips[0].absenceConfirmed);
         assert.equal(saved.trips[0].status,'geprüft');assert.deepEqual(saved.trips[1],before.trips[1]);assert.deepEqual(saved.expenses,before.expenses);assert.deepEqual(saved.statements,before.statements);await fits();
       });
-      await check(`${engine} ${viewport.width}: existing reports plus preserved dashboard metrics and bars are read-only`,async()=>{
-        const before=await state(page);await nav(page,'Auswertungen');await page.getByText('Bisherige Monatskennzahlen und Kostenaufteilung',{exact:true}).click();
-        assert.equal(await page.locator('.previous-dashboard-statistics .metric').count(),4);assert.equal(await page.locator('.cost-bars .bar-row').count(),5);
-        assert.equal(await page.locator('.report-grid .card').count(),3);assert.equal(await page.locator('.month-bars>div').count(),6);assert.match(await page.locator('.previous-dashboard-statistics').innerText(),/Dienstliche Kilometer/);
-        await fits();await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-reports.png`),fullPage:true});assert.deepEqual(await state(page),before);
+      await check(`${engine} ${viewport.width}: annual analysis has twelve months, independent year selection and stays read-only`,async()=>{
+        const before=await state(page);await nav(page,'Auswertungen');
+        assert.equal(await page.locator('.annual-month-row').count(),12);assert.equal(await page.locator('.annual-metric-grid .metric').count(),5);
+        assert.equal(await page.locator('.quick-top,.receipt-top,.quick-fab,.camera-fab').count(),0);
+        assert.equal(await page.locator('.year-picker strong').innerText(),'2026');assert.match(await page.locator('.analysis-card[aria-labelledby="projects-heading"]').innerText(),/Nicht eindeutig zugeordnet/);
+        assert.match(await page.locator('.analysis-card[aria-labelledby="reimbursements-heading"]').innerText(),/Offene persönliche Erstattung/);
+        await page.getByRole('button',{name:'Vorheriges Jahr',exact:true}).click();assert.equal(await page.locator('.year-picker strong').innerText(),'2025');
+        assert.equal(await picker.inputValue(),'2026-06');assert.equal(await page.locator('.annual-month-row').count(),12);
+        assert.match(await page.locator('.annual-month-bars').innerText(),/0,00/);await page.getByRole('button',{name:'Nächstes Jahr',exact:true}).click();
+        assert.equal(await page.locator('.year-picker strong').innerText(),'2026');await fits();await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-reports.png`),fullPage:true});assert.deepEqual(await state(page),before);
         await goJune();await page.getByRole('button',{name:'Tarife und Regeln ansehen',exact:true}).click();await page.getByRole('heading',{name:'Einstellungen',exact:true}).waitFor();assert.equal(await picker.inputValue(),'2026-06');await nav(page,'Monatsübersicht');
       });
       await check(`${engine} ${viewport.width}: unsaved cost draft survives sidebar, return and month-change requests until explicit cancel`,async()=>{

@@ -65,6 +65,7 @@ import {
 } from "../lib/importer";
 import { manualTripErrors, manualTripInterval, manualTripReviewNotes, projectPlace, projectSuggestions } from "../lib/manual-trip";
 import { cleanContext, duplicateMessage, linkingErrors, paymentLabel, paymentPayer, similarExpense, syncExpenseLink, validDate } from "../lib/receipt-linking";
+import { buildAnnualAnalysis } from "../lib/annual-reports";
 import { readReceiptFile } from "../lib/receipt-file";
 import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
 import { MonthWorkspace } from "./month-workspace";
@@ -322,6 +323,7 @@ export default function Home() {
             <h1>{tab}</h1>
           </div>
           <div className="top-actions">
+            {tab !== "Auswertungen" && <>
             <button
               className="ghost receipt-top"
               onClick={() => setReceiptCaptureOpen(true)}
@@ -336,6 +338,7 @@ export default function Home() {
               <Plus size={17} />
               Ausgabe
             </button>
+            </>}
             <label className="month-picker">
               Abrechnungsmonat
               <input
@@ -420,22 +423,22 @@ export default function Home() {
           )}
         </div>
       </main>
-      <button
+      {tab !== "Auswertungen" && <button
         className="quick-fab"
         onClick={() => setQuickOpen(true)}
         aria-label="Ausgabe schnell erfassen"
       >
         <Plus size={24} />
         <span>Ausgabe</span>
-      </button>
-      <button
+      </button>}
+      {tab !== "Auswertungen" && <button
         className="camera-fab"
         onClick={() => setReceiptCaptureOpen(true)}
         aria-label="Beleg fotografieren"
       >
         <Camera size={22} />
-      </button>
-      {quickOpen && (
+      </button>}
+      {quickOpen && tab !== "Auswertungen" && (
         <QuickExpense
           state={state}
           month={month}
@@ -444,7 +447,7 @@ export default function Home() {
           close={() => setQuickOpen(false)}
         />
       )}
-      {receiptCaptureOpen && (
+      {receiptCaptureOpen && tab !== "Auswertungen" && (
         <ReceiptCapture
           state={state}
           month={month}
@@ -535,86 +538,6 @@ function MonthChecks({state, month, update, notify, editTrips, editCosts, viewRu
   </section>;
 }
 
-function DashboardStatistics({state, month, statement}: {state: AppState; month: string; statement: ReturnType<typeof buildStatement>}) {
-  const monthTrips = state.trips.filter(t => t.date.startsWith(month) && t.tripType === "dienstlich");
-  return <>      <section className="metric-grid">
-        <Metric
-          label="Dienstliche Kilometer"
-          value={`${statement.rows.reduce((s, r) => s + r.totalKm, 0).toLocaleString("de-DE")} km`}
-          sub={`${monthTrips.length} Fahrten`}
-        />
-        <Metric
-          label="Tage mit Spesen"
-          value={String(
-            statement.rows.filter((r) => r.allowanceAfter > 0).length,
-          )}
-          sub={euro(statement.totals.allowance)}
-        />
-        <Metric
-          label="Gesamtkosten"
-          value={euro(statement.totals.grandTotal)}
-          sub="inkl. Firmenkosten"
-        />
-        <Metric
-          label="Offene Auszahlung"
-          value={euro(statement.totals.openAmount)}
-          sub="an Reisenden"
-          strong
-        />
-      </section>
-      <section className="dashboard-statistics">
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <p className="eyebrow">Monatsverlauf</p>
-              <h3>Kostenaufteilung</h3>
-            </div>
-            <span className="muted">{month}</span>
-          </div>
-          <div className="cost-bars">
-            {[
-              ["Verpflegung", statement.totals.allowance],
-              ["Kilometer", statement.totals.mileage],
-              ["Tanken", statement.totals.fuel],
-              ["Übernachtung", statement.totals.accommodation],
-              ["Sonstiges", statement.totals.other],
-            ].map(([label, value]) => (
-              <div className="bar-row" key={String(label)}>
-                <span>{label}</span>
-                <div>
-                  <i
-                    style={{
-                      width: `${Math.max(3, (Number(value) / Math.max(1, statement.totals.grandTotal)) * 100)}%`,
-                    }}
-                  />
-                </div>
-                <b>{euro(Number(value))}</b>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section></>;
-}
-
-function Metric({
-  label,
-  value,
-  sub,
-  strong,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  strong?: boolean;
-}) {
-  return (
-    <div className={`metric ${strong ? "strong" : ""}`}>
-      <span>{label}</span>
-      <b>{value}</b>
-      <small>{sub}</small>
-    </div>
-  );
-}
 function CheckRow({
   label,
   value,
@@ -3182,100 +3105,92 @@ function Statements({
 }
 
 function Reports({ state, month }: { state: AppState; month: string }) {
-  const data = buildStatement(state, month);
-  const byCustomer = new Map<string, number>();
-  data.rows.forEach((r) =>
-    r.customers.forEach((c) =>
-      byCustomer.set(
-        c || "Ohne Kunde",
-        (byCustomer.get(c || "Ohne Kunde") || 0) + r.openAmount,
-      ),
-    ),
-  );
-  const max = Math.max(1, ...[...byCustomer.values()]);
+  const [year, setYear] = useState(() => Number(month.slice(0, 4)));
+  const analysis = useMemo(() => buildAnnualAnalysis(state, year), [state, year]);
+  const maximumMonth = Math.max(0, ...analysis.months.map(item => item.statement.totals.grandTotal));
+  const categories = [
+    ["Verpflegung", analysis.totals.allowance],
+    ["Kilometer", analysis.totals.mileage],
+    ["Übernachtung", analysis.totals.accommodation],
+    ["Tanken", analysis.totals.fuel],
+    ["Sonstige Kosten", analysis.totals.other],
+  ] as const;
+  const changeYear = (delta: number) => setYear(current => Math.max(1, Math.min(9999, current + delta)));
+  const missingReceipts = state.expenses.filter(expense => expense.status !== "storniert" && expense.date.startsWith(`${String(year).padStart(4, "0")}-`) && !expense.receipt).length;
   return (
-    <>
-    <details className="card previous-dashboard-statistics"><summary>Bisherige Monatskennzahlen und Kostenaufteilung</summary><DashboardStatistics state={state} month={month} statement={data} /></details>
-    <div className="report-grid">
-      <section className="card">
-        <p className="eyebrow">Kosten nach Kunde</p>
-        <h3>Wer verursacht welche Reisekosten?</h3>
-        <div className="ranking">
-          {[...byCustomer.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .map(([k, v]) => (
-              <div key={k}>
-                <span>{k}</span>
-                <div>
-                  <i style={{ width: `${(v / max) * 100}%` }} />
-                </div>
-                <b>{euro(v)}</b>
-              </div>
-            ))}
-          {byCustomer.size === 0 && (
-            <p className="muted">Noch keine Kundendaten im gewählten Monat.</p>
-          )}
+    <div className="annual-reports">
+      <header className="annual-report-header">
+        <div><p className="eyebrow">Aktuelle Erfassungsdaten</p><h2>Jahresanalyse</h2><p className="muted">Jahresanalyse nach den bestehenden Monatsberechnungen. Gespeicherte Abrechnungsstände bleiben unverändert.</p></div>
+        <nav className="year-picker" aria-label="Analysejahr">
+          <button className="ghost" aria-label="Vorheriges Jahr" onClick={() => changeYear(-1)} disabled={year <= 1}>‹</button>
+          <strong aria-live="polite">{year}</strong>
+          <button className="ghost" aria-label="Nächstes Jahr" onClick={() => changeYear(1)} disabled={year >= 9999}>›</button>
+        </nav>
+      </header>
+
+      <section className="analysis-section" aria-labelledby="annual-metrics-heading">
+        <div className="analysis-section-head"><p className="eyebrow">Jahreskennzahlen</p><h3 id="annual-metrics-heading">Reisekosten und Erstattung</h3></div>
+        <div className="metric-grid annual-metric-grid">
+          <Metric label="Gesamte Reisekosten" value={euro(analysis.totals.grandTotal)} sub="inkl. vom Unternehmen bezahlter Kosten" />
+          <Metric label="Verpflegungspauschalen" value={euro(analysis.totals.allowance)} sub="aus den Monatsberechnungen" />
+          <Metric label="Übernachtungskosten" value={euro(analysis.totals.accommodation)} sub="erfasste Hotel- und Übernachtungskosten" />
+          <Metric label="Sonstige Reisekosten" value={euro(analysis.totals.other)} sub="ohne Tanken und Übernachtung" />
+          <Metric label="Offene persönliche Erstattung" value={euro(analysis.totals.openAmount)} sub="Pauschalen, Kilometer und offene Privatauslagen" strong />
+        </div>
+        <div className="annual-counts" aria-label="Weitere Jahreskennzahlen">
+          <span><b>{analysis.businessKm.toLocaleString("de-DE")} km</b> dienstliche Kilometer</span>
+          <span><b>{analysis.allowanceDayCount}</b> Tage mit Spesen</span>
+          <span><b>{analysis.tripCount}</b> eindeutige Dienstreisen</span>
+          <span><b>{analysis.travelDayCount}</b> Reisetage</span>
+          <span><b>{analysis.entryMonthCount}</b> Monate mit Einträgen</span>
+          <span><b>{analysis.closedMonthCount}</b> ausdrücklich abgeschlossene Monate</span>
         </div>
       </section>
-      <section className="card">
-        <p className="eyebrow">Offene Erstattungen</p>
-        <h3>{euro(data.totals.openAmount)}</h3>
-        <div className="big-number">
-          <span>{data.rows.length}</span>
-          <p>Reisetage</p>
-        </div>
-        <div className="big-number">
-          <span>
-            {
-              state.expenses.filter(
-                (e) => e.date.startsWith(month) && !e.receipt,
-              ).length
-            }
-          </span>
-          <p>fehlende Belege</p>
-        </div>
-      </section>
-      <section className="card full">
-        <p className="eyebrow">Monatsvergleich</p>
-        <h3>Reisekosten der letzten Monate</h3>
-        <div className="month-bars">
-          {Array.from({ length: 6 }, (_, i) => {
-            const d = new Date(month + "-01T12:00");
-            d.setMonth(d.getMonth() - 5 + i);
-            const m = d.toISOString().slice(0, 7);
-            const v = buildStatement(state, m).totals.grandTotal;
-            return (
-              <div key={m}>
-                <b>{euro(v)}</b>
-                <i
-                  style={{
-                    height: `${Math.max(
-                      4,
-                      (v /
-                        Math.max(
-                          1,
-                          ...Array.from({ length: 6 }, (_, j) => {
-                            const x = new Date(month + "-01T12:00");
-                            x.setMonth(x.getMonth() - 5 + j);
-                            return buildStatement(
-                              state,
-                              x.toISOString().slice(0, 7),
-                            ).totals.grandTotal;
-                          }),
-                        )) *
-                        150,
-                    )}px`,
-                  }}
-                />
-                <span>{d.toLocaleDateString("de-DE", { month: "short" })}</span>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+
+      <div className="analysis-grid">
+        <section className="card analysis-card full" aria-labelledby="year-months-heading">
+          <p className="eyebrow">Monatsvergleich</p><h3 id="year-months-heading">Reisekosten von Januar bis Dezember {year}</h3>
+          <div className="annual-month-bars" role="list">
+            {analysis.months.map(item => {
+              const amount = item.statement.totals.grandTotal;
+              return <div className="annual-month-row" key={item.month} role="listitem" aria-label={`${item.label}: ${euro(amount)}`}>
+                <span>{item.label}</span><div className="annual-bar-track" aria-hidden="true"><i style={{ width: `${maximumMonth > 0 ? amount / maximumMonth * 100 : 0}%` }} /></div><b>{euro(amount)}</b>
+              </div>;
+            })}
+          </div>
+        </section>
+
+        <section className="card analysis-card" aria-labelledby="cost-types-heading">
+          <p className="eyebrow">Kostenarten</p><h3 id="cost-types-heading">Aufteilung im Jahr {year}</h3>
+          <div className="analysis-rows">{categories.map(([label, amount]) => <div className="analysis-row" key={label}><span>{label}</span><b>{euro(amount)}</b></div>)}</div>
+          <p className="analysis-note">Summe: {euro(analysis.totals.grandTotal)} · Gesamtkosten einschließlich Firmenkosten; die offene persönliche Erstattung wird getrennt ausgewiesen.</p>
+        </section>
+
+        <section className="card analysis-card" aria-labelledby="projects-heading">
+          <p className="eyebrow">Interne Kostenanalyse</p><h3 id="projects-heading">Reisekosten nach Projekt</h3>
+          <p className="analysis-note">Keine verbindliche steuerliche oder buchhalterische Zuordnung. Tagespauschalen werden nur bei einem eindeutig belegten Projekt zugeordnet.</p>
+          {analysis.projects.length ? <div className="analysis-rows">{analysis.projects.map(project => <div className="analysis-row" key={project.key}><span>{project.label}</span><b>{euro(project.amount)}</b></div>)}</div> : <p className="muted">Für dieses Jahr liegen keine eindeutig zuordenbaren Projektkosten vor.</p>}
+          <div className="analysis-row unassigned-row"><span>Nicht eindeutig zugeordnet</span><b>{euro(analysis.unassignedProjectCosts)}</b></div>
+        </section>
+
+        <section className="card analysis-card" aria-labelledby="reimbursements-heading">
+          <p className="eyebrow">Erstattungsübersicht</p><h3 id="reimbursements-heading">Zahlungsarten und persönliche Auszahlung</h3>
+          <div className="analysis-rows">
+            <div className="analysis-row"><span>Privat vorgestreckt</span><b>{euro(analysis.totals.privatelyAdvanced)}</b></div>
+            <div className="analysis-row"><span>Vom Unternehmen bezahlt</span><b>{euro(analysis.totals.companyPaid)}</b></div>
+            <div className="analysis-row"><span>Bereits erstattet</span><b>{euro(analysis.totals.reimbursed)}</b></div>
+            <div className="analysis-row"><span>Zahlungsart unbekannt</span><b>{euro(analysis.totals.unknownPayment)}</b></div>
+            <div className="analysis-row open-reimbursement"><span>Offene persönliche Erstattung</span><b>{euro(analysis.totals.openAmount)}</b></div>
+          </div>
+          <p className="analysis-note">Privat vorgestreckt heißt nicht automatisch offen. Unbekannte Zahlungsarten zählen nicht zur persönlichen Auszahlung. Zahlungsart und Erstattungsstatus sind getrennte Merkmale und können sich überschneiden. Fehlende Belege: {missingReceipts}.</p>
+        </section>
+      </div>
     </div>
-    </>
   );
+}
+
+function Metric({ label, value, sub, strong }: { label: string; value: string; sub: string; strong?: boolean }) {
+  return <div className={`metric ${strong ? "strong" : ""}`}><span>{label}</span><b>{value}</b><small>{sub}</small></div>;
 }
 
 function SettingsPanel({
