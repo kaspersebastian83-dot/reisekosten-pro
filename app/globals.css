@@ -2780,3 +2780,34 @@ button.small { padding: 5px 10px; font-size: 12px; min-height: 0; }
 
 /* Fluss: Erfassen direkt in der Monatsübersicht */
 .manual-trip .trip-required { margin: 0; padding: 12px 16px; border-radius: 8px; background: var(--mint); color: var(--muted); font-size: 13px; }
+
+/* Fluss 2: Monats-Zeitleiste */
+.month-timeline { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 18px; min-width: 0; }
+.month-timeline h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.month-timeline h3 small { font-size: 13px; font-weight: 600; color: var(--muted); }
+.timeline-days { list-style: none; margin: 12px 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.timeline-day { display: grid; grid-template-columns: 132px minmax(0, 1fr); border-top: 1px solid var(--line); }
+.timeline-day:first-child { border-top: 0; }
+.timeline-date { padding: 10px 12px; background: var(--paper); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.timeline-date b { font-size: 13px; }
+.timeline-date small { font-size: 12px; color: var(--green); font-weight: 700; }
+.timeline-day ul { list-style: none; margin: 0; padding: 0; min-width: 0; }
+.timeline-day li + li { border-top: 1px dashed var(--line); }
+.timeline-entry { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 0; border-radius: 0; background: transparent; text-align: left; font: inherit; color: inherit; cursor: pointer; min-height: 44px; }
+.timeline-entry:hover { background: var(--mint); }
+.timeline-entry:focus-visible { outline: 3px solid var(--green); outline-offset: -3px; }
+.timeline-entry > svg { flex-shrink: 0; color: var(--muted); }
+.timeline-entry.trip > svg { color: var(--green); }
+.timeline-entry.continued { opacity: 0.75; }
+.timeline-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.timeline-main b { font-size: 14px; overflow-wrap: anywhere; }
+.timeline-main small { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.timeline-flag { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; background: var(--yellow-bg); color: var(--yellow); font-size: 11px; font-weight: 800; }
+.timeline-state { flex-shrink: 0; font-size: 11px; color: var(--muted); }
+.timeline-amount { flex-shrink: 0; font-weight: 800; min-width: 84px; text-align: right; }
+@media (max-width: 760px) {
+  .timeline-day { grid-template-columns: 1fr; }
+  .timeline-date { flex-direction: row; justify-content: space-between; }
+  .timeline-entry { flex-wrap: wrap; }
+  .timeline-amount { min-width: 0; }
+}
