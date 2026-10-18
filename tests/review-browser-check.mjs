@@ -38,7 +38,7 @@ const download=async(page,name)=>{const pending=page.waitForEvent('download');aw
 const header='Abfahrt_datum;Abfahrt_uhrzeit;Ankunft_datum;Ankunft_uhrzeit;Betrieb_km;Arbeitsweg_km;Privat_km;Start Adresse;End Adresse;Anlass der Fahrt';
 const csv=[header,'09.03.2026;08:30;09.03.2026;09:00;12,5;0;0;Start;Testziel;Hinfahrt','09.03.2026;17:00;09.03.2026;17:30;25,75;0;0;Testziel;Start;Rückfahrt'].join('\n');
 const importTrips=async(page,text=csv)=>{await nav(page,'Fahrten importieren');await page.locator('input[type=file]').setInputFiles({name:'synthetic-review.csv',mimeType:'text/csv',buffer:Buffer.from(text)});await page.getByRole('button',{name:'Weiter',exact:true}).click();await page.getByRole('button',{name:'Weiter',exact:true}).click();await page.getByRole('button',{name:/^\d+ Fahrten importieren$/}).click();await page.getByRole('heading',{name:'Import abgeschlossen'}).waitFor();};
-const start=async()=>{const result=await open();await result.page.goto(url);await result.page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();return result;};
+const start=async()=>{const result=await open();await result.page.goto(url);await result.page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(result.page,'Reisen');return result;};
 const writeState=(page,value)=>page.evaluate(value=>new Promise((resolve,reject)=>{const r=indexedDB.open('reisekosten-pro',1);r.onsuccess=()=>{const tx=r.result.transaction('state','readwrite');tx.objectStore('state').put(value,'main');tx.oncomplete=()=>{r.result.close();resolve();};tx.onabort=()=>reject(tx.error);};}),value);
 try {
   await check('stale tab autosave cannot overwrite imported trips or receipts',async()=>{
@@ -47,8 +47,8 @@ try {
       await nav(page,'Einstellungen');await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();let saved=await waitState(page,s=>s?.changes.length===1);
       saved.expenses=[{id:'synthetic-expense',date:'2026-03-09',category:'Parken',description:'Synthetischer Beleg',gross:12.5,net:12.5,vatRate:0,vat:0,currency:'EUR',exchangeRate:1,paymentType:'privat vorgestreckt',paidBy:'',reimbursementStatus:'offen',businessShare:100,notes:'',status:'ungeprüft',warnings:[],receipt:{id:'synthetic-receipt',name:'synthetic.png',type:'image/png',hash:'synthetic',size:1,dataUrl:'data:image/png;base64,AA=='}}];
       saved.expenses[0].receipt.dataUrl=await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=2;canvas.height=2;return canvas.toDataURL('image/png');});
-      await writeState(page,saved);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
-      const second=await context.newPage();await second.goto(url);await second.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(second,'Einstellungen');
+      await writeState(page,saved);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+      const second=await context.newPage();await second.goto(url);await second.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(second,'Einstellungen');
       await importTrips(page);const committed=await state(page);
       await second.getByLabel('Firma',{exact:true}).fill('Stale tab');await second.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await second.waitForTimeout(400);
       assert.equal((await state(page)).trips.length,2);assert.deepEqual(await state(page),committed);
@@ -111,7 +111,7 @@ try {
       await page.getByPlaceholder('Ziel, Zweck oder Kunde suchen').fill('Hinfahrt');
       assert.match(await page.locator('.day-card .allowance').innerText(),/14,00/);
       await page.locator('.trip-rows .calculation-details summary').first().click();assert.match(await page.locator('.trip-rows .calculation-details').first().innerText(),/14,00.*Spesen/s);
-      const saved=await state(page);saved.trips=[{...saved.trips[0],date:'2026-02-28',endDate:'2026-03-02',overnight:true}];await writeState(page,saved);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+      const saved=await state(page);saved.trips=[{...saved.trips[0],date:'2026-02-28',endDate:'2026-03-02',overnight:true}];await writeState(page,saved);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await page.locator('input[type=month]').fill('2026-03');await nav(page,'Reisen');assert.equal(await page.locator('.day-card').count(),2);
       assert.match(await page.locator('.day-card .allowance').first().innerText(),/28,00/);
     } finally {await context.close();}
@@ -120,13 +120,13 @@ try {
     workerRevision=0;const {context,page}=await start();
     try {
       await nav(page,'Einstellungen');await page.evaluate(()=>navigator.serviceWorker.ready);
-      const second=await context.newPage();await second.goto(url);await second.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+      const second=await context.newPage();await second.goto(url);await second.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await second.evaluate(()=>{const send=ServiceWorker.prototype.postMessage;ServiceWorker.prototype.postMessage=function(message,...rest){if(message?.type==='UPDATE_READINESS')setTimeout(()=>send.call(this,message,...rest),900);else send.call(this,message,...rest);};});
       await page.evaluate(()=>{navigator.serviceWorker.addEventListener('message',e=>{if(e.data?.type==='UPDATE_APPROVED')e.stopImmediatePropagation();},true);const send=ServiceWorker.prototype.postMessage;ServiceWorker.prototype.postMessage=function(message,...rest){if(message?.type==='UPDATE_READINESS')window.updateReady=message.ready;return send.call(this,message,...rest);};});
       workerRevision=1;await page.evaluate(async()=>{await (await navigator.serviceWorker.ready).update();});await page.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).waitFor();
       await page.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).click();await page.waitForFunction(()=>window.updateReady===true);
       assert.equal(await page.locator('.app-shell').evaluate(node=>node.inert),true,'acknowledged readiness must hold until activation/block');
-      await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+      await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
     } finally {await context.close();}
   });
   console.log(JSON.stringify({results,failures},null,2));if(failures.length)throw Error(`${failures.length} review regression(s) failed`);

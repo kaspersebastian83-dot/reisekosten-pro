@@ -38,12 +38,12 @@ const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page)
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
 const header='Abfahrt_datum;Abfahrt_uhrzeit;Ankunft_datum;Ankunft_uhrzeit;Betrieb_km;Arbeitsweg_km;Privat_km;Start Adresse;End Adresse;Anlass der Fahrt';
 const csv=[header,'09.03.2026;08:30;09.03.2026;09:00;12,5;0;0;Start;Testziel;Testtermin','09.03.2026;17:00;09.03.2026;17:30;25,75;0;0;Testziel;Start;Testtermin','09.03.2026;08:30;09.03.2026;09:00;12,5;0;0;Start;Testziel;Testtermin','09.03.2026;07:00;09.03.2026;07:30;0;10;0;Start;Büro;Arbeitsweg','09.03.2026;06:00;09.03.2026;06:30;0;0;5;Start;Privat;Privat','31.02.2026;08:00;31.02.2026;17:00;10;0;0;Start;Ziel;Termin'].join('\n');
-const review=async(page, text=csv)=>{await nav(page,'Übersicht');await nav(page,'Fahrten importieren');await page.locator('input[type=file]').setInputFiles({name:'synthetic-review.csv',mimeType:'text/csv',buffer:Buffer.from(text)});await page.getByRole('button',{name:'Weiter',exact:true}).click();await page.getByRole('button',{name:'Weiter',exact:true}).click();await page.getByRole('heading',{name:/Datenzeilen/}).waitFor();};
+const review=async(page, text=csv)=>{if(await page.getByRole('button',{name:'Import abbrechen',exact:true}).isVisible())await page.getByRole('button',{name:'Import abbrechen',exact:true}).click();await nav(page,'Monatsübersicht');await nav(page,'Fahrten importieren');await page.locator('input[type=file]').setInputFiles({name:'synthetic-review.csv',mimeType:'text/csv',buffer:Buffer.from(text)});await page.getByRole('button',{name:'Weiter',exact:true}).click();await page.getByRole('button',{name:'Weiter',exact:true}).click();await page.getByRole('heading',{name:/Datenzeilen/}).waitFor();};
 const confirm=page=>page.getByRole('button',{name:/^\d+ Fahrten importieren$/});
 const {context,page}=await open();
 try {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(url);await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+  await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
   await check('review counts, physical source rows, filters, selection and cancel do not persist',async()=>{
     await review(page);assert.equal(await state(page),undefined);
     assert.match(await page.locator('.review-counts').innerText(),/2\s+Bereit/);
@@ -71,7 +71,7 @@ try {
     await page.getByRole('button',{name:'Import abbrechen',exact:true}).click();
     // Same isolated test database; remove one synthetic record before making a new review.
     await page.evaluate(()=>new Promise(resolve=>{const r=indexedDB.open('reisekosten-pro',1);r.onsuccess=()=>{const tx=r.result.transaction('state','readwrite'),store=tx.objectStore('state');const q=store.get('main');q.onsuccess=()=>{const s=q.result;window.savedTrip=s.trips.pop();store.put(s,'main');};tx.oncomplete=()=>{r.result.close();resolve();};};}));
-    await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await review(page);assert.equal(await confirm(page).innerText(),'1 Fahrten importieren');
+    await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await review(page);assert.equal(await confirm(page).innerText(),'1 Fahrten importieren');
     await page.evaluate(()=>new Promise(resolve=>{const r=indexedDB.open('reisekosten-pro',1);r.onsuccess=()=>{const tx=r.result.transaction('state','readwrite'),store=tx.objectStore('state');const q=store.get('main');q.onsuccess=()=>{const s=q.result;const trip=structuredClone(s.trips[0]);trip.id='concurrent';trip.startTime='17:00';trip.endTime='17:30';trip.startPlace='Testziel';trip.destination='Start';trip.businessKm=25.75;s.trips.push(trip);s.settings.company='Concurrent synthetic setting';store.put(s,'main');};tx.oncomplete=()=>{r.result.close();resolve();};};}));
     await confirm(page).click();await page.getByRole('heading',{name:'Import abgeschlossen'}).waitFor();
     const saved=await state(page);assert.equal(saved.trips.length,2);assert.equal(saved.settings.company,'Concurrent synthetic setting');
@@ -83,12 +83,12 @@ try {
     await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s.settings.vehicles[0].ownership==='privatwagen');
     await nav(page,'Reisen');await page.locator('.day-card > .calculation-details summary').click();assert.match(await page.locator('.day-card > .calculation-details').innerText(),/14,00/);
     await page.locator('.trip-rows .calculation-details summary').first().click();assert.match(await page.locator('.trip-rows .calculation-details').first().innerText(),/11,48/);
-    await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung ansehen)$/}).click();await page.locator('.monthly-details summary').click();await page.locator('.statement-day-details .calculation-details summary').click();
+    await nav(page,'Monatsübersicht');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung ansehen)$/}).click();await page.locator('.monthly-details summary').click();await page.locator('.statement-day-details .calculation-details summary').click();
     await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,'calculation-details-desktop.png'),fullPage:true});
     await waitState(page,s=>s.statements.length===1);
     await page.locator('.statement-actions select').selectOption('freigegeben');const frozen=(await waitState(page,s=>s.statements[0].locked)).statements[0];
     await nav(page,'Einstellungen');await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('dienstwagen');await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s.settings.vehicles[0].ownership==='dienstwagen');
-    await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();await page.locator('.statement-day-details .calculation-details summary').click();
+    await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();await page.locator('.statement-day-details .calculation-details summary').click();
     assert.match(await page.locator('.statement-day-details .calculation-details').innerText(),/Privatwagen.*12,5 berechtigte km/s);
     assert.deepEqual((await state(page)).statements[0],frozen);
   });
@@ -96,7 +96,7 @@ try {
     for(const [width,height,label] of [[390,844,'iphone'],[820,1180,'ipad']]) {
       await page.setViewportSize({width,height});await review(page,csv.replaceAll("09.03.2026","10.03.2026"));
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`import-review-${label}.png`),fullPage:true});
-      await page.getByRole('button',{name:'Import abbrechen',exact:true}).click();await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung ansehen)$/}).click();await page.locator('.monthly-details summary').click();
+      await page.getByRole('button',{name:'Import abbrechen',exact:true}).click();await nav(page,'Monatsübersicht');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung ansehen)$/}).click();await page.locator('.monthly-details summary').click();
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`calculation-details-${label}.png`),fullPage:true});
       await nav(page,'Einstellungen');assert.match(await page.locator('.app-version').innerText(),/SpesenKit 1\.7\.0/);assert.match(await page.locator('.app-version').innerText(),/Commit [a-f0-9]{7}/);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`version-${label}.png`),fullPage:true});
@@ -110,13 +110,13 @@ try {
     await page.getByRole('button',{name:'Später',exact:true}).click();await page.getByRole('button',{name:/Update anzeigen/}).click();
     await page.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).click();await page.getByText(/Es gibt offene Eingaben/).waitFor();
     await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,'update-pending-import.png'),fullPage:true});
-    const second=await context.newPage();await second.goto(url);await second.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(second,'Einstellungen');await second.getByLabel('Firma',{exact:true}).fill('Unsaved synthetic');
+    const second=await context.newPage();await second.goto(url);await second.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(second,'Einstellungen');await second.getByLabel('Firma',{exact:true}).fill('Unsaved synthetic');
     await page.getByRole('button',{name:'Offene Eingaben verwerfen und aktualisieren',exact:true}).click();await page.getByText(/in allen App-Tabs abschließen/).waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('synthetic-preserve')),'keep');assert.deepEqual(await state(page),before);
     await second.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(second,s=>s.settings.company==='Unsaved synthetic');
     const saved=await state(page);
     const navigated=page.waitForEvent('load');await page.getByRole('button',{name:'Offene Eingaben verwerfen und aktualisieren',exact:true}).click();await navigated;
-    await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();assert.deepEqual(await state(page),saved);assert.equal(await page.evaluate(()=>localStorage.getItem('synthetic-preserve')),'keep');
+    await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();assert.deepEqual(await state(page),saved);assert.equal(await page.evaluate(()=>localStorage.getItem('synthetic-preserve')),'keep');
     assert.equal(await page.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).count(),0);await second.close();
     await nav(page,'Einstellungen');await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,'version-desktop.png'),fullPage:true});
   });
@@ -129,10 +129,10 @@ try {
     await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(output,'version-update-desktop.png'),fullPage:true});
     await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s.settings.company==='Pending edit');
     const load=page.waitForEvent('load');await page.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).click();await load;
-    await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();assert.equal((await state(page)).settings.company,'Pending edit');
+    await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();assert.equal((await state(page)).settings.company,'Pending edit');
   });
   await check('offline startup retains running version and handles checks quietly',async()=>{
-    await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await nav(page,'Einstellungen');assert.match(await page.locator('.app-version').innerText(),/1\.7\.2/);await context.setOffline(false);assert.deepEqual(errors,[]);
+    await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(page,'Einstellungen');assert.match(await page.locator('.app-version').innerText(),/1\.7\.2/);await context.setOffline(false);assert.deepEqual(errors,[]);
   });
   console.log(JSON.stringify({checks:results.length,results,output},null,2));
 } catch(error) { console.error(await page.locator('body').innerText());await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,'failure.png'),fullPage:true});throw error; }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { AppState } from '../lib/types';
-import { localCalendarMonth, monthLabel, monthNames, monthOverview, openActivityMonths, yearOverview, type MonthStatus } from '../lib/month-navigation';
+import { localCalendarMonth, monthLabel, monthNames, openActivityMonths, yearOverview, type MonthStatus } from '../lib/month-navigation';
 
 const symbols: Record<MonthStatus,string> = {closed:'✓',working:'◐',open:'○',review:'!'};
 export function MonthNavigation({state,month,onSelect,children}: {
@@ -12,7 +12,6 @@ export function MonthNavigation({state,month,onSelect,children}: {
   const rows = useMemo(()=>yearOverview(state,year),[state,year]);
   const currentMonth = localCalendarMonth();
   const backlog = useMemo(()=>openActivityMonths(state),[state,currentMonth]);
-  const selected = useMemo(()=>monthOverview(state,month),[state,month]);
   const chooseMonth = (value: string) => {setYear(Number(value.slice(0,4))); onSelect(value);};
   return <div className="month-workspace">
     <aside className="year-navigation card" aria-label="Jahresübersicht">
@@ -36,7 +35,6 @@ export function MonthNavigation({state,month,onSelect,children}: {
       </section>
     </aside>
     <div className="month-statement">
-      {selected?.status==='review' && <div className="notice month-review" role="status"><b>Prüfung erforderlich</b><ul>{selected.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul></div>}
       {children}
     </div>
   </div>;

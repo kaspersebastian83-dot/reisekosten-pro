@@ -1,13 +1,14 @@
+import type { ReactNode } from 'react';
 import { Camera, Plus } from 'lucide-react';
 import type { AppState, StatementData } from '../lib/types';
 import { latestStatement, monthLabel, monthOverview } from '../lib/month-navigation';
 import { round2 } from '../lib/calculations';
 
 const euro = (value: number) => value.toLocaleString('de-DE', {style:'currency', currency:'EUR'});
-export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement}: {
+export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement, checks}: {
   state: AppState; month: string; statement: StatementData;
   startEntry: (kind: 'trip' | 'Hotel' | 'Parken') => void;
-  editCosts: () => void; editTrips: () => void; openCapture: () => void; openStatement: () => void;
+  editCosts: () => void; editTrips: () => void; openCapture: () => void; openStatement: () => void; checks: ReactNode;
 }) {
   const existing = latestStatement(state, month);
   const overview = monthOverview(state, month);
@@ -42,6 +43,7 @@ export function MonthWorkspace({state, month, statement, startEntry, editCosts, 
       </div>
       <p className="muted">Eingaben werden lokal gespeichert und können später weiterbearbeitet werden. Bei Rechnungen zählt das tatsächliche Rechnungsdatum für die Monatszuordnung.</p>
     </section>
+    {checks}
     <section className="workspace-statement-action" aria-label="Monatsabrechnung">
       <h3>Monatsabrechnung</h3>
       <p>{existing ? `Version ${existing.version} · ${existing.status}. Prüfung und Freigabe erfolgen in der bestehenden Abrechnung.` : 'Erst nach der Erfassung bewusst einen Entwurf erstellen. Freigabe und Abschluss erfolgen anschließend separat.'}</p>

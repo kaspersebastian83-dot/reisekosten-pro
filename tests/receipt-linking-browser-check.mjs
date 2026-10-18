@@ -55,12 +55,12 @@ try {
     const save=()=>modal.getByRole('button',{name:'Bestätigen & Ausgabe anlegen',exact:true}).click();
     const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'viewport overflow');
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await nav(page,'Datensicherung');await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).click();
       const seed=await waitState(page,s=>s?.trips.length>0);const base={...seed.trips[0],date:'2026-10-20',endDate:'2026-10-21',startTime:'07:00',endTime:'18:00',order:'26.0123 Musterstadt',destination:'Musterstadt',purpose:'Synthetischer Ortstermin',businessKm:0,privateKm:0,manualAbsenceMinutes:undefined,overnight:true,absenceConfirmed:true,tripType:'dienstlich',status:'ungeprüft',warnings:[],meals:{breakfast:false,lunch:false,dinner:false},dailyMeals:{'2026-10-21':{breakfast:true,lunch:false,dinner:false}}};
       seed.trips=[{...base,id:'trip-a'},{...base,id:'trip-b',date:'2026-11-20',endDate:'2026-11-21',dailyMeals:{}},{...base,id:'trip-c',order:'26.0124 Köln',endDate:'2026-10-23',dailyMeals:{}},{...base,id:'trip-d',order:'26.0124 Köln',endDate:'2026-10-22',dailyMeals:{}}];
       seed.expenses=[];seed.receiptInbox=[];seed.statements=[];seed.changes=[];seed.merchantRules=[];
-      await writeState(page,seed);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-10');
+      await writeState(page,seed);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-10');
       let frozen,baseline,hotelId;
       await check(`${engine} ${viewport.width}: late hotel invoice, explicit project+stay confirmation and breakfast hint`,async()=>{
         await begin(1);await fields();
@@ -75,7 +75,7 @@ try {
         await save();const s=await waitState(page,s=>s?.expenses.length===1);hotelId=s.expenses[0].id;
         assert.equal(s.expenses[0].date,'2026-10-29');assert.equal(s.expenses[0].stayStart,'2026-10-20');assert.equal(s.expenses[0].tripId,'trip-a');assert.equal(s.expenses[0].paymentType,'Unternehmen');
         assert.deepEqual(s.trips,seed.trips);
-        await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===1);
+        await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===1);
         await page.locator('.statement-actions select').selectOption('freigegeben');
         const locked=await waitState(page,s=>s?.statements[0].locked);frozen=locked.statements[0];baseline=frozen.data.totals.openAmount;
         assert.equal(frozen.data.totals.companyPaid,115);
@@ -118,13 +118,13 @@ try {
         await card.getByRole('button',{name:'Bearbeiten',exact:true}).click();await editor.getByLabel('Reisezuordnung',{exact:true}).selectOption('trip-a');await editor.getByRole('button',{name:'Speichern',exact:true}).click();await waitState(page,s=>s?.expenses.find(e=>e.id===hotelId)?.tripId==='trip-a');await fits();
       });
       await check(`${engine} ${viewport.width}: frozen report, personal payout, exports, backup and offline reload`,async()=>{
-        await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();assert.deepEqual((await state(page)).statements[0],frozen);
+        await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();assert.deepEqual((await state(page)).statements[0],frozen);
         assert.equal((await download(page,'PDF')).bytes.subarray(0,4).toString(),'%PDF');assert.equal((await download(page,'Excel')).bytes.subarray(0,2).toString(),'PK');
         await page.getByRole('button',{name:'Neue Version erstellen',exact:true}).click();let s=await waitState(page,s=>s?.statements.length===2);
         assert.equal(s.statements[1].data.totals.openAmount,Math.round((baseline+152)*100)/100);assert.equal(s.statements[1].data.totals.companyPaid,190);assert.deepEqual(s.statements[0],frozen);assert.deepEqual(s.trips,seed.trips);
         await nav(page,'Datensicherung');const backup=await download(page,'Sicherung herunterladen');const serialized=JSON.parse(backup.bytes);assert.equal(serialized.expenses[0].breakfastIncluded,'yes');
         await page.locator('.backup-grid input[type=file]').setInputFiles({name:'synthetic-linking-backup.json',mimeType:'application/json',buffer:backup.bytes});await page.getByText('Datensicherung wiederhergestellt',{exact:true}).waitFor();
-        await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();
+        await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
         assert.deepEqual(JSON.parse(JSON.stringify(await state(page))),serialized);await context.setOffline(false);await fits();assert.deepEqual(errors,[]);
       });
       await check(`${engine} ${viewport.width}: ambiguous suggestions stay unassigned without explicit confirmation`,async()=>{
@@ -135,7 +135,7 @@ try {
       });
       await check(`${engine} ${viewport.width}: legacy inbox without payment remains unknown and non-reimbursable`,async()=>{
         const before=await state(page);const legacy={id:'legacy-inbox',receipt:{...before.receiptInbox[0].receipt,id:'legacy-file',hash:'legacy-unique-hash',name:'synthetic-legacy.pdf'},capturedAt:'2026-10-30',status:'neu',suggestion:{date:'2026-10-30',gross:20,category:'Parken',confidence:0},notes:''};
-        await writeState(page,{...before,receiptInbox:[...before.receiptInbox,legacy]});await page.reload();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-10');await nav(page,'Kosten & Belege');
+        await writeState(page,{...before,receiptInbox:[...before.receiptInbox,legacy]});await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-10');await nav(page,'Kosten & Belege');
         await page.locator('.receipt-inbox').getByRole('button',{name:'Prüfen',exact:true}).click();
         assert.equal(await modal.getByLabel('Zahlungsart',{exact:true}).inputValue(),'unbekannt');await save();
         const saved=await waitState(page,s=>s?.expenses.length===before.expenses.length+1);

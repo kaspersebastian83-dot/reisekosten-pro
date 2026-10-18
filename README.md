@@ -154,7 +154,7 @@ Konflikt an und bietet die lokale JSON-Sicherung der eigenen Änderungen an.
 Danach neu laden und die gewünschten Änderungen auf dem aktuellen Stand
 übernehmen; eine automatische Zusammenführung findet nicht statt.
 
-Unter **Reisen**, **Übersicht** und **Monatsabrechnungen** öffnet **Berechnung
+Unter **Reisen** und in der Abrechnungsansicht der **Monatsübersicht** öffnet **Berechnung
 anzeigen** die verwendeten Tages-/Monatsbeträge. Kilometer und Ausgaben werden
 in den Fahrt-/Abrechnungsdetails erklärt. Tagespauschalen gelten gemeinsam für
 alle Fahrten eines Tages. Freigegebene Abrechnungen zeigen ausschließlich ihren
@@ -200,16 +200,17 @@ Deployment. Eine Veröffentlichung erfolgt erst durch die spätere Freigabe und
 
 ## Dienstreisen als Hauptworkflow
 
-Die App startet unter **Reisen**. **Reise erfassen** öffnet die vorhandene
+Die App startet unter **Monatsübersicht**. **Dienstreise erfassen** öffnet die vorhandene
 manuelle Erfassung für Datum, Enddatum, Beginn und Ende der Abwesenheit,
 Reiseziel und Reisezweck. Bestätigen Sie die tatsächliche berufliche
 Abwesenheit und tragen Sie gestellte Mahlzeiten ein. Die bestehenden
 Verpflegungs- und Fahrtkostenberechnungen bleiben unverändert.
 
 Unter **Kosten & Belege** oder über die Schnellerfassung lassen sich Ausgaben
-und Belege einer Reise zuordnen. In der **Übersicht** öffnen **Reise erfassen**,
-**Ausgabe erfassen** und **Beleg hinzufügen** direkt die jeweilige Erfassung.
-**Monatsabrechnungen** erstellt anschließend die Abrechnung und Exporte.
+und Belege einer Reise zuordnen. In der **Monatsübersicht** öffnen die
+Erfassungsaktionen die vorhandenen Masken. Die globale Aktion **Ausgabe** bietet
+weiterhin die Schnellerfassung. Im Abrechnungsbereich der Monatsübersicht werden
+Entwurf und Exporte anschließend ausdrücklich erstellt.
 Ein Fahrtenbuchimport ist für diesen Ablauf nicht erforderlich.
 
 Der vollständige Importassistent bleibt über den sekundären Button
@@ -396,7 +397,7 @@ fachliche Frühstücks-/Übernachtungsbehandlung bitte vor praktischer Nutzung p
 
 ### Jahresübersicht und Monatsnavigation (Schritt 3.1)
 
-**Monatsabrechnungen** zeigt links eine Jahresübersicht mit allen zwölf Monaten;
+**Monatsübersicht** zeigt links eine Jahresübersicht mit allen zwölf Monaten;
 auf iPad/iPhone steht eine kompakte Übersicht oberhalb der bisherigen Abrechnung.
 Monate sind direkt auswählbar, die aktive Auswahl ist hervorgehoben. Farben werden
 durch Symbole und Texte ergänzt; auf dem iPhone erklären eine sichtbare Legende
@@ -407,8 +408,8 @@ bestehen, bis tatsächlich ein Monat angeklickt wird; „Ausgewählt“ zeigt si
 Beim Start wird der **vorherige lokale Kalendermonat** vorgeschlagen, einschließlich
 Januar → Dezember des Vorjahres. Die Auswahl liegt ausschließlich im bereits
 bestehenden gemeinsamen React-Zustand von `Home`, ohne neue dauerhafte Einstellung.
-Sie bleibt beim Wechsel zwischen Reisen, Kosten & Belege, Monatsabrechnungen,
-Übersicht und den weiteren bestehenden Bereichen erhalten. Ein vollständiges
+Sie bleibt beim Wechsel zwischen Reisen, Kosten & Belege, Monatsübersicht
+und den weiteren bestehenden Bereichen erhalten. Ein vollständiges
 Neuladen/erneutes Öffnen startet wieder mit dem dann gültigen lokalen Vormonat;
 innerhalb der geöffneten Anwendung setzt kein Automatismus eine bewusste Auswahl
 zurück. Der bestehende globale Monatswähler bleibt nutzbar; leere/ungültige
@@ -478,7 +479,7 @@ auf physischen iPhone-/iPad-Geräten; WebKit-Nachweise stammen von macOS.
 
 ## Schritt 3.1b: Abrechnungsmonat als Arbeitsbereich
 
-Unter **Monatsabrechnungen** öffnet jeder ausgewählte Monat zunächst einen
+Unter **Monatsübersicht** öffnet jeder ausgewählte Monat zunächst einen
 Arbeitsbereich. „Bisher erfasst“ zeigt die aktuellen, aus `buildStatement`
 abgeleiteten Daten: eindeutige Dienstreisen, Verpflegungsvorschau, erfasste
 Hotel-/weitere Kosten, Unternehmenszahlungen und die offene persönliche
@@ -524,3 +525,71 @@ Sie prüft den Juni-Arbeitsablauf bei 390/820/1440 px, die Juli-Rechnung zu eine
 Juni-Reise, Unternehmenszahlungen, lokale Belege/Zuordnungen, aktualisierte
 Kennzahlen, explizite Entwurfserstellung, Wiederaufnahme ohne Duplikat,
 unveränderte abgeschlossene Snapshots, PDF/Excel und Offline-Neuladen.
+
+## Schritt 3.1c: Gemeinsame Monatsübersicht
+
+**Monatsübersicht → Reisen → Kosten & Belege → Auswertungen → Einstellungen →
+Datensicherung** ist die gemeinsame Reihenfolge auf allen Bildschirmgrößen.
+Die App startet in der Monatsübersicht mit dem vorherigen **lokalen**
+Kalendermonat. Die gemeinsame React-Monatsauswahl bleibt bei Bereichswechseln
+erhalten; es gibt weiterhin keine neue dauerhafte Speicherung dieser Auswahl.
+Der Monatsarbeitsbereich aus Schritt 3.1b bleibt die einzige Eingangsfläche.
+Erfassung erzeugt keinen Snapshot; Erstellung, Freigabe und Korrekturversionen
+nutzen weiterhin ausschließlich die vorhandene Abrechnungsansicht.
+
+### Bestandsaufnahme: Ziele der bisherigen Dashboard-Funktionen
+
+| Bisherige Funktion | Ziel nach der Zusammenführung |
+| --- | --- |
+| Dienstreise erfassen (Workflow und Hero-Aktion) | Monatsübersicht → Dienstreise erfassen; vorhandene `TripForm` |
+| Ausgabe schnell erfassen | Globale Aktion „Ausgabe“ / schwebende „Ausgabe schnell erfassen“, vorhandene `QuickExpense` |
+| Beleg hinzufügen / fotografieren | Monatsübersicht → Beleg fotografieren / OCR, vorhandene `ReceiptCapture`; globale Kamera bleibt erhalten |
+| Hotel und sonstige Kosten, bestehende Einträge bearbeiten | Bestehende Aktionen im Monatsarbeitsbereich, `Expenses` und `Trips` |
+| Laufende erfasste Kosten, Spesen, offene persönliche Erstattung | Einmalige Kennzahlen des vorhandenen `MonthWorkspace` |
+| Dienstliche Kilometer, Tage mit Spesen, Gesamtkosten inkl. Firmenkosten, offene Auszahlung | Auswertungen → „Bisherige Monatskennzahlen und Kostenaufteilung“, bisherige `Metric`-Karten |
+| Fünf Kostenbalken (Verpflegung/Kilometer/Tanken/Übernachtung/Sonstiges) | Derselbe aufklappbare Bereich unter Auswertungen, unveränderte Werte und Balkenformeln |
+| Ungeprüfte Datensätze | Monatsübersicht → Prüfen, getrennte Links zu Reisen und Kosten; bisherige Warnungs-/Statusprädikate |
+| Fehlende Belege | Prüfen → Fehlende Belege → bestehende Kostenansicht |
+| Mögliche Duplikate | Prüfen → Mögliche Duplikate → bestehende Reisenansicht |
+| Eindeutige Zeiten gemeinsam bestätigen | Prüfen → Eindeutige Zeiten bestätigen, ursprünglicher Filter und ursprünglicher Bestätigungshandler |
+| Anzahl wartender Belege | Prüfen → Belege im Eingang insgesamt; vorhandene Kostenansicht mit ihrem Monatsfilter |
+| Abrechnung vorhanden / Workflow „Abschließen“ | Einziger Abrechnungsbereich mit Erstellen/Fortsetzen/Ansehen; keine automatische Freigabe oder Exporte |
+| Berechnungsdetails und Exporte | Vorhandene Reise- und Abrechnungsdetails, unveränderte Exportaktionen |
+| Tarifhinweis / Regeln ansehen | Prüfen → Tarife und Regeln ansehen → vorhandene Einstellungen mit tatsächlichem Tarifstand |
+| Globale Anzahl offener Hinweise | Bestehende Kopfzeile, ausdrücklich „insgesamt“; Prüfbereich betrachtet den ausgewählten Monat |
+| Zweite Einführung, doppelte Eingabeleiste und dieselben Geldbeträge auf zwei Startseiten | Redundante Darstellung entfällt; alle Funktionen sind oben zugeordnet |
+| „Bereit zum Abschluss“, „Alles plausibel“, pauschaler Standardtarif-Text | Irreführende Allgemeinaussagen entfallen; bekannte Hinweise bzw. tatsächliche Einstellungen bleiben erreichbar |
+
+`MonthChecks` verwendet die bisherigen Dashboard-Prädikate für Reisen mit
+Abfahrt im Arbeitsmonat, Ausgaben nach Rechnungsmonat und die bisherigen
+Sammelbestätigungen. Die schon vorhandenen konkreten Monatsstatus-Hinweise
+(`monthOverview`) stehen in derselben Prüfliste, statt in einer zweiten Karte.
+Die Statusermittlung selbst bleibt unverändert. Keine bekannten Hinweise sind
+keine steuerliche oder fachliche Vollständigkeitsprüfung (Schritt 3.2).
+
+Die bisherige Meldung offener Formulare (`PendingWork`) schützt nun auch
+Bereichswechsel, Monatswechsel und die Rückkehr aus dem Monatsablauf. Offene
+Eingaben werden zuerst gespeichert oder im vorhandenen Formular ausdrücklich
+abgebrochen. Erfolgreiche Speicheraktionen kehren weiter zum Arbeitsmonat
+zurück. Innerhalb der Monatsübersicht erscheint kein Rückkehrhinweis.
+Die bestehende Update-Abstimmung zwischen App-Tabs bleibt erhalten.
+
+Die Auswertungen selbst, Datenmodelle, Rechenregeln, Speicheridentität,
+Abrechnungsstände und der Safari-/Service-Worker-Fix aus PR #10 sind unverändert.
+Schritt 3.1d kann die bereits verfügbaren Auswertungen später ordnen/erweitern;
+in diesem Schritt entstehen keine neuen Jahres-, Projekt- oder Steuerstatistiken.
+
+Zusätzliche synthetische Browserprüfung mit der bestehenden optionalen
+Playwright-Installation, ohne neue Projektabhängigkeit:
+
+```sh
+PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_EXECUTABLE=/pfad/zum/browser node tests/unified-overview-browser-check.mjs
+```
+
+Sie prüft Start/Navigation, zwölf Monate, gemeinsame Auswahl, den unveränderten
+lokalen Speicherstand bei Navigation, die übernommenen Prüf-/Sammelaktionen,
+beide vorhandenen Statistikbereiche, Tastaturbedienung der Prüfliste,
+ungespeicherte Kosten-/Einstellungsformulare und Offline-Neuladen bei
+390/820/1440 px in Chromium und WebKit. Die bestehenden Monatsablaufprüfungen
+prüfen weiter Reisen/Hotel/Kosten, bewusste Entwürfe, unveränderte gesperrte
+Snapshots, PDF/Excel und Belegzuordnungen.
