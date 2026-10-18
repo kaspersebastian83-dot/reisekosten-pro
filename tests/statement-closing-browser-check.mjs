@@ -99,6 +99,8 @@ try {
         assert.ok(!(await page.getByLabel('Abrechnungsstatus',{exact:true}).locator('option').allTextContents()).includes('freigegeben'));
       });
       await check(`${engine} ${viewport.width}: equal totals with changed cost details make a draft stale without overwriting it`,async()=>{
+        // An unchanged close no longer offers a redundant identical correction.
+        const changed=await state(page);changed.expenses[0].description='Synthetischer Korrekturanlass';await writeState(page,changed);await reload();
         await page.getByRole('button',{name:'Neue Version erstellen',exact:true}).click();const saved=await waitState(page,s=>s?.statements.length===2);const draft=structuredClone(saved.statements[1]);
         saved.expenses[0].description='Geänderte synthetische Einzelposition';await writeState(page,saved);await reload();
         assert.match(await review.innerText(),/Seit Erstellung des Entwurfs/);assert.equal(await review.getByRole('button',{name:'Monatsabrechnung abschließen',exact:true}).isEnabled(),false);
@@ -117,7 +119,7 @@ try {
         await review.locator('.closing-errors').getByRole('button',{name:'Reise bearbeiten',exact:true}).first().click();
         assert.equal(await page.locator('.modal').getByLabel('Abfahrt Datum *',{exact:true}).inputValue(),'2026-06-10');
         await page.locator('.modal').getByRole('button',{name:'Abbrechen',exact:true}).click();await nav(page,'Monatsübersicht');await resume();
-        const restored=await state(page);restored.trips[0].absenceConfirmed=true;await writeState(page,restored);await reload();
+        const restored=await state(page);restored.trips[0].absenceConfirmed=true;restored.expenses[0].notes='Synthetischer neuer Prüfstand';await writeState(page,restored);await reload();
         await page.getByRole('button',{name:'Neue Version erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===4);
       });
       await check(`${engine} ${viewport.width}: data changed in another tab after confirmation cannot be overwritten or approved`,async()=>{

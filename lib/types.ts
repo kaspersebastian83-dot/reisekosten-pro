@@ -197,6 +197,8 @@ export interface StatementSnapshot {
   data: StatementData;
   settingsSnapshot?: Settings;
   expensesSnapshot?: Expense[];
+  // Optional evidence for invoice-month expenses linked to trips outside that month.
+  relatedTripsSnapshot?: Trip[];
 }
 
 export interface Settings {

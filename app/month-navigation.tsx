@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { AppState } from '../lib/types';
-import { localCalendarMonth, monthLabel, monthNames, openActivityMonths, yearOverview, type MonthStatus } from '../lib/month-navigation';
+import { localCalendarMonth, monthLabel, monthNames, monthOverview, openActivityMonths, yearOverview, type MonthStatus } from '../lib/month-navigation';
 
-const symbols: Record<MonthStatus,string> = {closed:'✓',working:'◐',open:'○',review:'!'};
+const symbols: Record<MonthStatus,string> = {closed:'✓','closed-changed':'Δ',correction:'↻','history-review':'?',working:'◐',open:'○',review:'!'};
 export function MonthNavigation({state,month,onSelect,children}: {
   state: AppState; month: string; onSelect: (month: string)=>void; children: ReactNode;
 }) {
   const [year,setYear] = useState(()=>Number(month.slice(0,4)));
   useEffect(()=>setYear(Number(month.slice(0,4))),[month]);
-  const rows = useMemo(()=>yearOverview(state,year),[state,year]);
+  // Instance-local memoization: year navigation and backlog share month comparisons.
+  const readOverview = useMemo(() => { const cache = new Map<string, ReturnType<typeof monthOverview>>(); return (value: string) => { if (!cache.has(value)) cache.set(value, monthOverview(state, value)); return cache.get(value)!; }; }, [state]);
+  const rows = useMemo(()=>yearOverview(state,year,readOverview),[state,year,readOverview]);
   const currentMonth = localCalendarMonth();
-  const backlog = useMemo(()=>openActivityMonths(state),[state,currentMonth]);
+  const backlog = useMemo(()=>openActivityMonths(state, new Date(),readOverview),[state,currentMonth,readOverview]);
   const chooseMonth = (value: string) => {setYear(Number(value.slice(0,4))); onSelect(value);};
   return <div className="month-workspace">
     <aside className="year-navigation card" aria-label="Jahresübersicht">
@@ -27,11 +29,11 @@ export function MonthNavigation({state,month,onSelect,children}: {
           <span className="month-state">{row.label}</span>
         </button>)}
       </nav>
-      <p className="month-mobile-key">✓ Abgeschlossen · ◐ In Bearbeitung · ○ Offen · ! Prüfung erforderlich</p>
+      <p className="month-mobile-key">✓ Abgeschlossen · Δ Änderungen offen · ↻ Korrekturentwurf · ? Historie prüfen · ◐ In Bearbeitung · ○ Offen · ! Prüfung erforderlich</p>
       <p className="year-selection">Ausgewählt: <b>{monthLabel(month)}</b></p>
-      <details className="month-legend"><summary>Status verstehen</summary><p>✓ Abgeschlossen · ◐ In Bearbeitung · ○ Offen · ! Prüfung erforderlich</p><p>Grün entspricht der gespeicherten Freigabe/Auszahlung der jüngsten gesperrten Version. PDF und Berechnung schließen keinen Monat ab.</p><p>Rot zeigt nur konkrete gespeicherte Prüfhinweise oder einen stornierten/widersprüchlichen Abschlussstatus. Nachträgliche Änderungen werden hier noch nicht automatisch erkannt.</p></details>
+      <details className="month-legend"><summary>Status verstehen</summary><p>✓ Abgeschlossen und unverändert · Δ Abschluss mit offenen Änderungen · ↻ Abschluss vorhanden, Korrekturentwurf offen · ? Historie oder Stornierung prüfen.</p><p>Grün kennzeichnet einen gespeicherten, vergleichbaren Abschluss ohne bekannte nachträgliche Änderungen. PDF und Berechnung schließen keinen Monat ab. Freigabe und Auszahlung bleiben getrennt.</p><p>Ein Korrekturentwurf ersetzt den historischen Abschluss erst nach erneuter ausdrücklicher Freigabe. Eine stornierte neuere Version reaktiviert keine ältere Version.</p></details>
       <section className="month-backlog" aria-label="Offene Abrechnungsmonate">
-        {backlog.length ? <><b>{backlog.length} {backlog.length===1?'Monat mit offener Abrechnung':'Monate mit offenen Abrechnungen'}</b><p>Nur zurückliegende Monate mit Reisen oder Ausgaben.</p><button className="primary" onClick={()=>chooseMonth(backlog[0].month)}>Mit {monthLabel(backlog[0].month)} beginnen</button></> : <p>Keine offenen Abrechnungsmonate mit vorhandenen Einträgen. Alles im Blick.</p>}
+        {backlog.length ? <><b>{backlog.length} {backlog.length===1?'Monat mit offener Abrechnung':'Monate mit offenen Abrechnungen'}</b><p>Zurückliegende Monate mit Einträgen oder prüfbedürftigen Abschlüssen.</p><button className="primary" onClick={()=>chooseMonth(backlog[0].month)}>Mit {monthLabel(backlog[0].month)} beginnen</button></> : <p>Keine offenen Abrechnungsmonate mit vorhandenen Einträgen. Alles im Blick.</p>}
       </section>
     </aside>
     <div className="month-statement">

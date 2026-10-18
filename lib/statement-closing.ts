@@ -3,6 +3,7 @@ import { manualTripInterval } from './manual-trip';
 import { isMonth, latestStatement } from './month-navigation';
 import { duplicateExpense, linkingErrors, projectNumber, similarExpense, validDate } from './receipt-linking';
 import type { AppState, ChangeLog, ReviewStatus, StatementSnapshot } from './types';
+import { compareSnapshotWithCurrent, relatedTripsForSnapshot } from './statement-comparison';
 
 export interface ClosingIssue {
   code: string;
@@ -113,10 +114,13 @@ export function checkStatementForClosing(state: AppState, month: string, snapsho
   }
   if (snapshot && (!snapshot.settingsSnapshot || !snapshot.expensesSnapshot)) {
     issue(errors, 'legacy', 'Bei diesem älteren Entwurf fehlen Vergleichsinformationen zum Tarif-, Profil- oder Belegstand. Er bleibt lesbar; bitte eine neue Version erstellen.');
-  } else if (snapshot && current && canonical({ data: snapshot.data, settings: snapshot.settingsSnapshot, expenses: snapshot.expensesSnapshot }) !== canonical({ data: current, settings: state.settings, expenses })) {
-    issue(errors, 'stale', 'Seit Erstellung des Entwurfs haben sich abrechnungsrelevante Daten geändert. Bitte eine neue Version erstellen.');
+  } else if (snapshot && current) {
+    const comparison = compareSnapshotWithCurrent(state, month, snapshot, current);
+    if (comparison.hasChanges) issue(errors, 'stale', 'Seit Erstellung des Entwurfs haben sich abrechnungsrelevante Daten geändert. Bitte eine neue Version erstellen.');
+    if (comparison.limitations.length) issue(errors, 'legacy', 'Bei diesem älteren Entwurf fehlen vollständige Vergleichsinformationen. Bitte eine neue Version erstellen.');
   }
-  return { errors, warnings, fingerprint: canonical({ month, snapshot, current, settings: state.settings, expenses, errors, warnings }) };
+  if (snapshot?.expensesSnapshot && !snapshot.relatedTripsSnapshot && snapshot.expensesSnapshot.some(expense => expense.status !== 'storniert' && expense.tripId && !snapshot.data.rows.some(row => row.trips.some(trip => trip.id === expense.tripId)))) issue(errors, 'legacy', 'Bei diesem älteren Entwurf fehlen Vergleichsinformationen zur zugeordneten Reise außerhalb des Rechnungsmonats. Bitte eine neue Version erstellen.');
+  return { errors, warnings, fingerprint: canonical({ month, snapshot, current, relatedTrips: current ? relatedTripsForSnapshot(state, current) : [], settings: state.settings, expenses, errors, warnings }) };
 }
 
 /** Produces the existing state/snapshot format; never refreshes a draft's data. */
@@ -144,6 +148,7 @@ export async function persistStatementClosing(state: AppState, confirmation: Clo
 export function changeStatementStatus(state: AppState, id: string, status: ReviewStatus, audit: { id: string; at: string }): AppState {
   const snapshot = state.statements.find(item => item.id === id);
   if (!snapshot || snapshot.status === status) return state;
+  if (latestStatement(state, snapshot.month)?.id !== snapshot.id) throw new Error('Historische Versionen können nur angesehen werden. Bitte die aktuelle Version auswählen.');
   const allowed = snapshot.locked
     ? (status === 'storniert' || (snapshot.status === 'freigegeben' && status === 'ausgezahlt'))
     : ['vollständig', 'zur Freigabe eingereicht', 'storniert'].includes(status);

@@ -6,7 +6,7 @@ import { isMonth, localCalendarMonth, monthLabel, monthOverview, openActivityMon
 import type { AppState, StatementSnapshot, Trip } from '../lib/types';
 const trip=(extra: Partial<Trip> = {}): Trip => ({...demoState().trips[0],id:'synthetic-trip',date:'2026-07-20',endDate:'2026-07-22',tripType:'dienstlich',status:'ungeprüft',warnings:[],...extra});
 const fresh=()=>structuredClone(emptyState);
-const snapshot=(state:AppState,extra:Partial<StatementSnapshot> = {}): StatementSnapshot=>({id:'synthetic-snapshot',month:'2026-07',number:'SYNTHETIC-1',createdAt:'2026-08-01T10:00:00Z',status:'freigegeben',version:1,locked:true,data:buildStatement(state,'2026-07'),...extra});
+const snapshot=(state:AppState,extra:Partial<StatementSnapshot> = {}): StatementSnapshot=>({id:'synthetic-snapshot',month:'2026-07',number:'SYNTHETIC-1',createdAt:'2026-08-01T10:00:00Z',status:'freigegeben',version:1,locked:true,data:structuredClone(buildStatement(state,extra.month || '2026-07')),settingsSnapshot:structuredClone(state.settings),expensesSnapshot:structuredClone(state.expenses.filter(item=>item.date.startsWith(extra.month || '2026-07'))),relatedTripsSnapshot:[],...extra});
 
 describe('Lokale Monatsauswahl',()=>{
   it.each([[2026,11,5,'2026-11'],[2027,0,10,'2026-12'],[2026,0,1,'2025-12'],[2026,2,29,'2026-02']])('suggests previous local calendar month %s/%s/%s', (year,month,day,expected)=>{
@@ -44,7 +44,7 @@ describe('Ausschließlich abgeleiteter Monatsstatus',()=>{
   });
   it('uses latest version like the current statement view',()=>{
     const state=fresh();state.trips=[trip()];state.statements=[snapshot(state),snapshot(state,{id:'new',version:2,locked:false,status:'vollständig'})];
-    expect(monthOverview(state,'2026-07').status).toBe('working');
+    expect(monthOverview(state,'2026-07').status).toBe('correction');
   });
   it('uses concrete stored warnings without adding tax or completeness checks',()=>{
     const state=fresh();state.trips=[trip({warnings:['Inlandsvorschau nach gespeicherten Regeln. Ausland ist nicht geprüft.'],absenceConfirmed:false})];
@@ -55,10 +55,10 @@ describe('Ausschließlich abgeleiteter Monatsstatus',()=>{
     expect(monthOverview(state,'2026-07').status).toBe('working');
     state.expenses[0].warnings=['Beleg fehlt'];expect(monthOverview(state,'2026-07').status).toBe('review');
   });
-  it('does not flag changes after closure or alter frozen data (reserved for 3.2)',()=>{
+  it('flags changes after closure while preserving the historical snapshot',()=>{
     const state=fresh();state.trips=[trip()];state.statements=[snapshot(state)];const frozen=structuredClone(state.statements);
     state.trips.push(trip({id:'new-trip',warnings:['Reiseziel fehlt']}));
-    expect(monthOverview(state,'2026-07').status).toBe('closed');expect(monthOverview(state,'2026-07').tripCount).toBe(1);
+    expect(monthOverview(state,'2026-07').status).toBe('closed-changed');expect(monthOverview(state,'2026-07').tripCount).toBe(2);expect(monthOverview(state,'2026-07').hasClosed).toBe(true);
     expect(state.statements).toEqual(frozen);
   });
   it('counts unique business trips by existing month overlap and ignores cancellations',()=>{
