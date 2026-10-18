@@ -70,6 +70,8 @@ import { readReceiptFile } from "../lib/receipt-file";
 import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
 import { MonthWorkspace } from "./month-workspace";
 import { StatementClosing } from "./statement-closing";
+import { StatementChanges } from "./statement-changes";
+import { compareClosedStatementWithCurrent, isClosedStatement, persistCorrectionDraft, relatedTripsForSnapshot, snapshotHistoryLimitations, stateForStatementVersion } from "../lib/statement-comparison";
 import { changeStatementStatus, persistStatementClosing, type ClosingConfirmation, type ClosingIssue } from "../lib/statement-closing";
 import { MonthNavigation } from "./month-navigation";
 import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel, monthOverview } from "../lib/month-navigation";
@@ -81,6 +83,7 @@ import {
   exportExcel,
   exportPdf,
   exportZip,
+  correctionExportNotice,
 } from "../lib/exports";
 
 import { PendingWork, usePendingWork } from "../lib/pending-work";
@@ -157,6 +160,23 @@ export default function Home() {
       notify("Monatsabrechnung lokal gespeichert und abgeschlossen.");
     } catch (failure) {
       setSaveError(`Der Monatsabschluss wurde nicht bestätigt. ${failure instanceof Error ? failure.message : "Lokales Speichern fehlgeschlagen."}`);
+      throw failure;
+    } finally { importBusy.current = false; setTransactionSaving(false); }
+  };
+  const commitCorrection = async (targetMonth: string, expected: AppState) => {
+    if (importBusy.current) throw new Error("Ein lokaler Speichervorgang läuft bereits.");
+    importBusy.current = true; setTransactionSaving(true);
+    try {
+      await saveQueue.current;
+      const current = stateRef.current;
+      if (current !== lastSaved.current || current !== expected) throw new Error("Bitte offene Änderungen erfolgreich speichern und den Korrekturvergleich erneut prüfen.");
+      const result = await persistCorrectionDraft(current, targetMonth, { id: uid(), changeId: uid(), at: new Date().toISOString() }, saveState);
+      if (result.created) { lastSaved.current = result.state; stateRef.current = result.state; setState(result.state); }
+      setSaveError("");
+      notify(result.created ? "Korrekturentwurf lokal gespeichert. Noch nicht freigegeben oder ausgezahlt." : "Vorhandenen Korrekturentwurf geöffnet.");
+      return result.snapshotId;
+    } catch (failure) {
+      setSaveError(`Kein neuer Korrekturentwurf bestätigt. ${failure instanceof Error ? failure.message : "Lokales Speichern fehlgeschlagen."}`);
       throw failure;
     } finally { importBusy.current = false; setTransactionSaving(false); }
   };
@@ -432,6 +452,7 @@ export default function Home() {
               openCapture={() => setReceiptCaptureOpen(true)}
               viewRules={() => setTab("Einstellungen")}
               commitClosing={commitClosing}
+              commitCorrection={commitCorrection}
               editClosingIssue={target => {
                 setWorkspaceEntry({month});
                 if (target.kind === "trip") { setEditingTrip(state.trips.find(trip => trip.id === target.id) || null); setTab("Reisen"); }
@@ -2797,7 +2818,7 @@ function Statements({
   update,
   notify,
   startEntry, editCosts, editTrips, openCapture, viewRules,
-  commitClosing, editClosingIssue,
+  commitClosing, editClosingIssue, commitCorrection,
 }: {
   state: AppState;
   month: string;
@@ -2810,21 +2831,32 @@ function Statements({
   openCapture: () => void;
   viewRules: () => void;
   commitClosing: (confirmation: ClosingConfirmation) => Promise<void>;
+  commitCorrection: (month: string, expected: AppState) => Promise<string>;
   editClosingIssue: (target: NonNullable<ClosingIssue['target']>) => void;
 }) {
   const [reviewMonth, setReviewMonth] = useState<string | null>(null);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [correctionSaving, setCorrectionSaving] = useState(false);
+  const [correctionError, setCorrectionError] = useState("");
+  const correctionBusy = useRef(false);
   const reportHeading = useRef<HTMLElement>(null);
   useEffect(() => {if (reviewMonth === month) {reportHeading.current?.focus(); reportHeading.current?.scrollIntoView({block:"start"});}}, [reviewMonth, month]);
-  useEffect(() => setReviewMonth(null), [month]);
-  const existing = state.statements
-    .filter((s) => s.month === month)
-    .sort((a, b) => b.version - a.version)[0];
+  useEffect(() => {setReviewMonth(null); setSelectedVersionId(null); setCorrectionError("");}, [month]);
+  const versions = useMemo(() => state.statements.filter(s => s.month === month).sort((a, b) => b.version - a.version), [state.statements, month]);
+  const latest = versions[0];
+  const existing = versions.find(item => item.id === selectedVersionId) || latest;
+  const historical = !!existing && existing.id !== latest?.id;
+  const selectedHistoryLimitations = useMemo(() => existing ? snapshotHistoryLimitations(existing) : [], [existing]);
+  const versionStatus = (version: StatementSnapshot) => {
+    if (version.status === 'storniert') return version.locked ? 'Storniert' : 'Stornierter Entwurf';
+    if (isClosedStatement(version)) return version.status === 'ausgezahlt' ? 'Ausgezahlt' : 'Abgeschlossen';
+    if (version.locked || ['freigegeben', 'ausgezahlt'].includes(version.status)) return 'Status prüfen';
+    return versions.some(item => item.version < version.version && isClosedStatement(item)) ? 'Korrekturentwurf' : 'Entwurf';
+  };
+  const comparison = useMemo(() => compareClosedStatementWithCurrent(state, month, currentStatement), [state, month, currentStatement]);
   const statement = existing?.data || currentStatement;
-  const exportState = existing ? {
-    ...state,
-    settings: existing.settingsSnapshot || state.settings,
-    expenses: existing.expensesSnapshot || state.expenses,
-  } : state;
+  const exportState = useMemo(() => existing ? stateForStatementVersion(state, existing) : state, [state, existing]);
+  const exportContext = existing ? { version: existing.version, correction: versions.some(item => item.version < existing.version && isClosedStatement(item)) } : undefined;
   const number =
     existing?.number ||
     `RK-${month.replace("-", "")}-${String(state.statements.length + 1).padStart(3, "0")}`;
@@ -2876,7 +2908,16 @@ function Statements({
         }),
     ]).values(),
   ];
+  const openVersion = (id: string | null = null) => {setSelectedVersionId(id); setReviewMonth(month);};
+  const correct = async () => {
+    if (correctionBusy.current) return;
+    correctionBusy.current = true; setCorrectionSaving(true); setCorrectionError("");
+    try { const id = await commitCorrection(month, state); openVersion(id); }
+    catch (failure) { setCorrectionError(failure instanceof Error ? failure.message : "Korrekturentwurf konnte nicht gespeichert werden."); }
+    finally { correctionBusy.current = false; setCorrectionSaving(false); }
+  };
   const create = (reuseDraft = false) => {
+    if (comparison.baseline) { if (reuseDraft && latest) openVersion(); else void correct(); return; }
     update((s) => {
       const latest = s.statements
         .filter((x) => x.month === month)
@@ -2893,11 +2934,12 @@ function Statements({
         data: structuredClone(currentStatement),
         settingsSnapshot: structuredClone(s.settings),
         expensesSnapshot: structuredClone(s.expenses.filter((expense) => expense.date.startsWith(month))),
+        relatedTripsSnapshot: relatedTripsForSnapshot(s, currentStatement),
       };
       s.statements.push(snap);
       return s;
     });
-    setReviewMonth(month);
+    openVersion();
     notify("Entwurf mit Tarifstand erstellt.");
   };
   const setStatus = (status: ReviewStatus) =>
@@ -2905,7 +2947,9 @@ function Statements({
   return (
     <>
       <MonthWorkspace state={state} month={month} statement={currentStatement} startEntry={startEntry} editCosts={editCosts} editTrips={editTrips} openCapture={openCapture}
-        openStatement={() => {if (existing) setReviewMonth(month); else create(true);}}
+        openStatement={() => {if (latest) openVersion(); else create(true);}}
+        comparison={comparison}
+        changes={<StatementChanges comparison={comparison} creating={correctionSaving} error={correctionError} create={() => void correct()} resume={openVersion} />}
         checks={<MonthChecks state={state} month={month} update={update} notify={notify} editTrips={editTrips} editCosts={editCosts} viewRules={viewRules} />} />
       {reviewMonth === month && <>
       <button className="ghost workspace-hide-report" onClick={() => setReviewMonth(null)}>Zurück zur Erfassung</button>
@@ -2923,13 +2967,15 @@ function Statements({
             {exportState.expenses.filter((e) => e.date.startsWith(month) && e.status !== "storniert").length}{" "}
             Kostenpositionen · Gespeicherter Entwurfs- und Tarifstand.
           </p>
+          {versions.length > 0 && <label className="statement-version-picker">Historische Version / aktueller Entwurf<select aria-label="Abrechnungsversion" value={existing.id} onChange={event => setSelectedVersionId(event.target.value)}>{versions.map(version => <option key={version.id} value={version.id}>Version {version.version} · {versionStatus(version)} · erstellt {dateDe(version.createdAt?.slice(0,10))}</option>)}</select></label>}
+          {existing && <p>Freigabestatus: {existing.status}. {(() => { const closing = state.changes.filter(change => change.entityId === existing.id && change.field === 'Status' && (change.newValue === 'freigegeben' || (typeof change.newValue === 'object' && change.newValue !== null && 'status' in change.newValue && change.newValue.status === 'freigegeben'))).at(-1); return closing ? `Abgeschlossen am ${dateDe(closing.changedAt.slice(0,10))}.` : existing.locked ? 'Historisches Abschlussdatum ist nicht gesondert gespeichert.' : ''; })()}</p>}
         </div>
         <div className="statement-actions">
-          <button className="primary" onClick={() => create()}>
+          {!historical && <button className="primary" disabled={correctionSaving || (!!comparison.baseline && !comparison.hasChanges && !comparison.limitations.length && !comparison.draft) || (!!comparison.draft && comparison.draftCurrent)} onClick={() => create()}>
             <Save size={18} />
             {existing ? "Neue Version erstellen" : "Abrechnung erstellen"}
-          </button>
-          {existing && (
+          </button>}
+          {existing && !historical && (
             <select
               aria-label="Abrechnungsstatus"
               value={existing.status}
@@ -2943,7 +2989,8 @@ function Statements({
           )}
         </div>
       </section>
-      <StatementClosing state={state} month={month} snapshot={existing} commit={commitClosing} edit={editClosingIssue} />
+      {historical && <div className="notice" role="status">Historische Version {existing.version}: nur Ansicht und Export. Die gespeicherten Beträge, Tarife und Belege dieser ausgewählten Version werden verwendet.</div>}
+      {!historical && <StatementClosing state={state} month={month} snapshot={existing} commit={commitClosing} edit={editClosingIssue} />}
       <section className="card statement-profile">
         <div>
           <span>Name</span>
@@ -2972,7 +3019,7 @@ function Statements({
           )}
         </div>
       </section>
-      {existing && (!existing.expensesSnapshot || !existing.settingsSnapshot) && <div className="notice" role="status">Diese ältere Abrechnung enthält eingefrorene Berechnungen, aber keinen vollständigen eingefrorenen Beleg- und Profilstand. Ihre Exporte verwenden dafür teilweise die aktuellen Belege und Einstellungen. Eine ungeprüfte Freigabe ist ausgeschlossen.</div>}
+      {existing && selectedHistoryLimitations.length > 0 && <div className="notice" role="status"><div><b>Historischer Vergleich eingeschränkt.</b><ul>{selectedHistoryLimitations.map((limitation, index) => <li key={index}>{limitation}</li>)}</ul>Fehlende historische Angaben werden im Export ausgelassen und nicht aus aktuellen Daten ergänzt. Die gespeicherten Berechnungsbeträge bleiben erhalten.</div></div>}
       {existing?.locked && (
         <div className="notice">
           <ShieldCheck />
@@ -3071,7 +3118,7 @@ function Statements({
           <b>{euro(statement.totals.privatelyAdvanced)}</b>
         </div>
         <div className="total">
-          <span>Offener Erstattungsbetrag</span>
+          <span>Persönlicher Erstattungsbetrag laut Abrechnungsstand</span>
           <b>{euro(statement.totals.openAmount)}</b>
         </div>
       </section>
@@ -3083,25 +3130,30 @@ function Statements({
             PDF für Unterschrift, Tabellen für Buchhaltung oder Komplettpaket
             mit Belegen.
           </p>
+          <p>Tabellen enthalten den vollständigen ausgewählten Abrechnungsstand. Die bestehende Spalte „OffenerBetrag“ bezeichnet dessen rechnerischen Erstattungsbetrag, keine tatsächliche Restzahlung.</p>
+          {exportContext?.correction && <p className="correction-payment-note">{correctionExportNotice} CSV-/DATEV-Exporte vor einer Übernahme mit der Buchhaltung abstimmen; frühere Versionen nicht zusätzlich buchen.</p>}
         </div>
         <div className="export-buttons">
-          <button onClick={() => exportPdf(statement, exportState, number)}>
+          <button onClick={() => exportPdf(statement, exportState, number, exportContext)}>
             <FileDown />
             PDF
           </button>
-          <button onClick={() => exportExcel(statement, exportState)}>
+          <button onClick={() => exportExcel(statement, exportState, exportContext)}>
             <FileSpreadsheet />
             Excel
           </button>
-          <button onClick={() => exportCsv(statement, exportState)}>
+          <button onClick={() => exportCsv(statement, exportState, false, exportContext)}>
             <Download />
             CSV
           </button>
-          <button onClick={() => exportCsv(statement, exportState, true)}>
+          <button onClick={() => {
+            if (exportContext?.correction && !window.confirm(`${correctionExportNotice}\n\nDiese DATEV-CSV ist keine zusätzliche Differenzbuchung. Vor einer Übernahme frühere Buchungen und Zahlungen gesondert abstimmen. Vollständigen ausgewählten Stand trotzdem exportieren?`)) return;
+            exportCsv(statement, exportState, true, exportContext);
+          }}>
             <FileSpreadsheet />
             DATEV-CSV
           </button>
-          <button onClick={() => exportZip(statement, exportState, number)}>
+          <button onClick={() => exportZip(statement, exportState, number, exportContext)}>
             <Archive />
             ZIP + Belege
           </button>

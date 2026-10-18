@@ -87,6 +87,7 @@ function validateState(value: Partial<AppState>) {
       validateState({ settings: value.settings, trips: row.trips });
     }
     if (statement.settingsSnapshot || statement.expensesSnapshot) validateState({ settings: statement.settingsSnapshot || value.settings, expenses: statement.expensesSnapshot });
+    if (statement.relatedTripsSnapshot !== undefined) validateState({ settings: statement.settingsSnapshot || value.settings, trips: statement.relatedTripsSnapshot });
   }
   for (const change of value.changes || []) if (!record(change) || !texts(change, ["id", "entityType", "entityId", "field", "reason", "user", "changedAt"])) fail();
 }

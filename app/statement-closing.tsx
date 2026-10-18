@@ -3,6 +3,7 @@ import { checkStatementForClosing, type ClosingCheck, type ClosingConfirmation, 
 import { monthLabel } from '../lib/month-navigation';
 import { usePendingWork } from '../lib/pending-work';
 import type { AppState, StatementSnapshot } from '../lib/types';
+import { isClosedStatement } from '../lib/statement-comparison';
 
 const euro = (value: number) => value.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 export function StatementClosing({ state, month, snapshot, commit, edit }: {
@@ -11,6 +12,7 @@ export function StatementClosing({ state, month, snapshot, commit, edit }: {
   edit: (target: NonNullable<ClosingIssue['target']>) => void;
 }) {
   const result = useMemo(() => checkStatementForClosing(state, month, snapshot), [state, month, snapshot]);
+  const correction = state.statements.some(item => item.month === month && item.version < (snapshot?.version || 0) && isClosedStatement(item));
   const [dialog, setDialog] = useState<{ snapshot: StatementSnapshot; result: ClosingCheck } | null>(null);
   const [reviewed, setReviewed] = useState(false);
   const [accepted, setAccepted] = useState(false);
@@ -64,8 +66,9 @@ export function StatementClosing({ state, month, snapshot, commit, edit }: {
           <div><dt>Kilometererstattung</dt><dd>{euro(dialog.snapshot.data.totals.mileage)}</dd></div>
           <div><dt>Hotel</dt><dd>{euro(dialog.snapshot.data.totals.accommodation)}</dd></div>
           <div><dt>Sonstiges einschließlich Tanken</dt><dd>{euro(dialog.snapshot.data.totals.other + dialog.snapshot.data.totals.fuel)}</dd></div>
-          <div><dt>Offene persönliche Erstattung</dt><dd>{euro(dialog.snapshot.data.totals.openAmount)}</dd></div>
+          <div><dt>{correction ? 'Persönlicher Erstattungsbetrag laut Entwurfsstand' : 'Offene persönliche Erstattung'}</dt><dd>{euro(dialog.snapshot.data.totals.openAmount)}</dd></div>
         </dl>
+        {correction && <p className="correction-payment-note">Dies ist eine neue vollständige Abrechnungsversion. Ihr Betrag und die rechnerische Differenz zum früheren Abschluss sind keine tatsächliche Restzahlung oder Rückforderung. Ein früherer Auszahlungsstatus wird nicht übertragen.</p>}
         {dialog.result.warnings.length ? <><h3>{dialog.result.warnings.length} verbleibende Hinweise</h3>{issueList(dialog.result.warnings, false)}</> : <p>Keine bekannten Prüfprobleme.</p>}
         <label className="closing-confirmation"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} disabled={saving} /><span>Ich habe diese Monatsabrechnung geprüft und alle mir bekannten erstattungsfähigen Ausgaben erfasst.</span></label>
         {dialog.result.warnings.length > 0 && <label className="closing-confirmation"><input type="checkbox" checked={accepted} onChange={event => setAccepted(event.target.checked)} disabled={saving} /><span>Ich habe die verbleibenden Hinweise gesehen und möchte die Abrechnung trotzdem abschließen.</span></label>}

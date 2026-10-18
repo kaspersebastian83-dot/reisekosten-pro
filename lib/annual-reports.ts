@@ -1,6 +1,7 @@
 import { buildStatement } from './calculations';
 import { projectNumber } from './receipt-linking';
-import { yearOverview } from './month-navigation';
+import { latestStatement } from './month-navigation';
+import { isClosedStatement } from './statement-comparison';
 import type { AppState, Expense, StatementData, Trip } from './types';
 
 export const reportMonthNames = [
@@ -149,7 +150,9 @@ export function buildAnnualAnalysis(state: AppState, year: number): AnnualAnalys
     if (expense.status !== 'storniert' && inYear(expense.date, year)) entryMonths.add(expense.date.slice(0, 7));
   }
 
-  const closedMonthCount = yearOverview(state, year).filter(item => item.status === 'closed').length;
+  // Count documented historical closings even while a correction draft is open.
+  // A cancelled newest version never silently reinstates an older one.
+  const closedMonthCount = months.filter(({month}) => latestStatement(state, month)?.status !== 'storniert' && state.statements.some(item => item.month === month && isClosedStatement(item))).length;
   const projects = [...projectAmounts].map(([key, amount]) => {
     const labels = [...(projectLabels.get(key) || [])].sort((a, b) => b.length - a.length || a.localeCompare(b, 'de'));
     const consistentLabel = labels.length <= 1 ? labels[0] : '';

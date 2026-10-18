@@ -1,17 +1,19 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Camera, Plus } from 'lucide-react';
 import type { AppState, StatementData } from '../lib/types';
 import { latestStatement, monthLabel, monthOverview } from '../lib/month-navigation';
 import { round2 } from '../lib/calculations';
+import type { StatementComparison } from '../lib/statement-comparison';
 
 const euro = (value: number) => value.toLocaleString('de-DE', {style:'currency', currency:'EUR'});
-export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement, checks}: {
+export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement, checks, comparison, changes}: {
   state: AppState; month: string; statement: StatementData;
   startEntry: (kind: 'trip' | 'Hotel' | 'Parken') => void;
   editCosts: () => void; editTrips: () => void; openCapture: () => void; openStatement: () => void; checks: ReactNode;
+  comparison?: StatementComparison; changes?: ReactNode;
 }) {
   const existing = latestStatement(state, month);
-  const overview = monthOverview(state, month);
+  const overview = useMemo(() => monthOverview(state, month, comparison), [state, month, comparison]);
   const totals = statement.totals;
   const trips = new Set(statement.rows.flatMap(row => row.trips.map(trip => trip.id))).size;
   return <section className="card month-entry-workspace" aria-label="Monatsarbeitsbereich">
@@ -37,6 +39,7 @@ export function MonthWorkspace({state, month, statement, startEntry, editCosts, 
       <h3>Monatsabrechnung</h3>
       <p>{existing ? `Version ${existing.version} · ${existing.status}. Prüfung und Freigabe erfolgen in der bestehenden Abrechnung.` : 'Erst nach der Erfassung bewusst einen Entwurf erstellen. Freigabe und Abschluss erfolgen anschließend separat.'}</p>
       <button className="primary" onClick={openStatement}>{existing ? existing.locked ? 'Abrechnung ansehen' : 'Abrechnung fortsetzen' : 'Spesenabrechnung erstellen'}</button>
+      {changes}
     </section>
     <section aria-label="Bisher erfasst" className="workspace-summary">
       <h3>Bisher erfasst</h3>
@@ -47,7 +50,7 @@ export function MonthWorkspace({state, month, statement, startEntry, editCosts, 
         <div><dt>Weitere Kosten inkl. Tanken · erfasst</dt><dd>{euro(round2(totals.other + totals.fuel))}</dd></div>
       </dl>
       <div className="workspace-reimbursement-summary">
-        <b>Voraussichtliche persönliche Erstattung</b><strong>{euro(totals.openAmount)}</strong>
+        <b>{comparison?.baseline ? 'Persönlicher Erstattungsbetrag laut aktuellem Rechenstand' : 'Voraussichtliche persönliche Erstattung'}</b><strong>{euro(totals.openAmount)}</strong>
       </div>
       <p className="workspace-company-paid">Vom Unternehmen bezahlt: <b>{euro(totals.companyPaid)}</b></p>
       <p className="muted">Aktueller Erfassungsstand nach den bestehenden Regeln. Erfasste Kosten sind nicht automatisch persönlich erstattungsfähig. Diese Vorschau erstellt keinen Abrechnungsentwurf.</p>
