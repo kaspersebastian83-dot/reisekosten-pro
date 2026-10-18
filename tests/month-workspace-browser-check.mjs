@@ -58,7 +58,7 @@ try {
       await nav(page,'Monatsübersicht');await page.locator('.year-months').getByRole('button',{name:/^Juni 2026 ·/}).click();
       await check(`${engine} ${viewport.width}: June workspace opens without snapshots and retains responsive year navigation`,async()=>{
         await assertJune();assert.equal((await state(page)).statements.length,0);assert.equal(await page.locator('.statement-head').count(),0);
-        assert.deepEqual(await workspace.locator(':scope > section').evaluateAll(sections=>sections.map(section=>section.getAttribute('aria-label'))),['Spesen erfassen','Prüfen','Monatsabrechnung','Bisher erfasst']);
+        assert.deepEqual(await workspace.locator(':scope > section').evaluateAll(sections=>sections.map(section=>section.getAttribute('aria-label'))),['Spesen erfassen','Monat im Überblick','Prüfen','Monatsabrechnung','Bisher erfasst']);
         assert.equal(await workspace.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).count(),1);
         const tripButton=workspace.getByRole('button',{name:'Dienstreise erfassen',exact:true});const hotelButton=workspace.getByRole('button',{name:'Hotelrechnung erfassen',exact:true});const otherButton=workspace.getByRole('button',{name:'Sonstige Kosten erfassen',exact:true});
         assert.ok(await tripButton.evaluate(button=>button.classList.contains('primary')));assert.ok((await tripButton.boundingBox()).height>=60);
