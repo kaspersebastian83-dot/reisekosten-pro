@@ -44,7 +44,7 @@ export interface FolderFileContent {
 }
 export interface FolderFile { content: FolderFileContent; state: AppState; hash: string; text: string }
 /** Pro Browserprofil gespeichert (gemeinsame Datenbank „mosaik-suite“): welcher Ordner, welcher Dateistand zuletzt abgeglichen. */
-export interface FolderLink { handle: DirHandleLike; revision: number; hash: string; savedAt?: string }
+export interface FolderLink { handle: DirHandleLike; revision: number; hash: string; savedAt?: string; /** Anzeige, z. B. „Max Mustermann\SpesenKit“. */ label?: string }
 export interface WriteResult { revision: number; hash: string; savedAt: string }
 
 export type FolderErrorCode = "invalid" | "conflict" | "permission" | "read" | "write" | "verify";

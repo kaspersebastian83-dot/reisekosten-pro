@@ -44,7 +44,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   const lastError = useRef<Error | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const linkName = (link?: FolderLink | null) => link?.handle.name || FOLDER_NAME;
+  const linkName = (link?: FolderLink | null) => link?.label || link?.handle.name || FOLDER_NAME;
   const okStatus = (link: FolderLink, pending = false): FolderStatus => ({ kind: "ok", name: linkName(link), revision: link.revision, savedAt: link.savedAt, pending });
 
   const reconcile = useCallback(async (link: FolderLink) => {
@@ -161,7 +161,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     }
     try {
       const root = await resolveAppFolder(chosen);
-      const next: FolderLink = { handle: root, revision: 0, hash: "" };
+      const next: FolderLink = { handle: root, revision: 0, hash: "", label: root === chosen ? root.name : `${chosen.name}\\${root.name}` };
       await suiteLinks.set(next);
       await reconcile(next);
     } catch (error) { setStatus({ kind: "error", name: chosen.name, message: message(error) }); }

@@ -72,7 +72,7 @@ const tripIds = (state) => state.trips.map((t) => t.id);
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: 'Europe/Berlin' });
   await context.addInitScript(harness);
-  const page = await context.newPage();
+  const page = await context.newPage(); page.setDefaultTimeout(15000);
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   const banner = page.locator('.folder-banner');
   await page.goto(url); await ready(page);
@@ -178,7 +178,7 @@ try {
   await check('Abschluss meldet Erfolg erst, wenn er im Ordner gespeichert ist', async () => {
     assert.equal(await folderStatus(page), 'ok', 'lokal geänderter Stand wurde beim Start in den Ordner geschrieben');
     await closeMonth('2026-06');
-    await until(async () => /im SpesenKit-Ordner gespeichert/.test(await page.locator('.toast').innerText().catch(() => '')), 'Erfolgsmeldung');
+    await until(async () => /im SpesenKit-Ordner gespeichert/.test(await page.locator('.toast').innerText({ timeout: 500 }).catch(() => '')), 'Erfolgsmeldung');
     const folder = await readFolder(page);
     assert.equal(folder.file.state.statements.find((s) => s.month === '2026-06').locked, true);
   });
@@ -186,10 +186,12 @@ try {
   await check('Abschluss bei nicht beschreibbarem Ordner: keine Erfolgsmeldung, klare Anzeige, nachholbar', async () => {
     await page.evaluate(() => localStorage.setItem('test-fail-write', '1'));
     await closeMonth('2026-07');
-    await until(async () => /noch nicht im SpesenKit-Ordner/.test(await closing.innerText().catch(() => '')), 'Fehlermeldung im Dialog');
+    // Die Version ist lokal gesperrt, der Abschlussdialog schließt; die Meldung steht im Fehlerfeld oben.
+    const alert = page.locator('.error-box');
+    await until(async () => (await alert.count()) && /im Browser gespeichert, aber noch nicht im SpesenKit-Ordner/.test(await alert.innerText()), 'Fehlermeldung');
+    assert.doesNotMatch(await page.locator('.toast').innerText({ timeout: 500 }).catch(() => ''), /abgeschlossen/);
     assert.equal((await idbState(page)).statements.find((s) => s.month === '2026-07').locked, true, 'im Browser abgeschlossen');
     assert.equal((await readFolder(page)).file.state.statements.some((s) => s.month === '2026-07'), false);
-    await closing.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     assert.match(await banner.innerText(), /nicht im SpesenKit-Ordner gespeichert/);
     await page.evaluate(() => localStorage.removeItem('test-fail-write'));
     await banner.getByRole('button', { name: 'Erneut speichern' }).click();
