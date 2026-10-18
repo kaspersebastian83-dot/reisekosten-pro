@@ -2547,22 +2547,33 @@ button:focus-visible { outline: 3px solid #5a93d0; outline-offset: 3px; }
 .month-entry-workspace {display:grid;gap:24px;min-width:0}
 .month-entry-workspace header h2 {margin:4px 0 12px;font-size:24px;font-weight:700}
 .month-entry-workspace h3 {margin:0 0 12px}
-.workspace-figures {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0}
-.workspace-figures>div {padding:14px;background:var(--paper);border:1px solid var(--line);border-radius:12px;min-width:0}
-.workspace-figures dt {font-size:12px;color:var(--muted)}
-.workspace-figures dd {font-weight:700;font-size:20px;margin:6px 0 0}
-.workspace-entry-actions {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.workspace-entry-actions button {min-height:48px;white-space:normal;justify-content:center}
+.workspace-entry-actions {display:grid;gap:10px}
+.workspace-entry-actions button {min-height:54px;white-space:normal;justify-content:center}
+.workspace-entry-actions .workspace-trip-entry {width:100%;min-height:68px;justify-content:flex-start;padding:18px 22px;font-size:18px}
+.workspace-secondary-entry-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.workspace-secondary-entry-actions button {background:var(--paper);border:1px solid var(--line);font-weight:650}
 .workspace-edit-actions {display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .workspace-edit-actions button,.workspace-return button {min-height:44px;white-space:normal}
+.workspace-edit-actions button {font-size:14px}
+.workspace-figures {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0}
+.workspace-figures>div {padding:11px;background:var(--paper);border:1px solid var(--line);border-radius:10px;min-width:0}
+.workspace-figures dt {font-size:12px;color:var(--muted);line-height:1.35}
+.workspace-figures dd {font-weight:700;font-size:17px;margin:5px 0 0;overflow-wrap:anywhere}
+.workspace-reimbursement-summary {display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:12px;padding:12px 14px;background:#eff6ff;border:1px solid #c9dcf4;border-radius:10px}
+.workspace-reimbursement-summary strong {font-size:20px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:right}
+.workspace-company-paid {margin:8px 0 0;font-size:14px}
 .workspace-statement-action {border-top:1px solid var(--line);padding-top:24px}
 .workspace-return {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-@media(max-width:600px){.workspace-figures,.workspace-entry-actions{grid-template-columns:minmax(0,1fr)}.workspace-edit-actions{flex-direction:column;align-items:stretch}.workspace-statement-action>.primary{width:100%;white-space:normal;min-height:48px}}
+@media(max-width:900px){.workspace-figures{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.workspace-figures{grid-template-columns:repeat(2,minmax(0,1fr))}.workspace-entry-actions .workspace-trip-entry{min-height:62px}.workspace-secondary-entry-actions{grid-template-columns:minmax(0,1fr)}.workspace-edit-actions{flex-direction:column;align-items:stretch}.workspace-statement-action>.primary{width:100%;white-space:normal;min-height:48px}.workspace-reimbursement-summary{align-items:flex-start;flex-direction:column;gap:4px}.workspace-reimbursement-summary strong{text-align:left}}
 
 .statement-head[tabindex="-1"] {scroll-margin-top:150px}
 
 .month-checks {min-width:0;border-top:1px solid var(--line);padding-top:20px}
-.month-checks summary {min-height:44px;padding:12px 0;cursor:pointer;font-weight:700}
+.month-checks summary {display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:12px 0;cursor:pointer;font-weight:700}
+.workspace-check-status {flex:none;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:650}
+.workspace-check-status.has-issues {color:#8a3a18;background:#fff3e8}
+.workspace-check-status.no-known-issues {color:#586779;background:#f2f4f7}
 .month-checks .check-list button {min-height:44px;white-space:normal}
 .month-checks .check-list b {min-width:0;overflow-wrap:anywhere}
 .month-checks .month-review {color:var(--red);padding-left:20px}

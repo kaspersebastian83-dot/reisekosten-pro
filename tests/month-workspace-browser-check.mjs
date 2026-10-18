@@ -57,8 +57,16 @@ try {
       await nav(page,'Monatsübersicht');await page.locator('.year-months').getByRole('button',{name:/^Juni 2026 ·/}).click();
       await check(`${engine} ${viewport.width}: June workspace opens without snapshots and retains responsive year navigation`,async()=>{
         await assertJune();assert.equal((await state(page)).statements.length,0);assert.equal(await page.locator('.statement-head').count(),0);
+        assert.deepEqual(await workspace.locator(':scope > section').evaluateAll(sections=>sections.map(section=>section.getAttribute('aria-label'))),['Spesen erfassen','Prüfen','Monatsabrechnung','Bisher erfasst']);
         assert.equal(await workspace.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).count(),1);
-        for(const name of ['Dienstreise erfassen','Hotelrechnung erfassen','Sonstige Kosten erfassen'])assert.ok((await workspace.getByRole('button',{name,exact:true}).boundingBox()).height>=44);
+        const tripButton=workspace.getByRole('button',{name:'Dienstreise erfassen',exact:true});const hotelButton=workspace.getByRole('button',{name:'Hotelrechnung erfassen',exact:true});const otherButton=workspace.getByRole('button',{name:'Sonstige Kosten erfassen',exact:true});
+        assert.ok(await tripButton.evaluate(button=>button.classList.contains('primary')));assert.ok((await tripButton.boundingBox()).height>=60);
+        for(const button of [tripButton,hotelButton,otherButton])assert.ok((await button.boundingBox()).height>=44);
+        const hotelBox=await hotelButton.boundingBox();const otherBox=await otherButton.boundingBox();
+        if(viewport.width===390)assert.ok(otherBox.y>hotelBox.y);else {assert.ok(Math.abs(otherBox.y-hotelBox.y)<2);assert.ok(hotelBox.x<otherBox.x);}
+        assert.deepEqual(await workspace.locator('.workspace-figures dt').allTextContents(),['Dienstreisen','Verpflegungspauschalen · Vorschau','Hotelkosten · erfasst','Weitere Kosten inkl. Tanken · erfasst']);
+        assert.match(await workspace.innerText(),/Voraussichtliche persönliche Erstattung/);assert.match(await workspace.innerText(),/Vom Unternehmen bezahlt/);
+        assert.equal(await page.locator('.quick-fab,.camera-fab').count(),0,'duplicate floating actions do not cover the month entry controls');
         await fits();
       });
       await check(`${engine} ${viewport.width}: existing manual trip form defaults to June and returns after saving`,async()=>{
@@ -86,14 +94,14 @@ try {
         assert.equal(saved.expenses[0].date,'2026-07-02');assert.equal(saved.expenses[0].tripId,tripId);assert.equal(saved.expenses[0].stayStart,'2026-06-10');
         assert.equal(saved.expenses[0].paymentType,'Unternehmen');assert.ok(saved.expenses[0].receipt.dataUrl);assert.equal(saved.statements.length,0);
         assert.match(await workspace.innerText(),/Hotelkosten · erfasst\s+0,00/);
-        await selectMonth('2026-07');assert.match(await workspace.innerText(),/Hotelkosten · erfasst\s+115,00/);assert.match(await workspace.innerText(),/Vom Unternehmen bezahlt\s+115,00/);assert.match(await workspace.innerText(),/Offene persönliche Erstattung · Vorschau\s+0,00/);
+        await selectMonth('2026-07');assert.match(await workspace.innerText(),/Hotelkosten · erfasst\s+115,00/);assert.match(await workspace.innerText(),/Vom Unternehmen bezahlt:?\s+115,00/);assert.match(await workspace.innerText(),/Voraussichtliche persönliche Erstattung\s+0,00/);
         await selectMonth('2026-06');
       });
       await check(`${engine} ${viewport.width}: other expense defaults to June; figures update without snapshots and editing returns to June`,async()=>{
         await clickAction('Sonstige Kosten erfassen');assert.equal(await editor.getByLabel('Datum',{exact:true}).inputValue(),'2026-06-01');
         await editor.getByLabel('Beschreibung',{exact:true}).fill('Synthetisches Parken');await editor.getByLabel('Brutto (€)',{exact:true}).fill('25');await saveCost();
         const saved=await waitState(page,s=>s?.expenses.length===2);await assertJune();assert.equal(saved.statements.length,0);
-        assert.match(await workspace.innerText(),/Weitere Kosten inkl. Tanken · erfasst\s+25,00/);assert.match(await workspace.innerText(),/Offene persönliche Erstattung · Vorschau\s+53,00/);
+        assert.match(await workspace.innerText(),/Weitere Kosten inkl. Tanken · erfasst\s+25,00/);assert.match(await workspace.innerText(),/Voraussichtliche persönliche Erstattung\s+53,00/);
         await clickAction('Kosten & Belege bearbeiten');await page.locator('.expense-card').getByRole('button',{name:'Bearbeiten',exact:true}).click();
         await editor.getByLabel('Brutto (€)',{exact:true}).fill('30');await saveCost();await waitState(page,s=>s?.expenses.find(e=>e.category==='Parken')?.gross===30);await assertJune();
         assert.match(await workspace.innerText(),/Weitere Kosten inkl. Tanken · erfasst\s+30,00/);await fits();
