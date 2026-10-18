@@ -588,8 +588,39 @@ PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_EXECUTABLE=/pfad/zum/browser node 
 
 Sie prüft Start/Navigation, zwölf Monate, gemeinsame Auswahl, den unveränderten
 lokalen Speicherstand bei Navigation, die übernommenen Prüf-/Sammelaktionen,
-beide vorhandenen Statistikbereiche, Tastaturbedienung der Prüfliste,
+Jahresanalyse und Monatskennzahlen, Tastaturbedienung der Prüfliste,
 ungespeicherte Kosten-/Einstellungsformulare und Offline-Neuladen bei
 390/820/1440 px in Chromium und WebKit. Die bestehenden Monatsablaufprüfungen
 prüfen weiter Reisen/Hotel/Kosten, bewusste Entwürfe, unveränderte gesperrte
 Snapshots, PDF/Excel und Belegzuordnungen.
+
+## Schritt 3.1d: Jahresauswertungen
+
+Der Bereich **Auswertungen** zeigt die aktuelle Erfassung des gewählten
+Analysejahres. Der Jahreswähler ist flüchtiger React-Zustand und verändert den
+Abrechnungsmonat nicht. Die fünf Jahreskennzahlen, alle zwölf Monatsbalken,
+Kostenarten und offenen Auszahlungen beruhen auf genau einer vorhandenen
+`buildStatement`-Berechnung pro Monat. Gespeicherte Snapshotwerte werden nicht
+mit aktuellen Erfassungsdaten vermischt; gesperrte Abschlüsse werden lediglich
+über den bestehenden Monatsstatus gezählt.
+
+Die Projektsicht ist eine interne Kostenanalyse. Reisekosten werden nur dann
+einem Projekt zugeordnet, wenn die bestehende Projektnummer in `Trip.order`
+oder `Expense.projectNumber` eindeutig ist. Ein verknüpfter Beleg mit
+widersprüchlichen Projektangaben bleibt ohne Projekt. Tagespauschalen werden
+nur zugeordnet, wenn alle Reisen des Tages dasselbe bekannte Projekt tragen;
+sonst erscheinen sie unter **Nicht eindeutig zugeordnet**. Kundenfelder werden
+nicht als Projekt interpretiert. Die Ansicht ist keine verbindliche steuerliche
+oder buchhalterische Projektkostenrechnung.
+
+Die Beträge für „Privat vorgestreckt“, „Vom Unternehmen bezahlt“, „Bereits
+erstattet“ und „Zahlungsart unbekannt“ folgen den vorhandenen Zahlungs- und
+Erstattungsfeldern. Sie sind getrennte Merkmale und können sich überschneiden.
+Offene persönliche Auszahlungen stammen ausschließlich aus den vorhandenen
+Monatsberechnungen. Eine private Vorauslage gilt dadurch nicht automatisch als
+offen; unbekannte Zahlungsarten erhöhen die persönliche Auszahlung nicht.
+
+Der Auswertungsbereich bietet keine Beleg- oder Spesenerfassung und erstellt
+keine Abrechnungsentwürfe. IndexedDB, Schema, Snapshots, Exporte, Import,
+Offlineverhalten, GitHub-Pages-Konfiguration und der Safari-/Service-Worker-Fix
+bleiben unberührt. Die Jahresauswertung speichert keine Daten.
