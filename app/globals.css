@@ -2914,3 +2914,44 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .manual-trip .meal-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
 .manual-trip .meal-days > b { grid-column: 1 / -1; }
 .trip-side .confirm { margin: 0; }
+
+/* Kostenformular kompakt: links Betrag, Beleg, Details; rechts Projekt und Reisezuordnung. */
+.expense-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
+.expense-fields { gap: 10px 14px; align-content: start; }
+.expense-fields input, .expense-fields select { min-height: 40px; padding-top: 8px; padding-bottom: 8px; }
+.expense-receipt { display: grid; gap: 4px; min-width: 0; }
+.expense-receipt .upload-box { padding: 8px 12px; gap: 4px; }
+.expense-receipt .receipt-attachment summary { padding: 2px 0; font-size: 13px; }
+.expense-receipt .receipt-missing { font-size: 12px; font-weight: 650; }
+.expense-fields .expense-more > summary { padding: 6px 0; }
+.expense-side { display: grid; gap: 10px; min-width: 0; position: sticky; top: 0; }
+.expense-side .receipt-linking { padding: 12px; }
+.expense-side .receipt-linking .form-grid { grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.expense-side .receipt-linking p { margin: 4px 0; font-size: 12px; }
+.expense-side .receipt-linking small { font-size: 11px; }
+.expense-side .receipt-linking input, .expense-side .receipt-linking select { min-height: 40px; padding-top: 8px; padding-bottom: 8px; }
+.expense-side .receipt-linking .wide > .link { min-height: 32px; margin: 4px 0; }
+.expense-side .trip-candidate { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; font-size: 13px; }
+@media (max-width: 900px) {
+  .expense-layout { grid-template-columns: minmax(0, 1fr); }
+  .expense-side { position: static; }
+}
+.modal-wide .modal-body > .notice:first-child { margin: 0 0 12px; padding: 8px 12px; font-size: 13px; }
+.expense-receipt { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; }
+.expense-receipt .upload-box { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 10px; border-width: 1.5px; }
+.expense-receipt .upload-box > span { flex: none; }
+/* Natives Dateifeld unsichtbar; die ganze Fläche öffnet die Auswahl, der Name steht daneben. */
+.expense-receipt .upload-box { cursor: pointer; position: relative; }
+.expense-receipt .upload-box input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.expense-receipt .upload-box:focus-within { outline: 3px solid #316ba8; outline-offset: 2px; }
+.expense-receipt .upload-box b { font-size: 13px; overflow-wrap: anywhere; }
+.expense-receipt .receipt-attachment[open] { grid-column: 1 / -1; }
+.expense-side .receipt-linking .muted, .expense-side .receipt-linking .hotel-review, .expense-side .receipt-linking .link-warning { font-size: 12px; line-height: 1.4; }
+.expense-side .receipt-linking .hotel-review { padding: 6px 8px; }
+.receipt-linking.compact .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.receipt-linking.compact .link-info { font-size: 12px; color: var(--muted); }
+.receipt-linking.compact .link-info summary { cursor: pointer; padding: 2px 0; }
+@media (max-width: 600px) { .receipt-linking.compact .form-grid { grid-template-columns: minmax(0, 1fr); } }
+.receipt-linking.compact .trip-candidate { padding: 4px 0; }
+.receipt-linking.compact .trip-candidate > button { min-height: 36px; padding: 6px 12px; }
+.receipt-linking.compact .wide > b { font-size: 14px; }

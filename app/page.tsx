@@ -2697,9 +2697,11 @@ function Expenses({
       </div>
       </>}
       {editing && (
-        <Modal title="Kosten & Beleg" close={() => setEditing(null)} onSubmitShortcut={() => save(true)}>
+        <Modal title="Kosten & Beleg" close={() => setEditing(null)} onSubmitShortcut={() => save(true)} wide>
           {workspaceMonth && <p className="notice" role="status">Arbeitsmonat: {monthLabel(workspaceMonth)}. Rechnungsdatum bitte am Beleg prüfen.{validDate(editing.date) && !editing.date.startsWith(workspaceMonth) && ` Diese Ausgabe erscheint wegen ihres Rechnungsdatums in ${monthLabel(editing.date.slice(0,7))}.`}</p>}
-          <div className="form-grid">
+          {/* Zweispaltig: links Betrag, Beleg und Details; rechts Projekt und Reisezuordnung. */}
+          <div className="expense-layout">
+          <div className="form-grid expense-fields">
             <label>
               Datum
               <input
@@ -2752,8 +2754,6 @@ function Expenses({
               />
             </label>
             <PaymentSelect value={editing.paymentType} onChange={paymentType => setEditing({...editing, paymentType, paidBy:paymentPayer(paymentType)})} />
-            <ReceiptLinkFields value={editing} onChange={patch=>setEditing({...editing,...patch})} trips={state.trips} travelLabel="Reisezuordnung" />
-            <div className="wide"><ReceiptAttachment receipt={editing.receipt} /></div>
             {editing.category === "Tanken" && (
               <>
                 <label>
@@ -2817,17 +2817,20 @@ function Expenses({
                 </label>
               </>
             )}
-            <label className="wide upload-box">
-              <span>Beleg (PDF, JPG, PNG, HEIC)</span>
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.heic,image/*"
-                onChange={(e) => receipt(e.target.files?.[0])}
-              />
-              <b>
-                {editing.receipt?.name || "Datei auswählen oder fotografieren"}
-              </b>
-            </label>
+            <div className="wide expense-receipt">
+              <label className="upload-box">
+                <span>Beleg (PDF, JPG, PNG, HEIC)</span>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.heic,image/*"
+                  onChange={(e) => receipt(e.target.files?.[0])}
+                />
+                <b>
+                  {editing.receipt?.name || "Datei auswählen oder fotografieren"}
+                </b>
+              </label>
+              <ReceiptAttachment receipt={editing.receipt} />
+            </div>
             <details className="wide expense-more" open={!!(editing.merchant || editing.invoiceNumber || editing.businessShare !== 100 || editing.reimbursementStatus !== "offen")}>
               <summary>Weitere Angaben · Händler, Rechnungsnummer, Steuer, Erstattungsstatus, Anteil</summary>
               <div className="form-grid">
@@ -2915,14 +2918,18 @@ function Expenses({
               </div>
             </details>
           </div>
-          {mileageConflict && (
-            <div className="error-box">
-              <AlertTriangle />
-              Mögliche Doppelerfassung: Bei Verwendung der Kilometerpauschale
-              dürfen abgegoltene Fahrzeugkosten nicht zusätzlich angesetzt
-              werden.
-            </div>
-          )}
+          <div className="expense-side">
+            <ReceiptLinkFields value={editing} onChange={patch=>setEditing({...editing,...patch})} trips={state.trips} travelLabel="Reisezuordnung" compact />
+            {mileageConflict && (
+              <div className="error-box">
+                <AlertTriangle />
+                Mögliche Doppelerfassung: Bei Verwendung der Kilometerpauschale
+                dürfen abgegoltene Fahrzeugkosten nicht zusätzlich angesetzt
+                werden.
+              </div>
+            )}
+          </div>
+          </div>
           <div className="modal-actions">
             <BatchCount count={batch} noun={["Kostenposition", "Kostenpositionen"]} />
             <button className="ghost" onClick={() => setEditing(null)}>

@@ -81,6 +81,8 @@ try {
       });
       await check(`${engine} ${viewport.width}: expenses in a batch – date, payment type and link carry over, amount and description do not`,async()=>{
         await clickAction('Sonstige Kosten erfassen');await editor.waitFor();
+        if(viewport.width>=1366){const body=await editor.locator('.modal-body').evaluate(b=>({sh:b.scrollHeight,ch:b.clientHeight}));assert.ok(body.sh<=body.ch+1,`expense form scrolls: ${JSON.stringify(body)}`);}
+        {const actions=await editor.locator('.modal-actions').boundingBox();assert.ok(actions.y+actions.height<=viewport.height+1,'expense save buttons visible');}
         await editor.getByLabel('Datum',{exact:true}).fill('2026-06-10');await editor.getByLabel('Beschreibung',{exact:true}).fill('Synthetisches Parken');await editor.getByLabel('Brutto (€)',{exact:true}).fill('12');
         await editor.getByLabel('Zahlungsart',{exact:true}).selectOption('Unternehmen');
         await editor.getByRole('button',{name:'Speichern & nächste',exact:true}).click();
