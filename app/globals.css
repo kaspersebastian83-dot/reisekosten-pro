@@ -2955,3 +2955,18 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .receipt-linking.compact .trip-candidate { padding: 4px 0; }
 .receipt-linking.compact .trip-candidate > button { min-height: 36px; padding: 6px 12px; }
 .receipt-linking.compact .wide > b { font-size: 14px; }
+
+/* Funktionen aus „Reisen“ und „Kosten & Belege“ in der Monatsübersicht. */
+.modal-delete { margin-right: auto; color: var(--red); }
+.modal-delete:hover { background: var(--red-bg); }
+.workspace-inbox { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; padding: 10px 22px; background: var(--yellow-bg); border-bottom: 1px solid #f0dcae; color: #6b4a10; }
+.workspace-inbox span { flex: 1 1 240px; }
+.workspace-inbox small { color: #8a6a2a; }
+.workspace-inbox .primary { min-height: 40px; }
+.timeline-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 8px 0; padding: 8px 12px; border-radius: 8px; background: var(--mint); font-size: 13px; }
+.timeline-filter .link { min-height: 32px; font-size: 13px; }
+.timeline-calc { grid-column: 2; padding: 0 12px 6px; min-width: 0; }
+.timeline-calc .calculation-details { margin: 0; }
+.timeline-calc .calculation-details > summary { font-size: 11px; color: var(--muted); cursor: pointer; padding: 2px 0 4px; width: fit-content; }
+.timeline-calc .calculation-details > summary:hover { color: var(--green); }
+@media (max-width: 760px) { .workspace-inbox { padding: 10px 16px; } .timeline-calc { grid-column: 1 / -1; } }

@@ -776,3 +776,18 @@ unten sichtbar. Unter 900 px Breite einspaltig. Keine Änderung an Pflichtfelder
 Übernachtungszeitraum und Frühstück in einer Zeile, Reisevorschläge und Reisezuordnung. Warnungen bleiben sichtbar,
 feste Erläuterungen stehen unter „Hinweise zur Zuordnung“ (`ReceiptLinkFields compact`; Schnellerfassung und
 Beleg-Eingang unverändert). Auch eine Hotelrechnung passt ab etwa 1366 × 660 px ohne Scrollen.
+
+## Alles aus der Monatsübersicht
+
+Was bisher nur unter „Reisen“ bzw. „Kosten & Belege“ ging, ist jetzt auch in der Monatsübersicht erreichbar:
+
+- **Fahrtenbuch importieren** in der Werkzeugleiste (danach „Zurück zum Monatsarbeitsbereich“).
+- **Beleg-Eingang:** Hinweis „N Belege warten auf Zuordnung“ mit „Nacheinander zuordnen“ – öffnet die offenen Belege
+  aller Monate der Reihe nach (älteste zuerst, „Beleg 2 von 5“); Schließen beendet die Runde.
+- **Löschen** im Bearbeitungsfenster („Reise löschen“ / „Löschen“) mit Rückfrage und Eintrag im Änderungsprotokoll.
+  Gelöschte Kosten aus dem Beleg-Eingang geben ihren Beleg wieder in den Eingang zurück (`lib/entry-removal.ts`).
+  Gespeicherte Abrechnungen bleiben unverändert.
+- **Rechenweg** je Tag direkt in der Zeitleiste.
+- **Prüfen:** Die Prüfzeilen filtern die Zeitleiste (z. B. nur fehlende Belege) statt in die Listen zu wechseln.
+
+Browsercheck: `tests/month-functions-browser-check.mjs`.

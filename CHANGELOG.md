@@ -1,5 +1,14 @@
 # Release Notes
 
+## Alles aus der Monatsübersicht (Schritt 1 von 2)
+
+- Fahrtenbuch-Import in der Werkzeugleiste; Werkzeugleiste mit kürzeren Beschriftungen.
+- Beleg-Eingang der Reihe nach zuordnen („Nacheinander zuordnen“, „Beleg 2 von 5“).
+- Reise und Kostenposition im Bearbeitungsfenster löschen (mit Rückfrage, Änderungsprotokoll; Beleg geht zurück in
+  den Eingang).
+- Rechenweg je Tag in der Zeitleiste; Prüfzeilen filtern die Zeitleiste.
+- Die Reiter „Reisen“ und „Kosten & Belege“ bleiben in diesem Schritt noch erhalten.
+
 ## Kostenformular ohne Scrollen
 
 - „Kosten & Beleg“ zweispaltig im breiten Fenster: Betrag und Beleg links, Projekt und Reisezuordnung rechts.

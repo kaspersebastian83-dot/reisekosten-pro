@@ -63,7 +63,8 @@ try {
         assert.equal(await page.locator('.sidebar nav [aria-current=page]').innerText(),'Reisen');
         await fits();await page.getByRole('button',{name:'Zurück zu Reisen',exact:true}).click();
         await nav(page,'Monatsübersicht');
-        assert.doesNotMatch(await page.locator('.month-entry-workspace').innerText(),/Datei importieren|Fahrtenbuch importieren/);
+        // Der Fahrtenbuch-Import ist seit der Zusammenführung genau einmal in der Werkzeugleiste des Monats erreichbar.
+        assert.equal(await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).count(),1);assert.doesNotMatch(await page.locator('.month-entry-workspace').innerText(),/Datei importieren/);
         // In der Monatsübersicht gibt es keine doppelten Schnellknöpfe mehr; Kosten werden dort über den Arbeitsbereich erfasst.
         assert.equal(await page.locator('.quick-top:visible, .quick-fab:visible').count(),0);
         await page.locator('.month-entry-workspace').getByRole('button',{name:'Sonstige Kosten erfassen',exact:true}).click();

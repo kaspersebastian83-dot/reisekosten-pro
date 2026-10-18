@@ -4,10 +4,10 @@ const euro = (n: number) => n.toLocaleString("de-DE", { style: "currency", curre
 const date = (d: string) => d.split("-").reverse().join(".");
 const number = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 20 });
 
-export function DayDetails({ day, frozen = false, tripId }: { day: DayCalculation; frozen?: boolean; tripId?: string }) {
+export function DayDetails({ day, frozen = false, tripId, summary }: { day: DayCalculation; frozen?: boolean; tripId?: string; summary?: string }) {
   const row = "openAmount" in day ? day as StatementRow : undefined;
   const context = day.calculation;
-  return <details className="calculation-details"><summary>Berechnung anzeigen{tripId ? " · Fahrt" : ` · ${date(day.date)}`}</summary>
+  return <details className="calculation-details"><summary>{summary || <>Berechnung anzeigen{tripId ? " · Fahrt" : ` · ${date(day.date)}`}</>}</summary>
     <div className="calculation-body">
       <h4>{date(day.date)} · {frozen ? "Gespeicherte Berechnung" : "Berechnung dieses Tages"}</h4>
       {tripId && <p>Die Spesen gelten gemeinsam für den Tag und werden nicht je Fahrt addiert. Diese Fahrt ist Teil des unten gezeigten Tages.</p>}
