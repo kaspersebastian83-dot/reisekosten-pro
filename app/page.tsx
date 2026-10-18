@@ -56,6 +56,7 @@ import {
   duplicateKey,
   expenseConflictsWithMileageAllowance,
   round2,
+  expenseReimbursable,
   validateTrip,
 } from "../lib/calculations";
 import {
@@ -65,6 +66,9 @@ import {
   suggestMapping,
 } from "../lib/importer";
 import { manualTripErrors, manualTripInterval, manualTripReviewNotes, projectPlace, projectSuggestions } from "../lib/manual-trip";
+import { cleanContext, duplicateMessage, linkingErrors, paymentLabel, paymentPayer, similarExpense, syncExpenseLink, validDate } from "../lib/receipt-linking";
+import { readReceiptFile } from "../lib/receipt-file";
+import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
 import { demoState } from "../lib/demo";
 import { applyMerchantRule, recognizeReceiptLocally } from "../lib/receipt-ocr";
 import {
@@ -149,6 +153,7 @@ export default function Home() {
   const [toast, setToast] = useState("");
   const [undoAction, setUndoAction] = useState<(() => void) | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const openTrip = () => {
     setTab("Reisen");
@@ -357,6 +362,7 @@ export default function Home() {
               editing={editingTrip}
               setEditing={setEditingTrip}
               openImport={() => setTab("Fahrten importieren")}
+              openExpense={id => {setEditingExpenseId(id); setTab("Kosten & Belege");}}
               state={state}
               month={month}
               update={update}
@@ -370,6 +376,8 @@ export default function Home() {
               update={update}
               notify={notify}
               openCapture={() => setReceiptCaptureOpen(true)}
+              initialExpenseId={editingExpenseId}
+              clearInitialExpense={() => setEditingExpenseId(null)}
             />
           )}
           {tab === "Monatsabrechnungen" && (
@@ -829,7 +837,7 @@ function QuickExpense({
       description: preset.label,
       paymentType: preset.payment,
       paidBy:
-        preset.payment === "privat vorgestreckt" ? "Reisender" : "Unternehmen",
+        paymentPayer(preset.payment),
       reimbursementStatus:
         preset.payment === "privat vorgestreckt"
           ? "offen"
@@ -839,57 +847,46 @@ function QuickExpense({
     requestAnimationFrame(() => amountRef.current?.focus());
   };
 
+  const [readingReceipt, setReadingReceipt] = useState(false);
+  const receiptRevision = useRef(0);
+  const saving = useRef(false);
+  useEffect(() => () => {receiptRevision.current++;}, []);
   const addReceipt = async (file?: File) => {
     if (!file) return;
-    const dataUrl = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.readAsDataURL(file);
-    });
-    const hash = crypto.subtle
-      ? await crypto.subtle
-          .digest("SHA-256", await file.arrayBuffer())
-          .then((bytes) =>
-            [...new Uint8Array(bytes)]
-              .map((x) => x.toString(16).padStart(2, "0"))
-              .join(""),
-          )
-      : `${file.name}-${file.size}`;
-    setDraft((d) => ({
-      ...d,
-      receipt: {
-        id: uid(),
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        hash,
-        dataUrl,
-      },
-    }));
+    const revision = ++receiptRevision.current;
+    setReadingReceipt(true);
+    try {
+      const receipt = {id:uid(), ...await readReceiptFile(file)};
+      if (revision === receiptRevision.current) setDraft(d => ({...d, receipt}));
+    } catch { if (revision === receiptRevision.current) notify("Beleg konnte nicht gelesen werden. Bitte erneut auswählen."); }
+    finally { if (revision === receiptRevision.current) setReadingReceipt(false); }
   };
 
   const saveQuick = () => {
-    if (!(draft.gross > 0)) {
+    if (readingReceipt || saving.current) return;
+    if (!(Number.isFinite(draft.gross) && draft.gross > 0)) {
       notify("Bitte zuerst einen Betrag eingeben");
       amountRef.current?.focus();
       return;
     }
     const vatRate = draft.vatRate || 0;
     const net = round2(draft.gross / (1 + vatRate / 100));
-    const autoTrip =
-      draft.tripId === undefined ? state.trips.find((t) => t.date === draft.date)?.id : draft.tripId || undefined;
+    const problem = linkingErrors(draft)[0] || (!validDate(draft.date) ? "Rechnungsdatum prüfen" : "") || duplicateMessage(state, draft);
+    if (problem) return notify(problem);
     const duplicateReceipt =
       !!draft.receipt &&
       state.expenses.some((e) => e.receipt?.hash === draft.receipt?.hash);
     const item: Expense = {
       ...draft,
       id: uid(),
-      tripId: autoTrip,
+      ...cleanContext(draft),
+      tripId: draft.tripId || undefined,
       net,
       vat: round2(draft.gross - net),
       status: draft.receipt ? "vollständig" : "geprüft",
       warnings: duplicateReceipt ? ["Möglicher doppelter Beleg"] : [],
     };
+    saving.current = true;
     update((s) => {
       s.expenses.push(item);
       return s;
@@ -963,10 +960,14 @@ function QuickExpense({
               onChange={(e) => addReceipt(e.target.files?.[0])}
             />
           </label>
-          <button className="primary quick-save" onClick={saveQuick}>
+          <button className="primary quick-save" onClick={saveQuick} disabled={readingReceipt}>
             <Check size={20} />
             Speichern
           </button>
+        </div>
+        <div className="quick-link-fields">
+          <PaymentSelect value={draft.paymentType} onChange={paymentType => setDraft({...draft, paymentType, paidBy:paymentPayer(paymentType), reimbursementStatus:paymentType === "privat vorgestreckt" ? "offen" : "nicht erstattungsfähig"})} />
+          <ReceiptLinkFields value={draft} onChange={patch => setDraft({...draft, ...patch})} trips={state.trips} travelLabel="Reise" />
         </div>
         <button
           className="advanced-toggle"
@@ -988,41 +989,6 @@ function QuickExpense({
               />
             </label>
             <label>
-              Zahlungsart
-              <select
-                value={draft.paymentType}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    paymentType: e.target.value as Expense["paymentType"],
-                  })
-                }
-              >
-                <option>privat vorgestreckt</option>
-                <option>Firmenkarte</option>
-                <option>Unternehmen</option>
-                <option>bereits erstattet</option>
-              </select>
-            </label>
-            <label>
-              Reise
-              <select
-                value={draft.tripId || ""}
-                onChange={(e) =>
-                  setDraft({ ...draft, tripId: e.target.value })
-                }
-              >
-                <option value="">Automatisch nach Datum</option>
-                {state.trips
-                  .filter((t) => t.date.startsWith(month))
-                  .map((t) => (
-                    <option value={t.id} key={t.id}>
-                      {dateDe(t.date)} · {t.destination}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label>
               Beschreibung
               <input
                 value={draft.description}
@@ -1034,7 +1000,7 @@ function QuickExpense({
           </div>
         )}
         <p className="quick-hint">
-          Datum, Steuer und Reisezuordnung werden automatisch vorgeschlagen und
+          Datum und Steuer sind Vorschläge. Reisezuordnungen werden ausdrücklich bestätigt und
           können später jederzeit geändert werden.
         </p>
       </section>
@@ -1059,7 +1025,7 @@ function ReceiptCapture({
 }) {
   const now = new Date().toISOString().slice(0, 10);
   const [receipt, setReceipt] = useState(initial?.receipt);
-  const [suggestion, setSuggestion] = useState(
+  const [suggestion, setSuggestionState] = useState<import("../lib/types").ReceiptSuggestion>(
     initial?.suggestion || {
       date: now.startsWith(month) ? now : `${month}-01`,
       category: "sonstige Nebenkosten",
@@ -1068,19 +1034,18 @@ function ReceiptCapture({
     },
   );
   const [paymentType, setPaymentType] = useState<Expense["paymentType"]>(
-    "privat vorgestreckt",
+    initial ? initial.paymentType || state.expenses.find(e => e.id === initial.expenseId)?.paymentType || "unbekannt" : "privat vorgestreckt",
   );
   const [tripId, setTripId] = useState<string | undefined>(initial?.tripId);
   const [scanning, setScanning] = useState(false);
+  const [readingReceipt, setReadingReceipt] = useState(false);
+  const saving = useRef(false);
   const [progress, setProgress] = useState(0);
   const [scanStatus, setScanStatus] = useState("");
   const [scanError, setScanError] = useState("");
   usePendingWork(true);
 
-  const automaticTripId = suggestion.date
-    ? state.trips.find((trip) => trip.date === suggestion.date)?.id
-    : undefined;
-  const selectedTripId = tripId === undefined ? automaticTripId : tripId;
+  const selectedTripId = tripId;
   const duplicateReceipt = receipt
     ? state.expenses.some(
         (expense) =>
@@ -1092,6 +1057,14 @@ function ReceiptCapture({
       )
     : false;
 
+  const similarReceipt = similarExpense(state.expenses, {...suggestion, id:initial?.expenseId});
+  const setSuggestion = (next: typeof suggestion) => {
+    for (const key of Object.keys(next) as (keyof typeof suggestion)[]) if (next[key] !== suggestion[key]) editedFields.current.add(key);
+    setSuggestionState(next);
+  };
+  const scanRevision = useRef(0);
+  const editedFields = useRef(new Set<string>());
+  useEffect(() => () => { scanRevision.current++; fileRevision.current++; }, []);
   const scan = async (nextReceipt: NonNullable<typeof receipt>) => {
     if (!/^image\/(jpeg|jpg|png|webp)$/i.test(nextReceipt.type)) {
       setScanError(
@@ -1099,54 +1072,48 @@ function ReceiptCapture({
       );
       return;
     }
+    const revision = ++scanRevision.current;
     setScanning(true);
     setScanError("");
     try {
       const recognized = await recognizeReceiptLocally(
         nextReceipt.dataUrl,
         (value, status) => {
+          if (revision !== scanRevision.current) return;
           setProgress(value);
           setScanStatus(status);
         },
       );
       const learned = applyMerchantRule(recognized, state.merchantRules);
-      setSuggestion((current) => ({ ...current, ...learned.suggestion }));
-      if (learned.rule) setPaymentType(learned.rule.paymentType);
+      if (revision !== scanRevision.current) return;
+      setSuggestionState(current => ({...current, ...Object.fromEntries(Object.entries(learned.suggestion).filter(([key]) => !editedFields.current.has(key)))}));
+
     } catch {
+      if (revision !== scanRevision.current) return;
       setScanError(
         "Die automatische Erkennung war nicht möglich. Der Beleg kann trotzdem gespeichert und manuell bestätigt werden.",
       );
     } finally {
-      setScanning(false);
+      if (revision === scanRevision.current) setScanning(false);
     }
   };
 
+  const fileRevision = useRef(0);
   const chooseFile = async (file?: File) => {
     if (!file) return;
-    const dataUrl = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.readAsDataURL(file);
-    });
-    const hash = crypto.subtle
-      ? await crypto.subtle
-          .digest("SHA-256", await file.arrayBuffer())
-          .then((bytes) =>
-            [...new Uint8Array(bytes)]
-              .map((x) => x.toString(16).padStart(2, "0"))
-              .join(""),
-          )
-      : `${file.name}-${file.size}`;
-    const nextReceipt = {
-      id: initial?.receipt.id || uid(),
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      hash,
-      dataUrl,
-    };
-    setReceipt(nextReceipt);
-    void scan(nextReceipt);
+    const revision = ++fileRevision.current;
+    scanRevision.current++;
+    editedFields.current.clear();
+    setReadingReceipt(true);
+    setScanning(false);
+    try {
+      const nextReceipt = {id: initial?.receipt.id || uid(), ...await readReceiptFile(file)};
+      if (revision !== fileRevision.current) return;
+      setReceipt(nextReceipt);
+      void scan(nextReceipt);
+    } catch {
+      if (revision === fileRevision.current) setScanError("Beleg konnte nicht gelesen werden. Bitte erneut auswählen.");
+    } finally { if (revision === fileRevision.current) setReadingReceipt(false); }
   };
 
   const buildInboxItem = (
@@ -1160,11 +1127,15 @@ function ReceiptCapture({
     suggestion,
     tripId: selectedTripId || undefined,
     expenseId,
+    paymentType,
     notes: initial?.notes || "",
   });
 
   const saveInbox = () => {
-    if (!receipt) return;
+    if (!receipt || readingReceipt || saving.current) return;
+    const duplicate = duplicateMessage(state, {id:initial?.expenseId, receipt}, initial?.id);
+    if (duplicate) return notify(duplicate);
+    saving.current = true;
     const item = buildInboxItem(suggestion.rawText ? "erkannt" : "neu");
     update((s) => {
       const index = s.receiptInbox.findIndex((entry) => entry.id === item.id);
@@ -1190,14 +1161,17 @@ function ReceiptCapture({
   };
 
   const createExpenseFromReceipt = () => {
-    if (!receipt || !suggestion.gross || !suggestion.date) {
+    if (readingReceipt || scanning || saving.current) return;
+    if (!receipt || !(suggestion.gross && Number.isFinite(suggestion.gross) && suggestion.gross > 0) || !validDate(suggestion.date)) {
       notify("Bitte Datum und Betrag bestätigen");
       return;
     }
+    const problem = linkingErrors({...suggestion, date:suggestion.date!, category:suggestion.category || ""})[0] || duplicateMessage(state, {id:initial?.expenseId, receipt, merchant:suggestion.merchant, invoiceNumber:suggestion.invoiceNumber}, initial?.id);
+    if (problem) return notify(problem);
     const vatRate = suggestion.vatRate ?? 19;
     const net = round2(suggestion.gross / (1 + vatRate / 100));
     const expenseId = initial?.expenseId || uid();
-    const duplicate = duplicateReceipt;
+    const duplicate = duplicateReceipt || !!similarReceipt;
     const merchantPattern = suggestion.merchant
       ?.toLowerCase()
       .trim()
@@ -1209,9 +1183,12 @@ function ReceiptCapture({
           ),
         )
       : undefined;
+    const previousExpense = state.expenses.find(e => e.id === expenseId);
     const expense: Expense = {
+      ...previousExpense,
+      ...cleanContext(suggestion),
       id: expenseId,
-      date: suggestion.date,
+      date: suggestion.date!,
       tripId: selectedTripId || undefined,
       category: suggestion.category || "sonstige Nebenkosten",
       description: suggestion.merchant || "Fotografierter Beleg",
@@ -1223,7 +1200,7 @@ function ReceiptCapture({
       exchangeRate: 1,
       paymentType,
       paidBy:
-        paymentType === "privat vorgestreckt" ? "Reisender" : "Unternehmen",
+        paymentPayer(paymentType),
       reimbursementStatus:
         paymentType === "privat vorgestreckt"
           ? "offen"
@@ -1231,11 +1208,12 @@ function ReceiptCapture({
       merchant: suggestion.merchant,
       invoiceNumber: suggestion.invoiceNumber,
       businessShare: 100,
-      notes: "Aus Beleg-Eingang übernommen",
+      notes: previousExpense?.notes || "Aus Beleg-Eingang übernommen",
       receipt,
       status: duplicate ? "ungeprüft" : "vollständig",
       warnings: duplicate ? ["Möglicher doppelter Beleg"] : [],
     };
+    saving.current = true;
     const item = buildInboxItem("zugeordnet", expense.id);
     update((s) => {
       const expenseIndex = s.expenses.findIndex(
@@ -1275,6 +1253,7 @@ function ReceiptCapture({
     notify(`${expense.category}: ${euro(expense.gross)} übernommen`, () =>
       update((s) => {
         s.expenses = s.expenses.filter((entry) => entry.id !== expense.id);
+        if (previousExpense) s.expenses.push(previousExpense);
         if (initial) {
           const index = s.receiptInbox.findIndex(
             (entry) => entry.id === initial.id,
@@ -1378,14 +1357,13 @@ function ReceiptCapture({
                   </div>
                 </div>
               )}
-              {duplicateReceipt && (
+              {(duplicateReceipt || similarReceipt) && (
                 <div className="info-box yellow">
                   <Copy size={18} />
                   <div>
                     <b>Möglicher doppelter Beleg</b>
                     <p>
-                      Diese Datei wurde bereits erfasst. Bitte prüfen Sie sie
-                      vor dem Speichern.
+                      Datei oder Rechnungsangaben passen zu einem vorhandenen Beleg. Bitte vor erneutem Erfassen prüfen.
                     </p>
                   </div>
                 </div>
@@ -1440,6 +1418,7 @@ function ReceiptCapture({
                 <label>
                   Kategorie
                   <select
+                    aria-label="Kategorie"
                     value={suggestion.category || "sonstige Nebenkosten"}
                     onChange={(event) =>
                       setSuggestion({
@@ -1449,59 +1428,31 @@ function ReceiptCapture({
                     }
                   >
                     {expenseCategories.map((category) => (
-                      <option key={category}>{category}</option>
+                      <option key={category} value={category}>{category === "Hotel" ? "Hotel / Übernachtung" : category}</option>
                     ))}
                   </select>
                 </label>
-                <label>
-                  Zahlungsart
-                  <select
-                    value={paymentType}
-                    onChange={(event) =>
-                      setPaymentType(
-                        event.target.value as Expense["paymentType"],
-                      )
-                    }
-                  >
-                    <option>privat vorgestreckt</option>
-                    <option>Firmenkarte</option>
-                    <option>Unternehmen</option>
-                    <option>bereits erstattet</option>
-                  </select>
-                </label>
-                <label className="wide">
-                  Passende Reise
-                  <select
-                    value={selectedTripId || ""}
-                    onChange={(event) => setTripId(event.target.value)}
-                  >
-                    <option value="">
-                      Keine Reise gefunden / später zuordnen
-                    </option>
-                    {state.trips
-                      .filter((trip) => trip.date.startsWith(month))
-                      .map((trip) => (
-                        <option key={trip.id} value={trip.id}>
-                          {dateDe(trip.date)} · {trip.destination} ·{" "}
-                          {trip.purpose}
-                        </option>
-                      ))}
-                  </select>
-                </label>
+                <label>Rechnungsnummer<input value={suggestion.invoiceNumber || ""} onChange={e=>setSuggestion({...suggestion, invoiceNumber:e.target.value})} /></label>
+                <PaymentSelect value={paymentType} onChange={setPaymentType} />
+                <ReceiptLinkFields value={{...suggestion, category:suggestion.category || "", date:suggestion.date || "", tripId:selectedTripId}} onChange={patch => {
+                  const {tripId:nextTrip, ...context} = patch;
+                  if ("tripId" in patch) setTripId(nextTrip);
+                  setSuggestion({...suggestion, ...context});
+                }} trips={state.trips} />
               </div>
             </div>
           </div>
         )}
         {receipt && (
           <footer>
-            <button className="ghost" onClick={saveInbox}>
+            <button className="ghost" onClick={saveInbox} disabled={readingReceipt}>
               <Inbox size={17} />
               Nur im Eingang speichern
             </button>
             <button
               className="primary"
               onClick={createExpenseFromReceipt}
-              disabled={scanning}
+              disabled={scanning || readingReceipt}
             >
               <Check size={18} />
               Bestätigen & Ausgabe anlegen
@@ -1978,6 +1929,7 @@ function Trips({
   editing,
   setEditing,
   openImport,
+  openExpense,
 }: {
   state: AppState;
   month: string;
@@ -1986,6 +1938,7 @@ function Trips({
   editing: Trip | null;
   setEditing: (trip: Trip | null) => void;
   openImport: () => void;
+  openExpense: (id: string) => void;
 }) {
   usePendingWork(!!editing);
   const [query, setQuery] = useState("");
@@ -2230,6 +2183,15 @@ function Trips({
                       <Trash2 size={16} />
                     </button>
                     <DayDetails day={c} tripId={t.id} />
+                    <details className="trip-linked-expenses"><summary>Zugeordnete Kosten & Belege ({state.expenses.filter(e=>e.tripId===t.id && e.status!=="storniert").length})</summary>
+                      <p>Alle Kosten dieser konkreten Reise, unabhängig vom Rechnungsmonat. Verpflegung separat in der Tagesberechnung.</p>
+                      {state.expenses.filter(e=>e.tripId===t.id && e.status!=="storniert").map(expense => <article key={expense.id}>
+                        <b>{expense.category} · {expense.gross.toLocaleString("de-DE", {minimumFractionDigits:2, maximumFractionDigits:2})} {expense.currency}</b>
+                        <p>{dateDe(expense.date)} · {paymentLabel(expense.paymentType)} · persönliche Erstattung {euro(expenseConflictsWithMileageAllowance(state.settings, state.trips, expense) ? 0 : expenseReimbursable(expense))}</p>
+                        <ReceiptAttachment receipt={expense.receipt} />
+                        <button className="ghost" onClick={()=>openExpense(expense.id)}>Kosten / Zuordnung bearbeiten</button>
+                      </article>)}
+                    </details>
                   </div>
                 ))}
               </div>
@@ -2533,14 +2495,29 @@ function Expenses({
   update,
   notify,
   openCapture,
+  initialExpenseId,
+  clearInitialExpense,
 }: {
   state: AppState;
   month: string;
   update: (f: (s: AppState) => AppState) => void;
   notify: (s: string, undo?: () => void) => void;
   openCapture: () => void;
+  initialExpenseId: string | null;
+  clearInitialExpense: () => void;
 }) {
   const [editing, setEditing] = useState<Expense | null>(null);
+  useEffect(() => {
+    if (!initialExpenseId) return;
+    const expense = state.expenses.find(e => e.id === initialExpenseId);
+    if (expense) setEditing(structuredClone(expense));
+    clearInitialExpense();
+  }, [initialExpenseId, state.expenses, clearInitialExpense]);
+  const [readingReceipt, setReadingReceipt] = useState(false);
+  const receiptRevision = useRef(0);
+  const saving = useRef(false);
+  useEffect(() => {saving.current = false; receiptRevision.current++; setReadingReceipt(false);}, [editing?.id]);
+  useEffect(() => () => {receiptRevision.current++;}, []);
   const [reviewing, setReviewing] = useState<ReceiptInboxItem | null>(null);
   usePendingWork(!!editing || !!reviewing);
   const inboxItems = state.receiptInbox.filter(
@@ -2556,7 +2533,9 @@ function Expenses({
     !!editing &&
     expenseConflictsWithMileageAllowance(state.settings, state.trips, editing);
   const save = () => {
-    if (!editing) return;
+    if (!editing || readingReceipt || saving.current) return;
+    const problem = linkingErrors(editing)[0] || (!validDate(editing.date) || !Number.isFinite(editing.gross) || editing.gross <= 0 ? "Bitte Rechnungsdatum und positiven Betrag prüfen" : "") || duplicateMessage(state, editing);
+    if (problem) return notify(problem);
     const duplicateReceipt =
       !!editing.receipt &&
       state.expenses.some(
@@ -2573,6 +2552,7 @@ function Expenses({
     );
     const e = {
       ...editing,
+      ...cleanContext(editing),
       vat: round2(editing.gross - editing.net),
       reimbursementStatus: mileageConflict
         ? ("nicht erstattungsfähig" as const)
@@ -2596,6 +2576,7 @@ function Expenses({
       e.net = round2(e.gross / (1 + e.vatRate / 100));
       e.vat = round2(e.gross - e.net);
     }
+    saving.current = true;
     update((s) => {
       const i = s.expenses.findIndex((x) => x.id === e.id);
       if (i >= 0) {
@@ -2612,6 +2593,7 @@ function Expenses({
         });
         s.expenses[i] = e;
       } else s.expenses.push(e);
+      syncExpenseLink(s, e);
       return s;
     });
     setEditing(null);
@@ -2619,29 +2601,13 @@ function Expenses({
   };
   const receipt = async (file?: File) => {
     if (!file || !editing) return;
-    const dataUrl = await new Promise<string>((resolve) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result));
-      r.readAsDataURL(file);
-    });
-    const hash = await crypto.subtle
-      .digest("SHA-256", await file.arrayBuffer())
-      .then((b) =>
-        [...new Uint8Array(b)]
-          .map((x) => x.toString(16).padStart(2, "0"))
-          .join(""),
-      );
-    setEditing({
-      ...editing,
-      receipt: {
-        id: uid(),
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        hash,
-        dataUrl,
-      },
-    });
+    const revision = ++receiptRevision.current;
+    setReadingReceipt(true);
+    try {
+      const receipt = {id:uid(), ...await readReceiptFile(file)};
+      if (revision === receiptRevision.current) setEditing(current => current ? {...current, receipt} : null);
+    } catch { if (revision === receiptRevision.current) notify("Beleg konnte nicht gelesen werden. Bitte erneut auswählen."); }
+    finally { if (revision === receiptRevision.current) setReadingReceipt(false); }
   };
   return (
     <>
@@ -2738,8 +2704,10 @@ function Expenses({
               </span>
               <h3>{e.description || "Ohne Beschreibung"}</h3>
               <p>
-                {e.paymentType} · {e.reimbursementStatus}
+                {paymentLabel(e.paymentType)} · {e.reimbursementStatus}
               </p>
+              <p>{e.tripId ? `Reise: ${state.trips.find(t=>t.id===e.tripId) ? tripLabel(state.trips.find(t=>t.id===e.tripId)!) : "Zuordnung prüfen – Reise nicht mehr vorhanden"}` : "Noch keiner Dienstreise zugeordnet"}</p>
+              <ReceiptAttachment receipt={e.receipt} />
             </div>
             <div className="expense-amount">
               <b>{euro(e.gross)}</b>
@@ -2772,13 +2740,14 @@ function Expenses({
             <label>
               Kategorie
               <select
+                aria-label="Kategorie"
                 value={editing.category}
                 onChange={(e) =>
                   setEditing({ ...editing, category: e.target.value })
                 }
               >
                 {expenseCategories.map((c) => (
-                  <option key={c}>{c}</option>
+                  <option key={c} value={c}>{c === "Hotel" ? "Hotel / Übernachtung" : c}</option>
                 ))}
               </select>
             </label>
@@ -2858,23 +2827,7 @@ function Expenses({
                 value={euro(round2(editing.gross - editing.net))}
               />
             </label>
-            <label>
-              Zahlungsart
-              <select
-                value={editing.paymentType}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    paymentType: e.target.value as Expense["paymentType"],
-                  })
-                }
-              >
-                <option>privat vorgestreckt</option>
-                <option>Firmenkarte</option>
-                <option>Unternehmen</option>
-                <option>bereits erstattet</option>
-              </select>
-            </label>
+            <PaymentSelect value={editing.paymentType} onChange={paymentType => setEditing({...editing, paymentType, paidBy:paymentPayer(paymentType)})} />
             <label>
               Erstattungsstatus
               <select
@@ -2892,25 +2845,8 @@ function Expenses({
                 <option>nicht erstattungsfähig</option>
               </select>
             </label>
-            <label>
-              Reisezuordnung
-              <select
-                value={editing.tripId || ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    tripId: e.target.value || undefined,
-                  })
-                }
-              >
-                <option value="">Keine Zuordnung</option>
-                {state.trips.map((t) => (
-                  <option value={t.id} key={t.id}>
-                    {dateDe(t.date)} · {t.destination}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ReceiptLinkFields value={editing} onChange={patch=>setEditing({...editing,...patch})} trips={state.trips} travelLabel="Reisezuordnung" />
+            <div className="wide"><ReceiptAttachment receipt={editing.receipt} /></div>
             <label>
               Dienstlicher Anteil (%)
               <input
@@ -3013,7 +2949,7 @@ function Expenses({
             <button className="ghost" onClick={() => setEditing(null)}>
               Abbrechen
             </button>
-            <button className="primary" onClick={save}>
+            <button className="primary" onClick={save} disabled={readingReceipt}>
               <Save size={17} />
               Speichern
             </button>
