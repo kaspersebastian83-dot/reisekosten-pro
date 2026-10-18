@@ -728,3 +728,10 @@ aus `buildStatement` (mehrere Reisen eines Tages teilen sich eine Pauschale), da
 eine Zeile (Zeit, Ziel, Zweck, Projekt, km bzw. Kategorie, Zahlungsart, Reisezuordnung, Betrag, „Beleg fehlt“,
 Hinweise). Mehrtägige Reisen erscheinen an Folgetagen als Fortsetzung; Kosten zählen nach Rechnungsdatum. Ein Klick
 öffnet den Eintrag in der Monatsübersicht. Die Zeitleiste rechnet nichts selbst (`lib/month-timeline.ts`).
+
+## Fluss 3: Prüfen und Abschließen
+
+- `groupClosingIssues` fasst Prüfprobleme mit gleichem Hinweistext zusammen (reine Darstellung, keine Regeländerung).
+- `closingPreview` führt die Abschlussprüfung ohne Entwurf aus und blendet nur entwurfsbezogene Fehler aus; daraus
+  zeigt die Monatsabrechnung „1 Erfassen · 2 Prüfen · 3 Abschließen“. Abschluss bleibt eine bewusste, bestätigte Aktion.
+- Der Status oben entspricht `monthOverview` des gewählten Monats.
