@@ -318,6 +318,7 @@ export default function Home() {
   const update = (fn: (s: AppState) => AppState) =>
     setState((s) => fn(structuredClone(s)));
   const statement = useMemo(() => buildStatement(state, month), [state, month]);
+  const monthStatus = useMemo(() => monthOverview(state, month), [state, month]);
   const issueCount =
     state.trips.filter(
       (t) =>
@@ -440,12 +441,11 @@ export default function Home() {
                 onChange={(e) => selectMonth(e.target.value)}
               />
             </label>
-            <div className={`quality ${issueCount ? "warn" : "ok"}`}>
+            {/* Status des gewählten Monats – dieselbe Angabe wie in der Jahresleiste. */}
+            <button type="button" className={`quality ${["review", "history-review", "closed-changed"].includes(monthStatus.status) ? "warn" : "ok"}`} onClick={() => navigate("Monatsübersicht")} title="Zur Monatsübersicht">
               <CircleGauge size={18} />
-              <span>
-                {issueCount ? `${issueCount} Prüfhinweise insgesamt` : "Prüfliste im Monatsbereich"}
-              </span>
-            </div>
+              <span>{monthLabel(month)} · {monthStatus.label}</span>
+            </button>
           </div>
         </header>
         <div className="content">

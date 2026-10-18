@@ -3,7 +3,8 @@ import { Camera, Plus } from 'lucide-react';
 import type { AppState, StatementData } from '../lib/types';
 import { latestStatement, monthLabel, monthOverview } from '../lib/month-navigation';
 import { round2 } from '../lib/calculations';
-import type { StatementComparison } from '../lib/statement-comparison';
+import { isClosedStatement, type StatementComparison } from '../lib/statement-comparison';
+import { closingPreview, groupClosingIssues } from '../lib/statement-closing';
 
 const euro = (value: number) => value.toLocaleString('de-DE', {style:'currency', currency:'EUR'});
 export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement, checks, comparison, changes, timeline}: {
@@ -16,6 +17,12 @@ export function MonthWorkspace({state, month, statement, startEntry, editCosts, 
   const overview = useMemo(() => monthOverview(state, month, comparison), [state, month, comparison]);
   const totals = statement.totals;
   const trips = new Set(statement.rows.flatMap(row => row.trips.map(trip => trip.id))).size;
+  const expenses = state.expenses.filter(e => e.status !== 'storniert' && e.date.startsWith(month)).length;
+  // Dieselbe Prüfung wie beim Abschluss – nur lesen, nichts anlegen.
+  const preview = useMemo(() => closingPreview(state, month), [state, month]);
+  const closed = !!existing && isClosedStatement(existing) && !comparison?.draft && !comparison?.hasChanges;
+  const captured = trips + expenses > 0;
+  const step = !captured ? 1 : closed ? 4 : preview.errors.length ? 2 : 3;
   return <section className="card month-entry-workspace" aria-label="Monatsarbeitsbereich">
     <header><p className="eyebrow">Monatsarbeitsbereich</p><h2>{monthLabel(month)}</h2><span className="status-pill">{overview.label}</span></header>
     <section aria-label="Spesen erfassen">
@@ -38,6 +45,11 @@ export function MonthWorkspace({state, month, statement, startEntry, editCosts, 
     {checks}
     <section className="workspace-statement-action" aria-label="Monatsabrechnung">
       <h3>Monatsabrechnung</h3>
+      <ol className="workspace-steps" aria-label="Weg zum Abschluss">
+        <li className={step > 1 ? 'done' : 'current'}><b>1 · Erfassen</b><small>{captured ? `${trips} ${trips === 1 ? 'Reise' : 'Reisen'}, ${expenses} ${expenses === 1 ? 'Kostenposition' : 'Kostenpositionen'}` : 'Noch nichts erfasst'}</small></li>
+        <li className={closed ? 'done' : step === 2 ? 'current blocked' : step === 3 ? 'done' : ''}><b>2 · Prüfen</b><small>{!captured ? '–' : closed ? 'Geprüft' : preview.errors.length ? `${preview.errors.length} Fehler vor dem Abschluss beheben` : preview.warnings.length ? `${preview.warnings.length} Hinweise in ${groupClosingIssues(preview.warnings).length} Gruppen – blockieren nicht` : 'Keine bekannten Probleme'}</small></li>
+        <li className={closed ? 'done' : step === 3 ? 'current' : ''}><b>3 · Abschließen</b><small>{closed ? `Abgeschlossen · Version ${existing!.version}` : existing && !existing.locked ? `Entwurf Version ${existing.version} – Abschlussprüfung öffnen` : 'Entwurf erstellen, prüfen und verbindlich abschließen'}</small></li>
+      </ol>
       <p>{existing ? `Version ${existing.version} · ${existing.status}. Prüfung und Freigabe erfolgen in der bestehenden Abrechnung.` : 'Erst nach der Erfassung bewusst einen Entwurf erstellen. Freigabe und Abschluss erfolgen anschließend separat.'}</p>
       <button className="primary" onClick={openStatement}>{existing ? existing.locked ? 'Abrechnung ansehen' : 'Abrechnung fortsetzen' : 'Spesenabrechnung erstellen'}</button>
       {changes}
