@@ -624,3 +624,49 @@ Der Auswertungsbereich bietet keine Beleg- oder Spesenerfassung und erstellt
 keine Abrechnungsentwürfe. IndexedDB, Schema, Snapshots, Exporte, Import,
 Offlineverhalten, GitHub-Pages-Konfiguration und der Safari-/Service-Worker-Fix
 bleiben unberührt. Die Jahresauswertung speichert keine Daten.
+
+## Schritt 3.3a: Persönlicher SpesenKit-Ordner
+
+Für den Einsatz am Terminalserver (RDP, je Mitarbeiter ein eigenes Windows-Profil, Edge oder Chrome) kann jeder
+Mitarbeiter einmal seinen persönlichen Ordner wählen („Ordner einrichten“ im Hinweis oder unter *Datensicherung*).
+SpesenKit legt darin an:
+
+```text
+<gewählter Ordner>\SpesenKit\
+  Daten\spesenkit.json          aktueller Datenbestand (maßgeblich)
+  Daten\spesenkit.vorher.json   Stand vor dem letzten Speichern
+  Sicherungen\*.json            Kopien bei Konflikten / beiseitegelegte unlesbare Datei
+```
+
+- **Speichern:** Jede Änderung wird wie bisher zuerst lokal (IndexedDB) und direkt danach in `spesenkit.json`
+  gespeichert – der Reihe nach, mit Revisionsnummer und Rücklesekontrolle. Die Seitenleiste zeigt den Stand.
+  Schließen des Browsers mit noch nicht gespeicherter Ordnerdatei löst eine Rückfrage aus.
+- **Maßgeblicher Stand:** Beim Start vergleicht SpesenKit Browser und Datei (Revision und Inhalts-Fingerabdruck).
+  Automatisch nur in eindeutigen Fällen: Browser unverändert → Datei laden (z. B. anderer Terminalserver);
+  Datei unverändert → Browserstand schreiben (Ordner war nicht erreichbar); neuer Ordner mit leerem Browser →
+  Datei laden. Sonst fragt ein Dialog, welcher Stand gilt; der andere wird als wiederherstellbare Kopie in
+  `Sicherungen` abgelegt. Ein plötzlich leerer Browser leert die Datei nie automatisch.
+- **Abschluss und Korrektur:** Bei verbundenem Ordner wird Erfolg erst gemeldet, wenn auch die Datei geschrieben
+  ist. Ist der Ordner nicht beschreibbar (Zugriff nicht bestätigt, Konflikt, Datei fehlt/unlesbar), wird vor dem
+  Abschluss zuerst um Klärung gebeten. Scheitert nur das Schreiben in den Ordner, bleibt der Abschluss lokal
+  bestehen; die App sagt das ausdrücklich und bietet „Erneut speichern“ an.
+- **Unlesbare Datei:** wird nie überschrieben. Neu anlegen nur auf ausdrücklichen Wunsch; die alte Datei bleibt
+  als Kopie erhalten.
+- **Berechtigung:** Der Browser fragt nach einem Neustart erneut; die App zeigt dann „Zugriff bestätigen“.
+- **Ohne Ordner** (oder in Browsern ohne Ordnerzugriff) arbeitet SpesenKit wie bisher nur im Browser und weist
+  darauf hin.
+
+Unverändert: IndexedDB `reisekosten-pro` (Version 1, Store `state`, Schlüssel `main`), Datenformat und
+JSON-Sicherung, Berechnung, Abschluss-/Korrekturlogik, Exporte, Service Worker. Der Ordner-Verweis liegt wie bei
+den anderen Apps in der gemeinsamen Datenbank `mosaik-suite` (Version 1, Store `kv`), Schlüssel `spesenkit-ordner`.
+
+Organisatorisch nötig: Ordnerrechte nur für den jeweiligen Mitarbeiter (die Datei enthält Reisen und Belege
+unverschlüsselt) und eine Sicherung des Laufwerks außerhalb des Servers.
+
+Bekannte Grenze: Belege liegen als Base64 in der Datei; bei vielen Fotos wird sie groß und bei jeder Änderung
+vollständig neu geschrieben. Automatische Ablage von PDF/Excel/ZIP (3.3b) und Sicherungsgenerationen (3.3c) folgen.
+
+```sh
+npm run build
+PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_EXECUTABLE=/pfad/zu/chromium node tests/folder-storage-browser-check.mjs
+```

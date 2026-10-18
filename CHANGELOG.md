@@ -1,5 +1,14 @@
 # Release Notes
 
+## Persönlicher SpesenKit-Ordner (Schritt 3.3a)
+
+- Einmal den persönlichen Mitarbeiterordner wählen; jede Änderung wird zusätzlich in
+  `SpesenKit/Daten/spesenkit.json` gespeichert (Revision, Rücklesekontrolle, Vorgängerstand).
+- Beim Start Abgleich Browser ↔ Datei: eindeutige Fälle automatisch, sonst Entscheidungsdialog mit Sicherungskopie.
+- Monatsabschluss/Korrektur melden Erfolg erst nach dem Schreiben in den Ordner.
+- Speicherstatus in der Seitenleiste, Hinweise bei fehlendem Ordner, Zugriff, Schreibfehler, fehlender/unlesbarer Datei.
+- Unverändert: Datenbankidentität, Datenformat, Berechnung, Abschlusslogik, Exporte, Service Worker.
+
 ## Suite-Einbindung und neues Icon
 
 - Neues App-Icon (Koffer mit Euro-Zeichen, Amber) für Startbildschirm, Browser-Tab und Seitenleiste; im Stil der übrigen Apps.
