@@ -6,6 +6,7 @@ import { readFile, mkdtemp, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
+import { closeStatementInBrowser } from './close-statement-browser.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve('dist');
@@ -33,6 +34,7 @@ let syntheticBackup;
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
 const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const writeState=(page,value)=>page.evaluate(value=>new Promise((resolve,reject)=>{const r=indexedDB.open('reisekosten-pro',1);r.onsuccess=()=>{const tx=r.result.transaction('state','readwrite');tx.objectStore('state').put(value,'main');tx.oncomplete=()=>{r.result.close();resolve();};tx.onabort=()=>reject(tx.error);};}),value);
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
@@ -78,6 +80,9 @@ try {
     assert.match(await page.locator('.success-state').innerText(),/0 Fahrten/);
   });
   await check('daily, trip and month explanations reconcile displayed totals and frozen saved context',async()=>{
+    // Seit dem bestätigten Abschluss (#14) blockiert eine unbestätigte Abwesenheitsdauer; die synthetischen Märzfahrten bestätigen.
+    const confirmed=await state(page);confirmed.trips=confirmed.trips.map(t=>t.date.startsWith('2026-03')?{...t,absenceConfirmed:true}:t);
+    await writeState(page,confirmed);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
     await page.locator('input[type=month]').fill('2026-03');await nav(page,'Einstellungen');
     await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('privatwagen');
     await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s.settings.vehicles[0].ownership==='privatwagen');
@@ -86,7 +91,7 @@ try {
     await nav(page,'Monatsübersicht');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung ansehen)$/}).click();await page.locator('.monthly-details summary').click();await page.locator('.statement-day-details .calculation-details summary').click();
     await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,'calculation-details-desktop.png'),fullPage:true});
     await waitState(page,s=>s.statements.length===1);
-    await page.locator('.statement-actions select').selectOption('freigegeben');const frozen=(await waitState(page,s=>s.statements[0].locked)).statements[0];
+    await closeStatementInBrowser(page);const frozen=(await waitState(page,s=>s.statements[0].locked)).statements[0];
     await nav(page,'Einstellungen');await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('dienstwagen');await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s.settings.vehicles[0].ownership==='dienstwagen');
     await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();await page.locator('.statement-day-details .calculation-details summary').click();
     assert.match(await page.locator('.statement-day-details .calculation-details').innerText(),/Privatwagen.*12,5 berechtigte km/s);
