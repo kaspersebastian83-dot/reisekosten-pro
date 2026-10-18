@@ -1,5 +1,12 @@
 # Release Notes
 
+## Reiseformular ohne Scrollen
+
+- „Neue Dienstreise“ zweispaltig im breiteren Fenster: Eingaben links, Abwesenheit, Bestätigung und
+  Verpflegungsvorschau rechts. Abfahrt/Rückkehr in einer Zeile, Erklärtexte gekürzt bzw. aufklappbar.
+- Speichern-Knöpfe bleiben in allen Fenstern unten sichtbar, auch wenn gescrollt werden muss.
+- Prüfungen, Pflichtfelder und Berechnung unverändert.
+
 ## Veraltete Browserchecks repariert (nur Tests)
 
 - `browser-check`, `feature-browser-check`, `receipt-linking-browser-check`: Freigabe über den bestätigten Abschluss
