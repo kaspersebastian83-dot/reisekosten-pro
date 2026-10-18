@@ -4,54 +4,12 @@ import { demoState } from "../lib/demo";
 import {
   COPY_DIR, DATA_DIR, DATA_FILE, FOLDER_NAME, FolderError, PREVIOUS_FILE, decideReconcile, isEmptyState,
   readDataFile, resolveAppFolder, stateHash, writeDataFile, writeSafetyCopy,
-  type DirHandleLike, type FileHandleLike, type FolderLink,
+  type FolderLink,
 } from "../lib/folder-store";
+import { FakeDir } from "./helpers/fake-dir";
 import { normalizeState } from "../lib/storage";
 import type { AppState } from "../lib/types";
 
-/** Ordner im Speicher. Wie die File System Access API: Inhalt wird erst bei close() übernommen. */
-type Faults = { failWrite?: string; failClose?: string; truncate?: string; denyRead?: boolean };
-class FakeDir implements DirHandleLike {
-  kind = "directory" as const;
-  dirs = new Map<string, FakeDir>();
-  files = new Map<string, string>();
-  constructor(public name: string, public faults: Faults = {}) {}
-  async getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<DirHandleLike> {
-    let dir = this.dirs.get(name);
-    if (!dir) {
-      if (!options?.create) throw new DOMException("missing", "NotFoundError");
-      dir = new FakeDir(name, this.faults); this.dirs.set(name, dir);
-    }
-    return dir;
-  }
-  async getFileHandle(name: string, options?: { create?: boolean }): Promise<FileHandleLike> {
-    if (!this.files.has(name) && !options?.create) throw new DOMException("missing", "NotFoundError");
-    const dir = this; const faults = this.faults;
-    return {
-      async getFile() {
-        if (faults.denyRead) throw new DOMException("denied", "NotAllowedError");
-        const text = dir.files.get(name) ?? "";
-        return { text: async () => text };
-      },
-      async createWritable() {
-        let buffer = "";
-        return {
-          async write(data: string) { if (faults.failWrite === name) throw new DOMException("disk", "InvalidStateError"); buffer += data; },
-          async close() {
-            if (faults.failClose === name) throw new DOMException("network drive gone", "InvalidStateError");
-            dir.files.set(name, faults.truncate === name ? buffer.slice(0, Math.floor(buffer.length / 2)) : buffer);
-          },
-          async abort() { buffer = ""; },
-        };
-      },
-    };
-  }
-  file(...path: string[]) {
-    let dir: FakeDir = this;
-    for (const part of path.slice(0, -1)) dir = dir.dirs.get(part)!;
-    return dir?.files.get(path.at(-1)!);
-  }
-}
 const app = { version: "1.7.0", commit: "test123" };
 const clock = (minute: number) => new Date(2026, 9, 18, 13, minute, 0);
 const withTrip = (state: AppState, id: string): AppState => {
@@ -164,7 +122,7 @@ describe("SpesenKit-Ordner: Datei schreiben und lesen", () => {
     const second = await writeSafetyCopy(root, "browserstand", emptyState, clock(5));
     expect(first).toBe(`${FOLDER_NAME}/${COPY_DIR}/spesenkit_browserstand_2026-10-18_130500.json`);
     expect(second).toBe(`${FOLDER_NAME}/${COPY_DIR}/spesenkit_browserstand_2026-10-18_130500_2.json`);
-    const restored = normalizeState(JSON.parse(root.file(COPY_DIR, "spesenkit_browserstand_2026-10-18_130500.json")!));
+    const restored = normalizeState(JSON.parse(root.file(COPY_DIR, "spesenkit_browserstand_2026-10-18_130500.json") as string));
     expect(restored.trips.length).toBe(demoState().trips.length);
   });
 });
