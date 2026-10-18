@@ -423,7 +423,7 @@ export default function Home() {
           )}
         </div>
       </main>
-      {tab !== "Auswertungen" && <button
+      {tab !== "Auswertungen" && tab !== "Monatsübersicht" && <button
         className="quick-fab"
         onClick={() => setQuickOpen(true)}
         aria-label="Ausgabe schnell erfassen"
@@ -431,7 +431,7 @@ export default function Home() {
         <Plus size={24} />
         <span>Ausgabe</span>
       </button>}
-      {tab !== "Auswertungen" && <button
+      {tab !== "Auswertungen" && tab !== "Monatsübersicht" && <button
         className="camera-fab"
         onClick={() => setReceiptCaptureOpen(true)}
         aria-label="Beleg fotografieren"
@@ -519,10 +519,11 @@ function MonthChecks({state, month, update, notify, editTrips, editCosts, viewRu
   const tripIssues = monthTrips.filter(t => t.warnings.length || t.status === "ungeprüft" || t.status === "importiert").length;
   const expenseIssues = monthExpenses.filter(e => e.warnings.length || e.status === "ungeprüft").length;
   const reasons = monthOverview(state, month).reasons;
+  const hasKnownIssues = Boolean(tripIssues || expenseIssues || missingReceipts || duplicates || reasons.length);
   return <section className="month-checks" aria-label="Prüfen">
     <h3>Prüfen</h3>
     <details>
-      <summary>Offene Prüfhinweise ansehen</summary>
+      <summary><span>Offene Prüfhinweise ansehen</span><span className={`workspace-check-status ${hasKnownIssues ? "has-issues" : "no-known-issues"}`}>{hasKnownIssues ? "Hinweise vorhanden" : "Keine bekannten Hinweise"}</span></summary>
       <p>{tripIssues || expenseIssues || missingReceipts || duplicates || reasons.length ? "Vorhandene Hinweise und noch ungeprüfte Einträge dieses Monats." : "Keine bekannten Prüfhinweise für diesen Monat. Dies ersetzt keine vollständige Abschlussprüfung."}</p>
       {!!reasons.length && <ul className="month-review">{reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
       <div className="check-list">

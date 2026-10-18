@@ -53,6 +53,7 @@ try {
         assert.equal(await workspace.count(),1);assert.equal(await workspace.locator('.workspace-figures').count(),1);assert.equal(await page.locator('.hero-actions,.month-command').count(),0);
         await picker.fill('2026-06');for(const name of labels){await nav(page,name);await page.getByRole('heading',{name,exact:true}).waitFor();assert.equal(await picker.inputValue(),'2026-06');await fits();}
         await nav(page,'Monatsübersicht');assert.equal(await state(page),undefined);assert.equal(await page.evaluate(()=>localStorage.length),0);
+        assert.match(await page.locator('.month-checks summary').innerText(),/Keine bekannten Hinweise/);
         await page.locator('.month-checks summary').focus();await page.keyboard.press('Enter');assert.match(await page.getByRole('region',{name:'Prüfen',exact:true}).innerText(),/Keine bekannten Prüfhinweise/);
         assert.doesNotMatch(await page.locator('body').innerText(),/Bereit zum Abschluss|Alles plausibel|Alles geprüft/);
       });
@@ -62,7 +63,7 @@ try {
       seed.expenses=[{...seed.expenses[0],id:'missing-receipt',date:'2026-06-10',category:'Parken',gross:25,net:25,vat:0,receipt:undefined,tripId:'confirmable',status:'ungeprüft',warnings:['Beleg fehlt'],paymentType:'privat vorgestreckt',reimbursementStatus:'offen'}];seed.statements=[];seed.receiptInbox=[];seed.changes=[];seed.merchantRules=[];
       await writeState(page,seed);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await goJune();
       await check(`${engine} ${viewport.width}: former checklist, missing receipts, duplicate hints and routes retain selected month`,async()=>{
-        const before=await state(page);await page.locator('.month-checks summary').click();const checks=page.getByRole('region',{name:'Prüfen',exact:true});assert.match(await checks.innerText(),/Reiseziel fehlt/);
+        const before=await state(page);assert.match(await page.locator('.month-checks summary').innerText(),/Hinweise vorhanden/);await page.locator('.month-checks summary').click();const checks=page.getByRole('region',{name:'Prüfen',exact:true});assert.match(await checks.innerText(),/Reiseziel fehlt/);
         for(const label of ['Ungeprüfte Reisen / Reisehinweise','Ungeprüfte Kosten / Kostenhinweise','Fehlende Belege','Mögliche Duplikate'])assert.equal(await checks.getByRole('button',{name:new RegExp('^'+label)}).count(),1);
         await checks.getByRole('button',{name:/^Ungeprüfte Reisen/}).click();await page.getByRole('heading',{name:'Reisen',exact:true}).waitFor();assert.equal(await picker.inputValue(),'2026-06');assert.equal(await page.locator('.workspace-return').count(),1);
         await page.getByRole('button',{name:'Zurück zum Monatsarbeitsbereich',exact:true}).click();assert.equal(await page.locator('.workspace-return').count(),0);
