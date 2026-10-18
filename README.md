@@ -278,3 +278,44 @@ LEGACY_DIST=/pfad/zum/alten/dist PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_E
 Mit `BROWSER_ENGINE=webkit` und passendem `BROWSER_EXECUTABLE` läuft derselbe
 Update-Test in WebKit. Die vorhandenen Datenbank- und Cache-Namen bleiben
 bewusst `reisekosten-pro`; kein Lauf darf echte Browserprofile verwenden.
+
+### Vereinfachte manuelle Dienstreise (Schritt 1)
+
+Unter **Reisen → Neue Dienstreise** werden Projekt (`26.0123 Musterstadt`), Reisegrund,
+Reiseziel und vollständige Abfahrts-/Rückkehrzeiten erfasst. Projektvorschläge stammen
+aus bisherigen Auftragsangaben; neue Projekte können frei eingegeben werden. Der
+Projektort wird als Reiseziel vorgeschlagen und lässt sich überschreiben. Die
+Projektangabe nutzt das vorhandene Feld `Trip.order`, ohne Datenmigration.
+Bestehende/importierte Auftragsangaben bleiben auch ohne neues Projektformat bearbeitbar.
+
+Die Maske prüft positive Zeitintervalle mit explizitem Rückkehrdatum. Sie zeigt
+**Abwesenheitsdauer, keine Arbeitszeit**, sowie die bestehende Tagesberechnung mit
+Mahlzeitenkürzungen und Nullbegrenzung. Die Vorschau gilt für diese einzelne Reise;
+weitere Reisen am selben Tag können das Monatsergebnis beeinflussen. Gespeicherte
+Tarife, interne Schwellen und vorhandene manuelle Zeitkorrekturen bleiben wirksam.
+Fahrzeug, Kilometer, Kunde, Startort und Korrekturen stehen unter „Weitere Angaben“.
+Ein Dienstwagen erhält dadurch keine neue Kilometererstattung.
+
+Datumswechsel sind zunächst mögliche Nächte. Tatsächliche auswärtige Übernachtungen
+werden für alle angezeigten Nächte gemeinsam im vorhandenen `overnight`-Feld bestätigt.
+Abweichende/teilweise Übernachtungen werden in vorhandenen Notizen dokumentiert und
+müssen manuell geprüft werden. Es wird keine Übernachtungspauschale berechnet und
+keine Hotelrechnung angelegt oder automatisch einer Reise zugeordnet (Schritt 2).
+
+**Fachliche Grenze der bestehenden Berechnung:** Sie verwendet bei mehrtägigen
+Zeitintervallen An-/Abreisetage auch ohne bestätigte auswärtige Übernachtung. Dieser
+PR ändert diese Regel nicht; die Maske und gespeicherte Prüfhinweise kennzeichnen den
+Fall ausdrücklich. Für einen Tagwechsel ohne Übernachtung ist die Vorschau daher
+kein bestätigter Anspruch. Ebenso werden Ausland, erste Tätigkeitsstätte und die
+Dreimonatsfrist bei Wiederholungseinsätzen nicht automatisch geprüft. Grundlage für
+diese Prüfgrenzen: [§ 9 Abs. 4a EStG](https://www.gesetze-im-internet.de/estg/__9.html)
+und [amtliche Übersicht 2026](https://amtliche-handbuecher.bundesfinanzministerium.de/lsth/2026/tabellarische-Uebersicht/inhalt.html).
+Manuelles Speichern setzt den Status „ungeprüft“; die Bestätigung der Abwesenheitszeit
+ist keine steuerliche Freigabe. Gespeicherte Hinweise bleiben bei einer späteren
+Tagesbestätigung erhalten.
+
+Prüfung: `npm test` umfasst auch `tests/manual-trip.test.ts`. Der optionale
+`tests/workflow-browser-check.mjs` prüft die Maske, Projektvorschläge, Zeitfehler,
+Tagwechsel, Mahlzeiten, mehrtägige Speicherung/Neuladen, eingefrorene Berichte,
+Exporte, Import und Offline-Verhalten bei 390, 820 und 1440 px in Chromium/WebKit.
+Die Browserprogramme werden extern bereitgestellt; keine neue Projektabhängigkeit.

@@ -51,6 +51,8 @@ import {
 } from "../lib/storage";
 import {
   buildStatement,
+  calculateDay,
+  groupTripsByDay,
   duplicateKey,
   expenseConflictsWithMileageAllowance,
   round2,
@@ -62,6 +64,7 @@ import {
   rowsToTrips,
   suggestMapping,
 } from "../lib/importer";
+import { manualTripErrors, manualTripInterval, manualTripReviewNotes, projectPlace, projectSuggestions } from "../lib/manual-trip";
 import { demoState } from "../lib/demo";
 import { applyMerchantRule, recognizeReceiptLocally } from "../lib/receipt-ocr";
 import {
@@ -1936,7 +1939,8 @@ const blankTrip = (settings: AppState["settings"]): Trip => {
   );
   return {
     id: uid(),
-    date: new Date().toISOString().slice(0, 10),
+    date: new Date().toLocaleDateString("sv-SE"),
+    endDate: new Date().toLocaleDateString("sv-SE"),
     startTime: "08:00",
     endTime: "17:00",
     startPlace: "",
@@ -1987,17 +1991,15 @@ function Trips({
   const [query, setQuery] = useState("");
   const monthly = useMemo(() => buildStatement(state, month), [state, month]);
   const groups = monthly.rows.filter((row) => row.trips.some((trip) =>
-    [trip.destination, trip.purpose, trip.customer].join(" ").toLowerCase().includes(query.toLowerCase()),
+    [trip.destination, trip.purpose, trip.customer, trip.order].join(" ").toLowerCase().includes(query.toLowerCase()),
   )).map((row) => [row.date, [...row.trips].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))] as const);
   const save = () => {
-    if (!editing) return;
+    if (!editing || manualTripErrors(editing, state.trips.find(t => t.id === editing.id)?.order).length) return;
     const t = {
       ...editing,
       sourceHash: duplicateKey(editing),
-      warnings: validateTrip(editing),
-      status: editing.absenceConfirmed
-        ? ("geprüft" as ReviewStatus)
-        : ("ungeprüft" as ReviewStatus),
+      warnings: [...validateTrip(editing), ...manualTripReviewNotes(editing)],
+      status: "ungeprüft" as ReviewStatus,
     };
     update((s) => {
       const i = s.trips.findIndex((x) => x.id === t.id);
@@ -2018,7 +2020,7 @@ function Trips({
       return s;
     });
     setEditing(null);
-    notify("Reise gespeichert");
+    notify("Reise erfasst. Hotelbeleg später in Kosten & Belege ergänzen; keine Übernachtungspauschale hinzugefügt.");
   };
   const del = (id: string) =>
     update((s) => {
@@ -2084,7 +2086,7 @@ function Trips({
       s.trips = s.trips.map((trip) => {
         if (!ids.has(trip.id)) return trip;
         const next = { ...trip, absenceConfirmed: true };
-        next.warnings = validateTrip(next);
+        next.warnings = [...validateTrip(next), ...trip.warnings.filter(w => manualTripReviewNotes(trip).includes(w))];
         next.status = next.warnings.length ? "ungeprüft" : "geprüft";
         return next;
       });
@@ -2108,7 +2110,7 @@ function Trips({
           onClick={() => setEditing(blankTrip(state.settings))}
         >
           <Plus size={18} />
-          Reise erfassen
+          Neue Dienstreise
         </button>
         <button className="ghost" onClick={openImport}>
           <Import size={18} /> Fahrten importieren
@@ -2212,7 +2214,7 @@ function Trips({
                       {t.startPlace || "Start offen"} →{" "}
                       {t.destination || "Ziel offen"}
                     </span>
-                    <span>{t.purpose || "Zweck fehlt"}</span>
+                    <span>{t.purpose || "Zweck fehlt"}{t.order && <small>{t.order}</small>}</span>
                     <span>{t.businessKm} km</span>
                     <button
                       className="link"
@@ -2240,7 +2242,7 @@ function Trips({
           title={
             state.trips.some((t) => t.id === editing.id)
               ? "Reise bearbeiten"
-              : "Reise erfassen"
+              : "Neue Dienstreise"
           }
           close={() => setEditing(null)}
         >
@@ -2248,12 +2250,13 @@ function Trips({
             trip={editing}
             setTrip={setEditing}
             settings={state.settings}
+            trips={state.trips}
           />
           <div className="modal-actions">
             <button className="ghost" onClick={() => setEditing(null)}>
               Abbrechen
             </button>
-            <button className="primary" onClick={save}>
+            <button className="primary" onClick={save} disabled={!!manualTripErrors(editing, state.trips.find(t => t.id === editing.id)?.order).length}>
               <Save size={17} />
               Speichern
             </button>
@@ -2264,91 +2267,61 @@ function Trips({
   );
 }
 
-function TripForm({
-  trip,
-  setTrip,
-  settings,
-}: {
-  trip: Trip;
-  setTrip: (t: Trip) => void;
-  settings: AppState["settings"];
+function TripForm({ trip, setTrip, settings, trips }: {
+  trip: Trip; setTrip: (t: Trip) => void; settings: AppState["settings"]; trips: Trip[];
 }) {
-  const set = <K extends keyof Trip>(k: K, v: Trip[K]) =>
-    setTrip({ ...trip, [k]: v });
-  const selectedVehicle = (settings.vehicles || []).find(
-    (vehicle) => vehicle.id === trip.vehicleId,
-  );
+  const set = <K extends keyof Trip>(k: K, v: Trip[K]) => setTrip({ ...trip, [k]: v });
+  const originalProject = trips.find(t => t.id === trip.id)?.order;
+  const existing = originalProject !== undefined;
+  const errors = manualTripErrors(trip, originalProject);
+  const interval = manualTripInterval(trip);
+  const days = errors.length ? [] : [...groupTripsByDay([trip])].map(([date, dayTrips]) => calculateDay(date, dayTrips, settings));
+  const selectedVehicle = settings.vehicles.find(v => v.id === trip.vehicleId);
+  const duration = (minutes: number) => `${Math.floor(minutes / 60)} Std. ${minutes % 60} Min.`;
+  const suggestedDestination = useRef(projectPlace(trip.order));
+  const changeProject = (value: string) => {
+    const place = projectPlace(value);
+    const useSuggestion = !trip.destination || trip.destination === suggestedDestination.current;
+    setTrip({ ...trip, order: value, destination: useSuggestion && place ? place : trip.destination });
+    if (place) suggestedDestination.current = place;
+  };
   return (
-    <div className="form-grid">
-      <label>
-        Datum
-        <input
-          type="date"
-          value={trip.date}
-          onChange={(e) => set("date", e.target.value)}
-        />
+    <div className="form-grid manual-trip">
+      <p className="wide">Pflichtangaben sind mit * markiert. Erfasst wird deine berufliche Abwesenheit von Wohnung und erster Tätigkeitsstätte.</p>
+      <label className="wide">Projekt *
+        <input aria-label="Projekt *" required list="trip-projects" placeholder="26.0123 Musterstadt" value={trip.order} onChange={e => changeProject(e.target.value)} />
+        <datalist id="trip-projects">{projectSuggestions(trips).map(p => <option key={p} value={p} />)}</datalist>
+        <small>Nummer und Ort, frei eingeben oder bisheriges Projekt auswählen.{existing && !projectPlace(trip.order) ? " Vorhandene Projektangabe kann unverändert bleiben." : ""}</small>
       </label>
-      <label>
-        Enddatum
-        <input
-          type="date"
-          value={trip.endDate || ""}
-          onChange={(e) => set("endDate", e.target.value || undefined)}
-        />
-      </label>
-      <label>
-        Beginn der Abwesenheit
-        <input
-          type="time"
-          step="1"
-          value={trip.startTime}
-          onChange={(e) => set("startTime", e.target.value)}
-        />
-      </label>
-      <label>
-        Ende der Abwesenheit
-        <input
-          type="time"
-          step="1"
-          value={trip.endTime}
-          onChange={(e) => set("endTime", e.target.value)}
-        />
-      </label>
-      <label>
-        Startort
-        <input
-          value={trip.startPlace}
-          onChange={(e) => set("startPlace", e.target.value)}
-        />
-      </label>
-      <label>
-        Reiseziel
-        <input
-          value={trip.destination}
-          onChange={(e) => set("destination", e.target.value)}
-        />
-      </label>
-      <label className="wide">
-        Reisezweck
-        <input
-          value={trip.purpose}
-          onChange={(e) => set("purpose", e.target.value)}
-        />
-      </label>
-      <label>
-        Kunde
-        <input
-          value={trip.customer}
-          onChange={(e) => set("customer", e.target.value)}
-        />
-      </label>
-      <label>
-        Auftrag / Aktenzeichen
-        <input
-          value={trip.order}
-          onChange={(e) => set("order", e.target.value)}
-        />
-      </label>
+      <label>Reisegrund *<input required value={trip.purpose} onChange={e => set("purpose", e.target.value)} /></label>
+      <label>Reiseziel *<input aria-label="Reiseziel *" required value={trip.destination} onChange={e => set("destination", e.target.value)} /><small>Projektort vorgeschlagen, frei überschreibbar. Vorschau nur für Inland.</small></label>
+      <label>Abfahrt Datum *<input required type="date" value={trip.date} onChange={e => setTrip({...trip, date: e.target.value, endDate: !trip.endDate || trip.endDate === trip.date ? e.target.value : trip.endDate})} /></label>
+      <label>Abfahrt Uhrzeit *<input required type="time" step="1" value={trip.startTime} onChange={e => set("startTime", e.target.value)} /></label>
+      <label>Rückkehr Datum *<input required type="date" value={trip.endDate || trip.date} onChange={e => set("endDate", e.target.value)} /></label>
+      <label>Rückkehr Uhrzeit *<input required type="time" step="1" value={trip.endTime} onChange={e => set("endTime", e.target.value)} /></label>
+      {errors.length > 0 && <div className="wide trip-errors" role="alert">{errors.map(e => <p key={e}>{e}</p>)}</div>}
+      {interval && <div className="wide trip-summary"><b>Abwesenheitsdauer: {duration(interval.minutes)}</b><p>Keine Arbeitszeit. {interval.nights} Datumswechsel · {interval.nights + 1} Kalendertag(e).</p></div>}
+      {(!!interval?.nights || trip.overnight) && <div className="wide">
+        <label className="check"><input type="checkbox" checked={trip.overnight} onChange={e => set("overnight", e.target.checked)} />Alle {interval?.nights || 0} auswärtigen Übernachtungen zwischen Abfahrt und Rückkehr tatsächlich erfolgt</label>
+        <p>{days.slice(0,-1).map(d => dateDe(d.date)).join(" · ")} (jeweils Nacht auf den Folgetag)</p>
+        <small>Bei abweichenden oder fehlenden Übernachtungen nicht bestätigen; Einzelheiten in Notizen festhalten und Tagesaufteilung vor Abrechnung prüfen.</small>
+      </div>}
+      <MealEditor trip={trip} setTrip={setTrip} />
+      <section className="wide trip-preview" aria-label="Verpflegungsvorschau">
+        <h3>Verpflegungsvorschau · Inland</h3>
+        <p>{settings.ruleMode === "internal" ? "Achtung: interne Schwelle aus Einstellungen aktiv." : "Gespeicherte Inlandstarife und gesetzlicher Schwellenmodus."} Vorschau dieser Reise; weitere Reisen desselben Tages können die Monatsberechnung beeinflussen.</p>
+        {days.map(day => <article key={day.date}>
+          <b>{dateDe(day.date)} · {duration(day.absenceMinutes)}</b>
+          <p>{day.reason}</p><p>{euro(day.allowanceBefore)} − Frühstück {euro(day.breakfastCut)} − Mittag {euro(day.lunchCut)} − Abend {euro(day.dinnerCut)} = <b>{euro(day.allowanceAfter)}</b></p>
+        </article>)}
+        {!!days.length && <p><b>Verpflegung gesamt: {euro(round2(days.reduce((sum,d) => sum + d.allowanceAfter, 0)))}</b></p>}
+        {manualTripReviewNotes(trip).map(note => <p key={note}>{note}</p>)}
+        <p>Übernachtungspauschale: 0,00 €. Hotelrechnung separat in Kosten & Belege erfassen. Keine doppelte Erstattung; keine automatische Zuordnung.</p>
+      </section>
+      <details className="wide"><summary>Weitere Angaben · Fahrzeug, Korrekturen und Notizen</summary><div className="form-grid">
+      <label>Startort<input value={trip.startPlace} onChange={e => set("startPlace", e.target.value)} /></label>
+      <label>Kunde<input value={trip.customer} onChange={e => set("customer", e.target.value)} /></label>
+      <label className="wide">Notizen / abweichende Übernachtungen<textarea value={trip.notes} onChange={e => set("notes", e.target.value)} /></label>
       <label>
         Verwendetes Fahrzeug
         <select
@@ -2452,7 +2425,7 @@ function TripForm({
           }
         />
       </label>
-      <MealEditor trip={trip} setTrip={setTrip} />
+      </div></details>
       <label className="check wide confirm">
         <input
           type="checkbox"
@@ -2479,8 +2452,8 @@ function MealEditor({
   setTrip: (t: Trip) => void;
 }) {
   const days: string[] = [];
-  const start = new Date(`${trip.date}T12:00:00`);
-  const end = new Date(`${trip.endDate || trip.date}T12:00:00`);
+  const start = new Date(`${trip.date}T12:00:00Z`);
+  const end = new Date(`${trip.endDate || trip.date}T12:00:00Z`);
   for (
     let d = start;
     d <= end && days.length < 60;
@@ -2494,12 +2467,8 @@ function MealEditor({
     checked: boolean,
   ) => {
     if (!multi)
-      return setTrip({ ...trip, meals: { ...trip.meals, [field]: checked } });
-    const current = trip.dailyMeals?.[day] || {
-      breakfast: false,
-      lunch: false,
-      dinner: false,
-    };
+      return setTrip({ ...trip, meals: { ...trip.meals, [field]: checked }, dailyMeals: { ...trip.dailyMeals, [day]: { ...(trip.dailyMeals?.[day] || trip.meals), [field]: checked } } });
+    const current = trip.dailyMeals?.[day] || (day === trip.date ? trip.meals : { breakfast: false, lunch: false, dinner: false });
     setTrip({
       ...trip,
       dailyMeals: {
@@ -2513,12 +2482,8 @@ function MealEditor({
       <b>Gestellte / bezahlte Mahlzeiten</b>
       {days.map((day) => {
         const m = multi
-          ? trip.dailyMeals?.[day] || {
-              breakfast: false,
-              lunch: false,
-              dinner: false,
-            }
-          : trip.meals;
+          ? trip.dailyMeals?.[day] || (day === trip.date ? trip.meals : { breakfast: false, lunch: false, dinner: false })
+          : trip.dailyMeals?.[day] || trip.meals;
         return (
           <fieldset key={day}>
             <legend>{multi ? dateDe(day) : "Reisetag"}</legend>
