@@ -2508,85 +2508,112 @@ button:focus-visible { outline: 3px solid #5a93d0; outline-offset: 3px; }
 .receipt-linking .wide > .link { display: block; margin: 8px 0; min-height: 44px; }
 .trip-candidate > button { min-height: 44px; }
 
-/* Read-only year navigation; the existing statement keeps its own layout. */
-.month-workspace { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 20px; align-items: start; }
-.month-statement { min-width: 0; display: grid; gap: 20px; }
-.year-navigation { padding: 16px; min-width: 0; }
-.year-switch { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.year-switch h2 { margin: 0; font-size: 20px; }
-.year-switch button { min-width: 44px; min-height: 44px; padding: 8px; }
-.year-months { display: grid; gap: 6px; }
-.year-month { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px 6px; align-items: center; text-align: left; background: white; border: 1px solid var(--line); border-radius: 10px; min-height: 58px; padding: 9px; color: #334155; }
-.year-month .month-symbol { font-weight: 800; font-size: 17px; grid-row: span 2; }
-.month-name { font-weight: 700; display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
-.month-name small { font-size: 10px; font-weight: 500; }
-.month-state { grid-column: 2; font-size: 11px; }
-.month-closed { color: #24623f; background: #eff9f2; }
-.month-closed-changed {color:#874508;background:#fff5df}
-.month-correction {color:#315b91;background:#edf4ff}
-.month-history-review {color:#9a2833;background:#fff1f2}
-.month-working { color: #8a4a12; background: #fff6e9; }
-.month-open { color: #586779; background: #f7f9fc; }
-.month-review { color: #a32934; background: #fff1f2; }
-.year-month.selected { border: 2px solid #316ba8; box-shadow: 0 0 0 2px #316ba81c; padding: 8px; }
-.year-month:focus-visible, .year-switch button:focus-visible { outline: 3px solid #316ba8; outline-offset: 2px; }
-.month-short { display: none; }
-.year-selection, .month-legend, .month-backlog { font-size: 12px; overflow-wrap: anywhere; }
-.month-legend summary { cursor: pointer; padding: 10px 0; }
-.month-backlog { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
-.month-backlog button { white-space: normal; min-height: 44px; width: 100%; }
-.month-review ul { margin: 8px 0; padding-left: 20px; }
-@media (max-width: 1100px) {
-  .month-workspace { grid-template-columns: minmax(0, 1fr); }
-  .year-months { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .year-month { min-height: 72px; grid-template-columns: 18px minmax(0, 1fr); gap: 4px; }
-  .month-name { display: block; min-width: 0; font-size: 12px; overflow-wrap: anywhere; }
-  .month-name small { display: block; font-size: 10px; margin-top: 3px; }
-}
-@media (max-width: 600px) {
-  .year-navigation { padding: 12px; }
-  .year-months { gap: 6px; }
-  .year-month { grid-template-columns: 16px minmax(0, 1fr); padding: 7px 5px; min-height: 64px; gap: 3px; }
-  .year-month.selected { padding: 6px 4px; }
-  .month-full, .month-name small { display: none; }
-  .month-short { display: inline; }
-  .month-name { font-size: 13px; }
-  .month-state { font-size: 10px; overflow-wrap: anywhere; }
-}
-.month-statement { grid-template-columns: minmax(0, 1fr); }
+/* Monatsleiste oben: Jahr links, zwölf Monate als Reiter, Status als Symbol. */
+.month-workspace { display: grid; gap: 16px; min-width: 0; }
+.month-statement { min-width: 0; display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
 .month-statement > * { min-width: 0; }
-.month-mobile-key { display: none; }
+.year-navigation { padding: 10px 12px; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; align-items: center; }
+.year-switch { display: flex; align-items: center; gap: 2px; }
+.year-switch h2 { margin: 0; font-size: 17px; font-weight: 700; min-width: 3.2em; text-align: center; font-variant-numeric: tabular-nums; }
+.year-switch button { min-width: 36px; min-height: 44px; padding: 6px; border: 0; background: transparent; }
+.year-months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; }
+.year-month { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 52px; padding: 5px 2px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #4a5d72; font: inherit; cursor: pointer; min-width: 0; }
+.year-month:hover { background: var(--paper); }
+.year-month .month-name { font-weight: 700; font-size: 13px; color: var(--ink); }
+.year-month .month-symbol { font-size: 12px; line-height: 1; font-weight: 800; }
+.year-month .month-state { font-size: 10px; line-height: 1.2; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; min-height: 12px; }
+.year-month.month-open .month-symbol { color: #a5b4c4; }
+.year-month.month-working .month-symbol { color: #b46a12; }
+.year-month.month-review .month-symbol, .year-month.month-history-review .month-symbol { color: var(--red); }
+.year-month.month-closed .month-symbol { color: #24623f; }
+.year-month.month-closed-changed .month-symbol { color: #874508; }
+.year-month.month-correction .month-symbol { color: #315b91; }
+.year-month.selected { background: var(--mint); border-color: #9cbfe6; box-shadow: inset 0 -3px 0 var(--green); }
+.year-month:focus-visible, .year-switch button:focus-visible { outline: 3px solid #316ba8; outline-offset: 2px; }
+.year-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; border-top: 1px solid var(--line); padding-top: 6px; font-size: 12px; color: var(--muted); }
+.month-backlog { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; overflow-wrap: anywhere; }
+.month-backlog b { color: var(--ink); font-weight: 650; }
+.month-backlog .link, .month-legend summary { min-height: 32px; font-size: 12px; }
+.month-legend { font-size: 12px; overflow-wrap: anywhere; }
+.month-legend summary { cursor: pointer; display: flex; align-items: center; }
+.month-legend[open] { flex-basis: 100%; }
+.month-review ul { margin: 8px 0; padding-left: 20px; }
+/* Statusfarben für Plaketten (Monatsarbeitsbereich). */
+.status-pill.month-closed { color: #24623f; background: #eff9f2; }
+.status-pill.month-closed-changed { color: #874508; background: #fff5df; }
+.status-pill.month-correction { color: #315b91; background: #edf4ff; }
+.status-pill.month-history-review, .status-pill.month-review { color: #a32934; background: #fff1f2; }
+.status-pill.month-working { color: #8a4a12; background: #fff6e9; }
+.month-state-short { display: none; }
+@media (max-width: 1100px) {
+  .month-state-long { display: none; }
+  .month-state-short { display: inline; }
+  .year-navigation { grid-template-columns: minmax(0, 1fr); padding: 8px 10px; }
+  .year-switch { justify-content: center; }
+}
 @media (max-width: 600px) {
+  .month-state-long { display: inline; }
+  .month-state-short { display: none; }
+  .year-months { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .year-month { min-height: 48px; }
-  .year-month .month-symbol { grid-row: 1; }
-  .year-month .month-state { display: none; }
-  .month-mobile-key { display: block; font-size: 11px; line-height: 1.6; margin: 10px 0; color: #586779; }
-  .month-review.notice { display: block; }
 }
 
 /* Month workspace reuses the existing forms and statement view. */
-.month-entry-workspace {display:grid;gap:24px;min-width:0}
-.month-entry-workspace header h2 {margin:4px 0 12px;font-size:24px;font-weight:700}
-.month-entry-workspace h3 {margin:0 0 12px}
-.workspace-entry-actions {display:grid;gap:10px}
-.workspace-entry-actions button {min-height:54px;white-space:normal;justify-content:center}
-.workspace-entry-actions .workspace-trip-entry {width:100%;min-height:68px;justify-content:flex-start;padding:18px 22px;font-size:18px}
-.workspace-secondary-entry-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.workspace-secondary-entry-actions button {background:var(--paper);border:1px solid var(--line);font-weight:650}
-.workspace-edit-actions {display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.workspace-edit-actions button,.workspace-return button {min-height:44px;white-space:normal}
-.workspace-edit-actions button {font-size:14px}
-.workspace-figures {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0}
-.workspace-figures>div {padding:11px;background:var(--paper);border:1px solid var(--line);border-radius:10px;min-width:0}
-.workspace-figures dt {font-size:12px;color:var(--muted);line-height:1.35}
-.workspace-figures dd {font-weight:700;font-size:17px;margin:5px 0 0;overflow-wrap:anywhere}
-.workspace-reimbursement-summary {display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:12px;padding:12px 14px;background:#eff6ff;border:1px solid #c9dcf4;border-radius:10px}
-.workspace-reimbursement-summary strong {font-size:20px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:right}
-.workspace-company-paid {margin:8px 0 0;font-size:14px}
-.workspace-statement-action {border-top:1px solid var(--line);padding-top:24px}
-.workspace-return {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-@media(max-width:900px){.workspace-figures{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:600px){.workspace-figures{grid-template-columns:repeat(2,minmax(0,1fr))}.workspace-entry-actions .workspace-trip-entry{min-height:62px}.workspace-secondary-entry-actions{grid-template-columns:minmax(0,1fr)}.workspace-edit-actions{flex-direction:column;align-items:stretch}.workspace-statement-action>.primary{width:100%;white-space:normal;min-height:48px}.workspace-reimbursement-summary{align-items:flex-start;flex-direction:column;gap:4px}.workspace-reimbursement-summary strong{text-align:left}}
+/* Monatsarbeitsbereich: Kopfzeile mit Werkzeugleiste, links Zeitleiste und Prüfen, rechts Zahlen und Abschluss. */
+.month-entry-workspace { display: grid; gap: 0; min-width: 0; padding: 0; overflow: visible; }
+.workspace-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+.workspace-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.workspace-title .eyebrow { flex-basis: 100%; margin: 0; }
+.workspace-title h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+.workspace-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.workspace-toolbar button { min-height: 44px; white-space: nowrap; font-size: 14px; }
+.workspace-toolbar .ghost { background: var(--white); }
+.workspace-toolbar .workspace-trip-entry { padding-inline: 16px; }
+.workspace-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+.workspace-main { min-width: 0; padding: 4px 22px 22px; }
+.workspace-main > .month-timeline { border-top: 0; margin-top: 0; }
+.workspace-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 4px 0 8px; font-size: 13px; }
+.workspace-links .link { min-height: 36px; font-size: 13px; }
+.workspace-links .muted { flex-basis: 100%; font-size: 12px; margin: 0; }
+.workspace-side { position: sticky; top: 12px; min-width: 0; display: grid; gap: 0; border-left: 1px solid var(--line); background: #fafcfe; border-radius: 0 0 12px 0; }
+.workspace-side > section { padding: 18px 20px; min-width: 0; }
+.workspace-side > section + section { border-top: 1px solid var(--line); }
+.workspace-side > section > h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+.workspace-reimbursement-summary { display: grid; gap: 2px; margin: 0 0 12px; }
+.workspace-reimbursement-summary b { font-size: 12px; font-weight: 600; color: var(--muted); }
+.workspace-reimbursement-summary strong { font-size: 30px; font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; color: var(--ink); }
+.workspace-figures { display: grid; gap: 0; margin: 0; }
+.workspace-figures > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); min-width: 0; }
+.workspace-figures dt { font-size: 13px; color: var(--muted); line-height: 1.35; min-width: 0; }
+.workspace-figures dd { margin: 0; font-weight: 650; font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.workspace-company-paid { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.workspace-company-paid b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.workspace-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.workspace-note summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+.workspace-statement-action > .primary { width: 100%; min-height: 46px; white-space: normal; margin-top: 4px; }
+.workspace-statement-action > p { font-size: 12px; margin: 8px 0 0; }
+.workspace-return { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.workspace-return button { min-height: 44px; white-space: normal; }
+.timeline-empty { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 22px; border: 1px dashed #c9d9ea; border-radius: 10px; background: #fafcfe; color: var(--muted); }
+.timeline-empty p { margin: 0; }
+.timeline-empty button { min-height: 44px; }
+@media (max-width: 1100px) {
+  .workspace-layout { grid-template-columns: minmax(0, 1fr); }
+  .workspace-side { position: static; border-left: 0; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workspace-side > section + section { border-top: 0; border-left: 1px solid var(--line); }
+  .workspace-side { order: -1; }
+}
+@media (max-width: 760px) {
+  .workspace-head { padding: 14px 16px; }
+  .workspace-toolbar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .workspace-toolbar button { white-space: normal; justify-content: center; }
+  .workspace-toolbar .workspace-trip-entry { grid-column: 1 / -1; }
+  .workspace-toolbar button:last-child { grid-column: 1 / -1; }
+  .workspace-main { padding: 4px 16px 16px; }
+  .workspace-side { grid-template-columns: minmax(0, 1fr); }
+  .workspace-side > section + section { border-left: 0; border-top: 1px solid var(--line); }
+  .workspace-side > section { padding: 14px 16px; }
+}
 
 .statement-head[tabindex="-1"] {scroll-margin-top:150px}
 .statement-version-picker {max-width:580px;gap:6px;margin-top:12px}
@@ -2822,14 +2849,16 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .issue-group .closing-issues { margin: 8px 0 2px; }
 .issue-count { flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--muted); }
 .closing-issues.compact li { display: flex; justify-content: space-between; gap: 12px; }
-.workspace-steps { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 14px; padding: 0; counter-reset: step; }
-.workspace-steps li { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.workspace-steps li b { font-size: 13px; }
+/* Weg zum Abschluss: senkrechte Schrittfolge mit Nummernkreisen. */
+.workspace-steps { list-style: none; display: grid; gap: 0; margin: 0 0 12px; padding: 0; counter-reset: step; }
+.workspace-steps li { position: relative; counter-increment: step; display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 10px; padding: 0 0 14px; min-width: 0; }
+.workspace-steps li::before { content: counter(step); grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--white); border: 1.5px solid #c9d9ea; position: relative; z-index: 1; }
+.workspace-steps li:not(:last-child)::after { content: ""; position: absolute; left: 12px; top: 26px; bottom: 0; width: 2px; background: var(--line); }
+.workspace-steps li b { font-size: 14px; line-height: 26px; }
 .workspace-steps li small { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
-.workspace-steps li.done { border-color: #b9dcc8; background: #f1faf4; }
-.workspace-steps li.current { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
-.workspace-steps li.blocked small { color: var(--red); font-weight: 700; }
-@media (max-width: 760px) { .workspace-steps { grid-template-columns: 1fr; } }
+.workspace-steps li.done::before { content: "✓"; color: var(--white); background: #2f7d55; border-color: #2f7d55; }
+.workspace-steps li.current::before { color: var(--white); background: var(--green); border-color: var(--green); }
+.workspace-steps li.blocked small { color: var(--red); font-weight: 650; }
 .issue-group .closing-issues { list-style: none; padding: 0; display: grid; gap: 2px; }
 .issue-group .closing-issues li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 3px 0; margin: 0; min-width: 0; }
 .issue-group .closing-issues li span { min-width: 0; overflow-wrap: anywhere; font-size: 13px; }

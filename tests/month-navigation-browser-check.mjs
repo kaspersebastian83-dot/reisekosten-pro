@@ -87,7 +87,7 @@ try {
         for(let i=0;i<12;i++){const button=monthButton(names[i]);assert.ok((await button.boundingBox()).height>=44);await button.click();assert.equal(await picker.inputValue(),`2026-${String(i+1).padStart(2,'0')}`);assert.equal(await button.getAttribute('aria-current'),'date');}
         assert.deepEqual(await state(page),baseline);await monthButton('September').click();await page.locator('.month-checks summary').click();assert.match(await page.locator('.month-checks .month-review').innerText(),/Reiseziel fehlt/);
         await fits();const left=await page.locator('.year-navigation').boundingBox();const right=await page.locator('.month-statement').boundingBox();
-        if(viewport.width===1440)assert.ok(left.x+left.width<=right.x+1);else assert.ok(left.y+left.height<=right.y+1);
+        assert.ok(left.y+left.height<=right.y+1,'month bar above the month');if(viewport.width!==390){const tops=await page.locator('.year-month').evaluateAll(b=>b.map(x=>Math.round(x.getBoundingClientRect().top)));assert.equal(new Set(tops).size,1,'all twelve months in one row');}
         await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-year.png`),fullPage:false});
       });
       await check(`${engine} ${viewport.width}: year browsing preserves selected month; historical frozen report remains intact`,async()=>{

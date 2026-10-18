@@ -58,13 +58,14 @@ try {
       await nav(page,'Monatsübersicht');await page.locator('.year-months').getByRole('button',{name:/^Juni 2026 ·/}).click();
       await check(`${engine} ${viewport.width}: June workspace opens without snapshots and retains responsive year navigation`,async()=>{
         await assertJune();assert.equal((await state(page)).statements.length,0);assert.equal(await page.locator('.statement-head').count(),0);
-        assert.deepEqual(await workspace.locator(':scope > section').evaluateAll(sections=>sections.map(section=>section.getAttribute('aria-label'))),['Spesen erfassen','Monat im Überblick','Prüfen','Monatsabrechnung','Bisher erfasst']);
+        assert.deepEqual(await workspace.locator('section[aria-label]').evaluateAll(sections=>sections.map(section=>section.getAttribute('aria-label')).filter(name=>['Spesen erfassen','Monat im Überblick','Prüfen','Monatsabrechnung','Bisher erfasst'].includes(name))),['Spesen erfassen','Monat im Überblick','Prüfen','Bisher erfasst','Monatsabrechnung']);
         assert.equal(await workspace.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).count(),1);
         const tripButton=workspace.getByRole('button',{name:'Dienstreise erfassen',exact:true});const hotelButton=workspace.getByRole('button',{name:'Hotelrechnung erfassen',exact:true});const otherButton=workspace.getByRole('button',{name:'Sonstige Kosten erfassen',exact:true});
-        assert.ok(await tripButton.evaluate(button=>button.classList.contains('primary')));assert.ok((await tripButton.boundingBox()).height>=60);
+        assert.ok(await tripButton.evaluate(button=>button.classList.contains('primary')));assert.equal(await workspace.locator('button.primary').filter({hasText:'erfassen'}).count(),1,'only one primary entry action');
         for(const button of [tripButton,hotelButton,otherButton])assert.ok((await button.boundingBox()).height>=44);
         const hotelBox=await hotelButton.boundingBox();const otherBox=await otherButton.boundingBox();
-        if(viewport.width===390)assert.ok(otherBox.y>hotelBox.y);else {assert.ok(Math.abs(otherBox.y-hotelBox.y)<2);assert.ok(hotelBox.x<otherBox.x);}
+        if(viewport.width===390)assert.ok(Math.abs(otherBox.y-hotelBox.y)<2&&hotelBox.x<otherBox.x,'hotel and other side by side on phones');else {const tripBox=await tripButton.boundingBox();assert.ok(Math.abs(tripBox.y-hotelBox.y)<2&&tripBox.x<hotelBox.x,'toolbar keeps trip and hotel in one row');}
+        if(viewport.width===1440){const side=await workspace.locator('.workspace-side').boundingBox();const main=await workspace.locator('.workspace-main').boundingBox();assert.ok(main.x+main.width<=side.x+1,'figures beside the timeline on desktop');}
         assert.deepEqual(await workspace.locator('.workspace-figures dt').allTextContents(),['Dienstreisen','Verpflegungspauschalen · Vorschau','Hotelkosten · erfasst','Weitere Kosten inkl. Tanken · erfasst']);
         assert.match(await workspace.innerText(),/Voraussichtliche persönliche Erstattung/);assert.match(await workspace.innerText(),/Vom Unternehmen bezahlt/);
         assert.equal(await page.locator('.quick-fab,.camera-fab').count(),0,'duplicate floating actions do not cover the month entry controls');
@@ -103,7 +104,7 @@ try {
         await editor.getByLabel('Beschreibung',{exact:true}).fill('Synthetisches Parken');await editor.getByLabel('Brutto (€)',{exact:true}).fill('25');await saveCost();
         const saved=await waitState(page,s=>s?.expenses.length===2);await assertJune();assert.equal(saved.statements.length,0);
         assert.match(await workspace.innerText(),/Weitere Kosten inkl. Tanken · erfasst\s+25,00/);assert.match(await workspace.innerText(),/Voraussichtliche persönliche Erstattung\s+53,00/);
-        await clickAction('Kosten & Belege bearbeiten');await page.locator('.expense-card').getByRole('button',{name:'Bearbeiten',exact:true}).click();
+        await clickAction('Alle Kosten & Belege bearbeiten');await page.locator('.expense-card').getByRole('button',{name:'Bearbeiten',exact:true}).click();
         await editor.getByLabel('Brutto (€)',{exact:true}).fill('30');await saveCost();await waitState(page,s=>s?.expenses.find(e=>e.category==='Parken')?.gross===30);await assertJune();
         assert.match(await workspace.innerText(),/Weitere Kosten inkl. Tanken · erfasst\s+30,00/);await fits();
         await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-workspace.png`),fullPage:true});

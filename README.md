@@ -749,3 +749,14 @@ behält „Speichern“. „Nächste“ speichert mit denselben Prüfungen wie b
 
 Ein Zähler zeigt, wie viele Einträge in dieser Runde gespeichert wurden; Abbrechen verwirft nur den offenen Entwurf.
 Browsercheck: `tests/batch-entry-browser-check.mjs`.
+
+## Layout der Monatsübersicht
+
+- Monatsleiste oben statt Spalte links: Jahr mit Pfeilen, alle zwölf Monate in einer Zeile (Handy: 2 × 6), Stand als
+  Symbol, Reiseanzahl darunter. Darunter in einer Zeile die offenen Monate („Mit … beginnen“) und „Status verstehen“.
+- Monatsarbeitsbereich: Kopfzeile mit Monat, Status und Werkzeugleiste (ein Hauptknopf „Dienstreise erfassen“,
+  daneben Hotel, Sonstige Kosten, Beleg). Darunter zweispaltig: links Zeitleiste, Links „Alle Reisen/Kosten
+  bearbeiten“ und Prüfen; rechts mitlaufend Erstattung, Beträge und der Weg zum Abschluss mit dem Abrechnungsknopf.
+  Unter 1100 px rutscht die rechte Spalte über die Zeitleiste.
+- Leerer Monat: „Erste Dienstreise erfassen“ direkt in der Zeitleiste.
+- Reine Darstellung – keine Änderung an Berechnung, Status, Daten oder Abläufen.
