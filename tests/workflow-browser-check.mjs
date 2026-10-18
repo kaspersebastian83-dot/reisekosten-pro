@@ -74,7 +74,7 @@ try {
       });
       await check(`${engine} ${viewport.width}: validation, midnight, multiday meals and project suggestions`,async()=>{
         await nav(page,'Reisen');await page.locator('.trip-actions .primary').click();
-        const modal=page.locator('.modal');const save=modal.getByRole('button',{name:'Speichern',exact:true});
+        const modal=page.locator('.modal');const save=modal.getByRole('button',{name:'Speichern & fertig',exact:true});
         assert.equal(await save.isDisabled(),true);
         await modal.getByLabel('Projekt *',{exact:true}).fill('26.0123 Musterstadt');
         assert.equal(await modal.getByLabel('Reiseziel *',{exact:true}).inputValue(),'Musterstadt');
@@ -122,7 +122,7 @@ try {
         await modal.getByLabel('Reisegrund *',{exact:true}).fill('Synthetischer Testtermin');
         await modal.getByRole('checkbox',{name:/Abwesenheitsdauer bestätigt/}).check();
         await fits();await page.locator('.modal-body').evaluate(node=>node.scrollTop=0);await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-manual.png`),fullPage:true});
-        await modal.getByRole('button',{name:'Speichern',exact:true}).click();
+        await modal.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
         const saved=await waitState(page,s=>s?.trips.length===1);assert.equal(saved.profiles.length,0);assert.equal(saved.trips[0].order,'26.0123 Musterstadt');assert.equal(saved.trips[0].status,'ungeprüft');
         await nav(page,'Reisen');await page.locator('.trip-actions .primary').click();
         assert.deepEqual(await page.locator('#trip-projects option').evaluateAll(nodes=>nodes.map(n=>n.value)),['26.0123 Musterstadt']);
@@ -172,7 +172,7 @@ try {
         await modal.getByLabel('Rückkehr Datum *',{exact:true}).fill('2026-03-22');
         await modal.getByRole('checkbox',{name:/Alle 2 auswärtigen/}).check();
         await modal.locator('fieldset').nth(1).getByRole('checkbox',{name:'Frühstück',exact:true}).check();
-        await modal.getByRole('button',{name:'Speichern',exact:true}).click();
+        await modal.getByRole('button',{name:'Speichern & fertig',exact:true}).click();
         const saved=await waitState(page,s=>s?.trips.length===before.trips.length+1);
         assert.equal(saved.trips.at(-1).overnight,true);
         assert.equal(saved.trips.at(-1).dailyMeals['2026-03-21'].breakfast,true);
@@ -188,11 +188,11 @@ try {
         assert.equal(await modal.getByRole('checkbox',{name:/Alle 2 auswärtigen/}).isChecked(),true);
         assert.equal(await modal.locator('fieldset').nth(1).getByRole('checkbox',{name:'Frühstück',exact:true}).isChecked(),true);
         await modal.getByLabel('Projekt *',{exact:true}).fill('Ungültiges neues Projekt');
-        assert.equal(await modal.getByRole('button',{name:'Speichern',exact:true}).isDisabled(),true);
+        assert.equal(await modal.getByRole('button',{name:'Speichern & fertig',exact:true}).isDisabled(),true);
         await modal.getByRole('button',{name:'Abbrechen',exact:true}).click();
         // Imported legacy rows need no forced project migration to remain editable.
         await page.locator('.trip-rows > div').filter({hasText:'Import-Testtermin'}).first().getByRole('button',{name:'Bearbeiten',exact:true}).click();
-        assert.equal(await modal.getByRole('button',{name:'Speichern',exact:true}).isEnabled(),true);
+        assert.equal(await modal.getByRole('button',{name:'Speichern & fertig',exact:true}).isEnabled(),true);
         await modal.getByRole('button',{name:'Abbrechen',exact:true}).click();await fits();
         assert.deepEqual(errors,[]);
       });

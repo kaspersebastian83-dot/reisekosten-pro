@@ -735,3 +735,17 @@ Hinweise). Mehrtägige Reisen erscheinen an Folgetagen als Fortsetzung; Kosten z
 - `closingPreview` führt die Abschlussprüfung ohne Entwurf aus und blendet nur entwurfsbezogene Fehler aus; daraus
   zeigt die Monatsabrechnung „1 Erfassen · 2 Prüfen · 3 Abschließen“. Abschluss bleibt eine bewusste, bestätigte Aktion.
 - Der Status oben entspricht `monthOverview` des gewählten Monats.
+
+## Stapelerfassung
+
+Reise- und Kostenformular haben „Speichern & nächste“ (auch Strg+Enter) und „Speichern & fertig“; die Schnellerfassung
+behält „Speichern“. „Nächste“ speichert mit denselben Prüfungen wie bisher und öffnet sofort einen neuen Entwurf
+(`lib/batch-entry.ts`):
+
+- Reise: Datum = Tag nach dem Ende der vorigen Reise; Fahrzeug, Startort und Uhrzeiten bleiben, Projekt, Zweck, Ziel,
+  Kilometer und Übernachtung sind leer.
+- Kosten: Rechnungsdatum, Zahlungsart, bezahlt von, Reise- und Projektzuordnung bleiben; Betrag, Beschreibung, Händler,
+  Rechnungsnummer und Beleg sind leer.
+
+Ein Zähler zeigt, wie viele Einträge in dieser Runde gespeichert wurden; Abbrechen verwirft nur den offenen Entwurf.
+Browsercheck: `tests/batch-entry-browser-check.mjs`.

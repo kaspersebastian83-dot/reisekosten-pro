@@ -1,5 +1,14 @@
 # Release Notes
 
+## Stapelerfassung am Monatsende
+
+- Reise- und Kostenformular: „Speichern & nächste“ (Strg+Enter) und „Speichern & fertig“. Das Fenster bleibt offen,
+  der nächste Entwurf ist vorbelegt (Reise: Folgetag, Fahrzeug, Startort, Uhrzeiten; Kosten: Datum, Zahlungsart,
+  Reise-/Projektzuordnung), Inhaltliches bleibt leer. Fokus springt ins erste Feld.
+- Zähler „N … in dieser Runde erfasst“; Prüfungen und Doppelerfassungs-Hinweise unverändert, die Zeitleiste
+  aktualisiert sich im Hintergrund.
+- Browserchecks auf „Speichern & fertig“ umgestellt, neuer `batch-entry-browser-check`.
+
 ## Prüfen und Abschließen (Fluss, Schritt 3)
 
 - Abschlussprüfung gruppiert gleichartige Hinweise (z. B. „Projektzuordnung ist unklar · 11 Einträge“); große Gruppen

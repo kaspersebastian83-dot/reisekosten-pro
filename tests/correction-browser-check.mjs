@@ -71,7 +71,7 @@ try {
       await check(`${engine} ${viewport.width}: late hotel entered through existing form immediately shows +120 without opening report`,async()=>{
         await workspace.getByRole('button',{name:'Hotelrechnung erfassen',exact:true}).click();const editor=page.locator('.modal');
         await editor.getByLabel('Datum',{exact:true}).fill('2026-06-15');await editor.getByLabel('Beschreibung',{exact:true}).fill('Synthetisches Nachtragshotel');await editor.getByLabel('Brutto (€)',{exact:true}).fill('120');await editor.getByLabel('Zahlungsart',{exact:true}).selectOption('privat vorgestreckt');
-        await editor.getByRole('button',{name:'Speichern',exact:true}).click();await waitState(page,s=>s?.expenses.length===3);
+        await editor.getByRole('button',{name:'Speichern & fertig',exact:true}).click();await waitState(page,s=>s?.expenses.length===3);
         await changes.waitFor();assert.equal(await page.locator('.statement-head').count(),0);assert.match(await changes.innerText(),/Abgeschlossen – Änderungen erkannt/);assert.match(await changes.innerText(),/\+120,00/);assert.match(await changes.innerText(),/keine Zahlungsforderung/);assert.doesNotMatch(await changes.innerText(),/Noch auszuzahlen|Restzahlung:/);
         await changes.getByText('Änderungen ansehen',{exact:true}).click();assert.match(await changes.innerText(),/Neu hinzugefügt/i);assert.match(await changes.innerText(),/Synthetisches Nachtragshotel/);assert.match(await page.locator('.year-month.selected').getAttribute('class'),/month-closed-changed/);assert.deepEqual((await state(page)).statements,[frozen]);await fits();
       });
