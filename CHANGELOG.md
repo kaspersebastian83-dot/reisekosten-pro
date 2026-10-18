@@ -1,5 +1,15 @@
 # Release Notes
 
+## Veraltete Browserchecks repariert (nur Tests)
+
+- `browser-check`, `feature-browser-check`, `receipt-linking-browser-check`: Freigabe über den bestätigten Abschluss
+  statt über das Statusfeld; synthetische Fahrten mit bestätigter Abwesenheit; Beleg-Knopf im Monatsarbeitsbereich;
+  Rückfrage vor dem Wiederherstellen einer Sicherung bestätigen; gespeicherte Entwürfe bleiben eingefroren – neue
+  Einstellungen werden mit „Neue Version erstellen“ geprüft.
+- `branding-browser-check`: Wiederherstellungsrückfrage bestätigen. Läuft mit einem Build von `be44696` als
+  `LEGACY_DIST`.
+- Damit laufen alle Browserchecks wieder vollständig. Keine Änderung an der App.
+
 ## Neues Layout der Monatsübersicht
 
 - Monatsleiste oben (alle zwölf Monate in einer Zeile) statt einer langen Liste links; die Seite gewinnt die volle Breite.

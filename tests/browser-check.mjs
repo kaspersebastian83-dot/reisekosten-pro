@@ -6,6 +6,7 @@ import { readFile, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
+import { closeStatementInBrowser } from './close-statement-browser.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve('dist');
@@ -30,6 +31,7 @@ let syntheticBackup;
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
 const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const writeState=(page,value)=>page.evaluate(value=>new Promise((resolve,reject)=>{const r=indexedDB.open('reisekosten-pro',1);r.onsuccess=()=>{const tx=r.result.transaction('state','readwrite');tx.objectStore('state').put(value,'main');tx.oncomplete=()=>{r.result.close();resolve();};tx.onabort=()=>reject(tx.error);};}),value);
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
@@ -59,12 +61,14 @@ try {
     await nav(page,'Einstellungen');await page.getByLabel('Firma',{exact:true}).fill('Synthetischer Test');
     await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('privatwagen');
     await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s?.settings.company==='Synthetischer Test');await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-03');
-    await nav(page,'Monatsübersicht');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung fortsetzen|Abrechnung ansehen)$/}).click();assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+11,48/);
+    await nav(page,'Monatsübersicht');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung fortsetzen|Abrechnung ansehen)$/}).click();assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+0,00/,'saved draft keeps its tariff state');
+    // Gespeicherte Entwürfe bleiben eingefroren; neue Einstellungen gelten erst in einer neuen Version.
+    await page.getByRole('button',{name:'Neue Version erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===2);assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+11,48/);
   });
   // OCR asset loading is deliberately blocked; manual capture must remain usable.
   await context.route(/https?:\/\/(?!127\.0\.0\.1)/,r=>r.abort());
   await check('receipt file capture, OCR failure fallback, inbox, explicit no-trip assignment',async()=>{
-    await page.getByRole('button',{name:'Beleg',exact:true}).click();
+    await page.locator('.month-entry-workspace').getByRole('button',{name:'Beleg fotografieren / OCR',exact:true}).click();
     const png=Buffer.from(await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=20;canvas.height=40;const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,20,40);ctx.fillStyle='black';ctx.fillRect(2,5,16,2);return canvas.toDataURL('image/png').split(',')[1];}),'base64');
     await page.locator('.receipt-capture input[type=file]').first().setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:png});
     await page.getByText('Die automatische Erkennung war nicht möglich.',{exact:false}).waitFor({timeout:20000});
@@ -76,9 +80,13 @@ try {
     assert.equal(s.expenses[0].tripId,undefined);assert.equal(s.receiptInbox[0].status,'zugeordnet');assert.equal(s.expenses[0].receipt.type,'image/png');
   });
   await check('PDF with image attachment, Excel, CSV, ZIP exports and frozen approved statement',async()=>{
-    await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Abrechnung fortsetzen',exact:true}).click();await waitState(page,s=>s?.statements.length===1);
-    await page.locator('.statement-actions select').selectOption('freigegeben');const snapshot=await waitState(page,s=>s?.statements[0].locked);
-    assert.equal(snapshot.statements[0].expensesSnapshot.length,1);
+    // Seit dem bestätigten Abschluss blockiert eine unbestätigte Abwesenheitsdauer; die synthetischen Fahrten bestätigen.
+    const confirmed=await state(page);confirmed.trips=confirmed.trips.map(t=>({...t,absenceConfirmed:true}));
+    await writeState(page,confirmed);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-03');
+    await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Abrechnung fortsetzen',exact:true}).click();
+    await page.getByRole('button',{name:'Neue Version erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===3);
+    await closeStatementInBrowser(page);const snapshot=await waitState(page,s=>s?.statements[2].locked);
+    assert.equal(snapshot.statements[2].status,'freigegeben');assert.equal(snapshot.statements[2].expensesSnapshot.length,1);
     const pdf=await download(page,'PDF');assert.equal(pdf.bytes.subarray(0,4).toString(),'%PDF');assert.ok((pdf.bytes.toString('latin1').match(/\/Type \/Page\b/g)||[]).length>=3);assert.ok(/\/Subtype \/Image/.test(pdf.bytes.toString('latin1')),'PDF embeds receipt image');assert.ok(pdf.bytes.toString('latin1').includes('Privatwagen'),'PDF uses reimbursed vehicle profile');
     const xlsx=await download(page,'Excel');assert.equal(xlsx.bytes.subarray(0,2).toString(),'PK');
     const {Workbook}=require('exceljs');const exported=new Workbook();await exported.xlsx.load(xlsx.bytes);assert.equal(exported.creator,'SpesenKit');assert.equal(exported.getWorksheet('Übersicht').getCell('A1').value,'Reisekostenabrechnung');
@@ -86,12 +94,12 @@ try {
     const zip=await download(page,'ZIP + Belege');assert.equal(zip.bytes.subarray(0,2).toString(),'PK');
     await nav(page,'Einstellungen');await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('dienstwagen');await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s?.settings.vehicles[0].ownership==='dienstwagen');
     await nav(page,'Monatsübersicht');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung fortsetzen|Abrechnung ansehen)$/}).click();assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+11,48/);
-    await page.getByRole('button',{name:'Neue Version erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===2);assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+0,00/);
+    await page.getByRole('button',{name:'Neue Version erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===4);assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+0,00/);
   });
   await check('JSON backup/restore round trip and rejection without overwriting data',async()=>{
     await nav(page,'Datensicherung');const backup=await download(page,'Sicherung herunterladen');syntheticBackup=backup.bytes;const saved=JSON.parse(backup.bytes);assert.equal(saved.expenses.length,1);
     await page.locator('.backup-grid input[type=file]').setInputFiles({name:'bad.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({...saved,expenses:'broken'}))});await page.getByText('Ungültige Datensicherung',{exact:true}).waitFor();assert.deepEqual(JSON.parse(JSON.stringify(await state(page))),saved);
-    await page.locator('.backup-grid input[type=file]').setInputFiles({name:'roundtrip.json',mimeType:'application/json',buffer:backup.bytes});await page.getByText('Datensicherung wiederhergestellt',{exact:true}).waitFor();assert.deepEqual(JSON.parse(JSON.stringify(await waitState(page,s=>s?.expenses.length===1))),saved);
+    page.once('dialog',dialog=>void dialog.accept());await page.locator('.backup-grid input[type=file]').setInputFiles({name:'roundtrip.json',mimeType:'application/json',buffer:backup.bytes});await page.getByText('Datensicherung wiederhergestellt',{exact:true}).waitFor();assert.deepEqual(JSON.parse(JSON.stringify(await waitState(page,s=>s?.expenses.length===1))),saved);
   });
   await check('offline reload including lazy Excel chunk and foreign-cache preservation',async()=>{
     await page.evaluate(async()=>{const c=await caches.open('other-app-cache');await c.put('/other-app/test',new Response('keep'));await navigator.serviceWorker.ready;});
@@ -110,7 +118,7 @@ try {
     legacyMode=true;
     const {context,page}=await open();
     await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await page.evaluate(()=>navigator.serviceWorker.ready);
-    await nav(page,'Datensicherung');await page.locator('.backup-grid input[type=file]').setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer:syntheticBackup});await waitState(page,s=>s?.expenses.length===1);
+    await nav(page,'Datensicherung');page.once('dialog',dialog=>void dialog.accept());await page.locator('.backup-grid input[type=file]').setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer:syntheticBackup});await waitState(page,s=>s?.expenses.length===1);
     await page.evaluate(async()=>{
       const foreign=await caches.open('foreign-app');await foreign.put('/other-repo/marker',new Response('keep'));
       const old=await caches.open('reisekosten-pro-v1.6.0');await old.put('/other-repo/legacy',new Response('keep'));

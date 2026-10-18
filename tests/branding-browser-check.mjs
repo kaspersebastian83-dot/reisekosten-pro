@@ -84,7 +84,7 @@ try {
   await check('existing backup, frozen receipt snapshot and offline startup survive the rename',async()=>{
     await nav(page,'Datensicherung');const after=await download(page,'Sicherung herunterladen');
     assert.deepEqual(JSON.parse(after.bytes),JSON.parse(backup.bytes));
-    await page.locator('.backup-grid input[type=file]').setInputFiles({name:'synthetic-old-backup.json',mimeType:'application/json',buffer:backup.bytes});
+    page.once('dialog',dialog=>void dialog.accept());await page.locator('.backup-grid input[type=file]').setInputFiles({name:'synthetic-old-backup.json',mimeType:'application/json',buffer:backup.bytes});
     await page.getByText('Datensicherung wiederhergestellt',{exact:true}).waitFor();
     // JSON backups omit undefined properties; compare the serialized backup contract.
     const restored=JSON.parse(backup.bytes);

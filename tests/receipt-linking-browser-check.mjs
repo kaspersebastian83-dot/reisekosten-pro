@@ -7,6 +7,7 @@ import { readFile, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
+import { closeStatementInBrowser } from './close-statement-browser.mjs';
 const require = createRequire(import.meta.url);
 const engines = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const engine = process.env.BROWSER_ENGINE || 'chromium';
@@ -40,7 +41,10 @@ try {
     const {context,page}=await open({viewport});const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await context.route(/https?:\/\/(?!127\.0\.0\.1)/,r=>r.abort());
     const modal=page.locator('.receipt-capture');
-    const begin=async n=>{await page.locator(await page.locator('.camera-fab').isVisible()?'.camera-fab':'.receipt-top').click();await modal.locator('input[type=file]').first().setInputFiles(fakePdf(n));await modal.getByLabel('Betrag (€)',{exact:true}).waitFor();};
+    // Beleg-Erfassung: Kamera-Knopf (Handy), oben „Beleg“ oder – in der Monatsübersicht – im Monatsarbeitsbereich.
+    const openReceipt=async()=>{for(const sel of ['.camera-fab','.receipt-top']){if(await page.locator(sel).isVisible())return page.locator(sel).click();}return page.locator('.month-entry-workspace').getByRole('button',{name:'Beleg fotografieren / OCR',exact:true}).click();};
+    const openQuick=async()=>{if(!(await page.locator('.quick-fab').isVisible())&&!(await page.locator('.quick-top').isVisible()))await nav(page,'Kosten & Belege');await page.locator(await page.locator('.quick-fab').isVisible()?'.quick-fab':'.quick-top').click();};
+    const begin=async n=>{await openReceipt();await modal.locator('input[type=file]').first().setInputFiles(fakePdf(n));await modal.getByLabel('Betrag (€)',{exact:true}).waitFor();};
     const fields=async({amount=115,project='26.0123',start='2026-10-20',end='2026-10-21',payment='Unternehmen',invoice='INV-001'}={})=>{
       await modal.getByLabel('Kategorie',{exact:true}).selectOption('Hotel');
       await modal.getByLabel('Datum',{exact:true}).fill('2026-10-29');
@@ -76,12 +80,12 @@ try {
         assert.equal(s.expenses[0].date,'2026-10-29');assert.equal(s.expenses[0].stayStart,'2026-10-20');assert.equal(s.expenses[0].tripId,'trip-a');assert.equal(s.expenses[0].paymentType,'Unternehmen');
         assert.deepEqual(s.trips,seed.trips);
         await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===1);
-        await page.locator('.statement-actions select').selectOption('freigegeben');
+        await closeStatementInBrowser(page);
         const locked=await waitState(page,s=>s?.statements[0].locked);frozen=locked.statements[0];baseline=frozen.data.totals.openAmount;
         assert.equal(frozen.data.totals.companyPaid,115);
       });
       await check(`${engine} ${viewport.width}: quick parking, multiple receipts per trip and ambiguous hotel candidates`,async()=>{
-        await page.locator(await page.locator('.quick-fab').isVisible()?'.quick-fab':'.quick-top').click();const quick=page.locator('.quick-sheet');
+        await openQuick();const quick=page.locator('.quick-sheet');
         await quick.locator('.quick-amount input').fill('12');
         await quick.getByRole('button',{name:'Datum, Zahlungsart oder Reise ändern',exact:true}).click();await quick.getByLabel('Datum',{exact:true}).fill('2026-10-20');
         await quick.getByLabel('Projekt',{exact:true}).fill('26.0123');await quick.getByRole('button',{name:'Zuordnung bestätigen',exact:true}).click();
@@ -123,7 +127,7 @@ try {
         await page.getByRole('button',{name:'Neue Version erstellen',exact:true}).click();let s=await waitState(page,s=>s?.statements.length===2);
         assert.equal(s.statements[1].data.totals.openAmount,Math.round((baseline+152)*100)/100);assert.equal(s.statements[1].data.totals.companyPaid,190);assert.deepEqual(s.statements[0],frozen);assert.deepEqual(s.trips,seed.trips);
         await nav(page,'Datensicherung');const backup=await download(page,'Sicherung herunterladen');const serialized=JSON.parse(backup.bytes);assert.equal(serialized.expenses[0].breakfastIncluded,'yes');
-        await page.locator('.backup-grid input[type=file]').setInputFiles({name:'synthetic-linking-backup.json',mimeType:'application/json',buffer:backup.bytes});await page.getByText('Datensicherung wiederhergestellt',{exact:true}).waitFor();
+        page.once('dialog',dialog=>void dialog.accept());await page.locator('.backup-grid input[type=file]').setInputFiles({name:'synthetic-linking-backup.json',mimeType:'application/json',buffer:backup.bytes});await page.getByText('Datensicherung wiederhergestellt',{exact:true}).waitFor();
         await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
         assert.deepEqual(JSON.parse(JSON.stringify(await state(page))),serialized);await context.setOffline(false);await fits();assert.deepEqual(errors,[]);
       });
