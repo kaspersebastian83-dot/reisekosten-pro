@@ -122,6 +122,16 @@ describe("Ablage abgeschlossener Abrechnungen im SpesenKit-Ordner", () => {
     expect(report).toMatchObject({ written: ["Reisekosten_2026-07_V01.zip"], existing: ["Reisekosten_2026-07_V01.pdf"] });
   });
 
+  it("behandelt eine leere Datei (abgebrochener Schreibvorgang) als fehlend und legt sie richtig ab", async () => {
+    const root = new FakeDir(FOLDER_NAME);
+    const state = withVersion(demoState(), 1);
+    const dir = await (await (await root.getDirectoryHandle(FILING_DIR, { create: true })).getDirectoryHandle("2026", { create: true })).getDirectoryHandle("07", { create: true }) as FakeDir;
+    dir.files.set("Reisekosten_2026-07_V01.zip", "");
+    const report = await fileStatement(root, state, "v1", defaultFilingFormats, spyBuilders().builders);
+    expect(report.written).toEqual(["Reisekosten_2026-07_V01.pdf", "Reisekosten_2026-07_V01.zip"]);
+    expect(await (dir.files.get("Reisekosten_2026-07_V01.zip") as Blob).text()).toBe("zip:V1");
+  });
+
   it("zeigt an, welche Dateien einer Version bereits abgelegt sind (nur lesend)", async () => {
     const root = new FakeDir(FOLDER_NAME);
     const state = withVersion(demoState(), 1);

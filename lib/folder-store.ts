@@ -25,12 +25,13 @@ export const FILE_FORMAT_VERSION = 1;
 
 type Permission = "granted" | "denied" | "prompt";
 export interface WritableLike { write(data: string | Blob): Promise<void>; close(): Promise<void>; abort?(): Promise<void> }
-export interface FileHandleLike { kind?: "file"; name?: string; getFile(): Promise<{ text(): Promise<string> }>; createWritable(): Promise<WritableLike> }
+export interface FileHandleLike { kind?: "file"; name?: string; getFile(): Promise<{ text(): Promise<string>; size?: number }>; createWritable(): Promise<WritableLike> }
 export interface DirHandleLike {
   kind?: "directory";
   name: string;
   getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<DirHandleLike>;
   getFileHandle(name: string, options?: { create?: boolean }): Promise<FileHandleLike>;
+  removeEntry?(name: string): Promise<void>;
   queryPermission?(descriptor: { mode: "readwrite" }): Promise<Permission>;
   requestPermission?(descriptor: { mode: "readwrite" }): Promise<Permission>;
 }
@@ -70,6 +71,8 @@ async function fileText(dir: DirHandleLike, name: string) {
 }
 async function writeText(dir: DirHandleLike, name: string, text: string | Blob) {
   let writable: WritableLike | undefined;
+  // getFileHandle({create}) legt die Datei sofort (leer) an. Scheitert das Schreiben, darf keine leere Datei zurückbleiben.
+  const existed = await dir.getFileHandle(name).then(() => true, () => false);
   try {
     writable = await (await dir.getFileHandle(name, { create: true })).createWritable();
     await writable.write(text);
@@ -77,6 +80,7 @@ async function writeText(dir: DirHandleLike, name: string, text: string | Blob) 
   } catch (error) {
     // createWritable schreibt in eine Zwischendatei; ohne close() bleibt die Zieldatei unverändert.
     try { await writable?.abort?.(); } catch { /* bereits abgebrochen */ }
+    if (!existed) { try { await dir.removeEntry?.(name); } catch { /* bleibt als leere Datei; wird beim Ablegen als fehlend behandelt */ } }
     if (errorName(error) === "NotAllowedError" || errorName(error) === "SecurityError") throw new FolderError("permission", `Kein Schreibzugriff auf „${name}“. Bitte den Ordnerzugriff bestätigen.`);
     throw new FolderError("write", `„${name}“ konnte nicht geschrieben werden${errorName(error) === "QuotaExceededError" ? " (Speicherplatz voll)" : ""}.`);
   }
@@ -219,7 +223,8 @@ export async function openDir(root: DirHandleLike, parts: string[]) {
   return dir;
 }
 export async function fileExists(dir: DirHandleLike, name: string) {
-  try { await dir.getFileHandle(name); return true; }
+  // Eine leere Datei (abgebrochener Schreibvorgang) gilt als nicht vorhanden.
+  try { const file = await (await dir.getFileHandle(name)).getFile(); return file.size === undefined ? (await file.text()).length > 0 : file.size > 0; }
   catch (error) { if (errorName(error) === "NotFoundError") return false; throw accessError(error, `„${name}“`); }
 }
 /** Legt eine Datei nur an, wenn es sie noch nicht gibt. Vorhandene Dateien werden nie überschrieben. */

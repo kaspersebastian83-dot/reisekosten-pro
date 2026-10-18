@@ -17,6 +17,8 @@ export class FakeDir implements DirHandleLike {
   }
   async getFileHandle(name: string, options?: { create?: boolean }): Promise<FileHandleLike> {
     if (!this.files.has(name) && !options?.create) throw new DOMException("missing", "NotFoundError");
+    // Wie der Browser: create legt die (leere) Datei sofort an.
+    if (!this.files.has(name)) this.files.set(name, "");
     const dir = this; const faults = this.faults;
     return {
       async getFile() {
@@ -37,6 +39,7 @@ export class FakeDir implements DirHandleLike {
       },
     };
   }
+  async removeEntry(name: string) { if (!this.files.delete(name) && !this.dirs.delete(name)) throw new DOMException("missing", "NotFoundError"); }
   file(...path: string[]): string | Blob | undefined {
     let dir: FakeDir = this;
     for (const part of path.slice(0, -1)) dir = dir.dirs.get(part)!;
