@@ -83,12 +83,12 @@ try {
     await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s.settings.vehicles[0].ownership==='privatwagen');
     await nav(page,'Reisen');await page.locator('.day-card > .calculation-details summary').click();assert.match(await page.locator('.day-card > .calculation-details').innerText(),/14,00/);
     await page.locator('.trip-rows .calculation-details summary').first().click();assert.match(await page.locator('.trip-rows .calculation-details').first().innerText(),/11,48/);
-    await nav(page,'Monatsabrechnungen');await page.locator('.monthly-details summary').click();await page.locator('.statement-day-details .calculation-details summary').click();
+    await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung ansehen)$/}).click();await page.locator('.monthly-details summary').click();await page.locator('.statement-day-details .calculation-details summary').click();
     await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,'calculation-details-desktop.png'),fullPage:true});
-    await page.getByRole('button',{name:'Abrechnung erstellen',exact:true}).click();await waitState(page,s=>s.statements.length===1);
+    await waitState(page,s=>s.statements.length===1);
     await page.locator('.statement-actions select').selectOption('freigegeben');const frozen=(await waitState(page,s=>s.statements[0].locked)).statements[0];
     await nav(page,'Einstellungen');await page.locator('.vehicle-list article').first().getByLabel('Fahrzeugart').selectOption('dienstwagen');await page.getByRole('button',{name:'Einstellungen speichern',exact:true}).click();await waitState(page,s=>s.settings.vehicles[0].ownership==='dienstwagen');
-    await nav(page,'Monatsabrechnungen');await page.locator('.statement-day-details .calculation-details summary').click();
+    await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();await page.locator('.statement-day-details .calculation-details summary').click();
     assert.match(await page.locator('.statement-day-details .calculation-details').innerText(),/Privatwagen.*12,5 berechtigte km/s);
     assert.deepEqual((await state(page)).statements[0],frozen);
   });
@@ -96,7 +96,7 @@ try {
     for(const [width,height,label] of [[390,844,'iphone'],[820,1180,'ipad']]) {
       await page.setViewportSize({width,height});await review(page,csv.replaceAll("09.03.2026","10.03.2026"));
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`import-review-${label}.png`),fullPage:true});
-      await page.getByRole('button',{name:'Import abbrechen',exact:true}).click();await nav(page,'Monatsabrechnungen');await page.locator('.monthly-details summary').click();
+      await page.getByRole('button',{name:'Import abbrechen',exact:true}).click();await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung ansehen)$/}).click();await page.locator('.monthly-details summary').click();
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`calculation-details-${label}.png`),fullPage:true});
       await nav(page,'Einstellungen');assert.match(await page.locator('.app-version').innerText(),/SpesenKit 1\.7\.0/);assert.match(await page.locator('.app-version').innerText(),/Commit [a-f0-9]{7}/);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(150);await page.screenshot({path:path.join(output,`version-${label}.png`),fullPage:true});

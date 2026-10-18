@@ -49,7 +49,7 @@ try {
       assert.equal(await page.locator('.brand-mark').evaluate(el=>el.offsetWidth===el.offsetHeight),true,'brand symbol keeps its square proportions');
       assert.equal(await page.locator('.brand small').innerText(),'Dienstreisen · Spesen · Abrechnungen');
       await check(`${engine} ${viewport.width}: navigation, import access and empty dashboard actions`,async()=>{
-        const names=['Reisen','Kosten & Belege','Monatsabrechnungen','Übersicht','Auswertungen','Einstellungen','Datensicherung'];
+        const names=['Monatsabrechnungen','Reisen','Kosten & Belege','Übersicht','Auswertungen','Einstellungen','Datensicherung'];
         assert.deepEqual(await page.locator('.sidebar nav button span').allTextContents(),names);
         const create=page.locator('.trip-actions .primary');
         assert.equal(await create.evaluate(button=>getComputedStyle(button).fontSize),'14px');
@@ -136,7 +136,7 @@ try {
         await quick.getByRole('button',{name:'Speichern',exact:true}).click();
         const withExpense=await waitState(page,s=>s?.expenses.length===1);
         assert.equal(withExpense.expenses[0].tripId,id);assert.equal(withExpense.expenses[0].receipt.type,'image/png');
-        await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung erstellen',exact:true}).click();
+        await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();
         await waitState(page,s=>s?.statements.length===1);
         assert.equal((await download(page,'PDF')).bytes.subarray(0,4).toString(),'%PDF');
         assert.equal((await download(page,'Excel')).bytes.subarray(0,2).toString(),'PK');

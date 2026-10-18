@@ -75,7 +75,7 @@ try {
         await save();const s=await waitState(page,s=>s?.expenses.length===1);hotelId=s.expenses[0].id;
         assert.equal(s.expenses[0].date,'2026-10-29');assert.equal(s.expenses[0].stayStart,'2026-10-20');assert.equal(s.expenses[0].tripId,'trip-a');assert.equal(s.expenses[0].paymentType,'Unternehmen');
         assert.deepEqual(s.trips,seed.trips);
-        await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===1);
+        await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===1);
         await page.locator('.statement-actions select').selectOption('freigegeben');
         const locked=await waitState(page,s=>s?.statements[0].locked);frozen=locked.statements[0];baseline=frozen.data.totals.openAmount;
         assert.equal(frozen.data.totals.companyPaid,115);
@@ -118,7 +118,7 @@ try {
         await card.getByRole('button',{name:'Bearbeiten',exact:true}).click();await editor.getByLabel('Reisezuordnung',{exact:true}).selectOption('trip-a');await editor.getByRole('button',{name:'Speichern',exact:true}).click();await waitState(page,s=>s?.expenses.find(e=>e.id===hotelId)?.tripId==='trip-a');await fits();
       });
       await check(`${engine} ${viewport.width}: frozen report, personal payout, exports, backup and offline reload`,async()=>{
-        await nav(page,'Monatsabrechnungen');assert.deepEqual((await state(page)).statements[0],frozen);
+        await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();assert.deepEqual((await state(page)).statements[0],frozen);
         assert.equal((await download(page,'PDF')).bytes.subarray(0,4).toString(),'%PDF');assert.equal((await download(page,'Excel')).bytes.subarray(0,2).toString(),'PK');
         await page.getByRole('button',{name:'Neue Version erstellen',exact:true}).click();let s=await waitState(page,s=>s?.statements.length===2);
         assert.equal(s.statements[1].data.totals.openAmount,Math.round((baseline+152)*100)/100);assert.equal(s.statements[1].data.totals.companyPaid,190);assert.deepEqual(s.statements[0],frozen);assert.deepEqual(s.trips,seed.trips);

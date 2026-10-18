@@ -74,7 +74,7 @@ try {
     for(const key of ['id','scope','start_url'])assert.equal(manifest[key],oldManifest[key]);
     assert.equal(manifest.name,'SpesenKit');assert.equal(manifest.short_name,'SpesenKit');
     assert.equal(await page.locator('.brand b').innerText(),'SpesenKit');
-    await page.locator('input[type=month]').fill('2026-07');await nav(page,'Monatsabrechnungen');
+    await page.locator('input[type=month]').fill('2026-07');await nav(page,'Monatsabrechnungen');await page.getByRole('button',{name:'Abrechnung ansehen',exact:true}).click();
     const pdf=await download(page,'PDF');assert.match(pdf.bytes.toString('latin1'),/Reisekostenabrechnung/);
     const excel=await download(page,'Excel');const {Workbook}=require('exceljs');const workbook=new Workbook();await workbook.xlsx.load(excel.bytes);
     assert.equal(workbook.creator,'SpesenKit');assert.equal(workbook.getWorksheet('Übersicht').getCell('A1').value,'Reisekostenabrechnung');
