@@ -73,6 +73,7 @@ import { MonthWorkspace } from "./month-workspace";
 import { StatementClosing } from "./statement-closing";
 import { StatementChanges } from "./statement-changes";
 import { compareClosedStatementWithCurrent, isClosedStatement, persistCorrectionDraft, relatedTripsForSnapshot, snapshotHistoryLimitations, stateForStatementVersion } from "../lib/statement-comparison";
+import { FolderBanner, FolderCard, FolderConflictDialog, FolderStatusLine, useFolderStorage, type FolderStorage } from "./folder-storage";
 import { changeStatementStatus, persistStatementClosing, type ClosingConfirmation, type ClosingIssue } from "../lib/statement-closing";
 import { MonthNavigation } from "./month-navigation";
 import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel, monthOverview } from "../lib/month-navigation";
@@ -143,41 +144,57 @@ export default function Home() {
       lastSaved.current = committed.state;
       stateRef.current = committed.state;
       setState(committed.state);
+      folder.afterLocalSave();
       return committed;
     } finally { importBusy.current = false; setTransactionSaving(false); }
   };
   const commitClosing = async (confirmation: ClosingConfirmation) => {
     if (importBusy.current) throw new Error("Ein lokaler Speichervorgang läuft bereits.");
     importBusy.current = true; setTransactionSaving(true);
+    let closedLocally = false;
     try {
       await saveQueue.current;
+      // Ein verbundener, aber gerade nicht beschreibbarer Ordner wird vor dem Abschluss geklärt.
+      const folderBlock = folder.blocking();
+      if (folderBlock) throw new Error(folderBlock);
       const current = stateRef.current;
       if (current !== lastSaved.current) throw new Error("Bitte zuerst offene Änderungen erfolgreich lokal speichern und die Abschlussprüfung erneut öffnen.");
       const committed = await persistStatementClosing(current, confirmation, { id: uid(), at: new Date().toISOString() }, saveState);
       lastSaved.current = committed;
       stateRef.current = committed;
       setState(committed);
+      closedLocally = true;
+      // Erfolg erst melden, wenn auch die Datei im SpesenKit-Ordner geschrieben ist.
+      const filed = await folder.flush();
+      if (filed.error) throw new Error(`Der Abschluss ist im Browser gespeichert, aber noch nicht im SpesenKit-Ordner: ${filed.error} Bitte den Hinweis oben beachten und erneut speichern.`);
       setSaveError("");
-      notify("Monatsabrechnung lokal gespeichert und abgeschlossen.");
+      notify(filed.linked ? "Monatsabrechnung abgeschlossen und im SpesenKit-Ordner gespeichert." : "Monatsabrechnung lokal gespeichert und abgeschlossen.");
     } catch (failure) {
-      setSaveError(`Der Monatsabschluss wurde nicht bestätigt. ${failure instanceof Error ? failure.message : "Lokales Speichern fehlgeschlagen."}`);
+      const text = failure instanceof Error ? failure.message : "Lokales Speichern fehlgeschlagen.";
+      setSaveError(closedLocally ? text : `Der Monatsabschluss wurde nicht bestätigt. ${text}`);
       throw failure;
     } finally { importBusy.current = false; setTransactionSaving(false); }
   };
   const commitCorrection = async (targetMonth: string, expected: AppState) => {
     if (importBusy.current) throw new Error("Ein lokaler Speichervorgang läuft bereits.");
     importBusy.current = true; setTransactionSaving(true);
+    let createdLocally = false;
     try {
       await saveQueue.current;
+      const folderBlock = folder.blocking();
+      if (folderBlock) throw new Error(folderBlock);
       const current = stateRef.current;
       if (current !== lastSaved.current || current !== expected) throw new Error("Bitte offene Änderungen erfolgreich speichern und den Korrekturvergleich erneut prüfen.");
       const result = await persistCorrectionDraft(current, targetMonth, { id: uid(), changeId: uid(), at: new Date().toISOString() }, saveState);
-      if (result.created) { lastSaved.current = result.state; stateRef.current = result.state; setState(result.state); }
+      if (result.created) { lastSaved.current = result.state; stateRef.current = result.state; setState(result.state); createdLocally = true; }
+      const filed = await folder.flush();
+      if (filed.error) throw new Error(`Der Korrekturentwurf ist im Browser gespeichert, aber noch nicht im SpesenKit-Ordner: ${filed.error}`);
       setSaveError("");
-      notify(result.created ? "Korrekturentwurf lokal gespeichert. Noch nicht freigegeben oder ausgezahlt." : "Vorhandenen Korrekturentwurf geöffnet.");
+      notify(result.created ? `Korrekturentwurf ${filed.linked ? "im SpesenKit-Ordner" : "lokal"} gespeichert. Noch nicht freigegeben oder ausgezahlt.` : "Vorhandenen Korrekturentwurf geöffnet.");
       return result.snapshotId;
     } catch (failure) {
-      setSaveError(`Kein neuer Korrekturentwurf bestätigt. ${failure instanceof Error ? failure.message : "Lokales Speichern fehlgeschlagen."}`);
+      const text = failure instanceof Error ? failure.message : "Lokales Speichern fehlgeschlagen.";
+      setSaveError(createdLocally ? text : `Kein neuer Korrekturentwurf bestätigt. ${text}`);
       throw failure;
     } finally { importBusy.current = false; setTransactionSaving(false); }
   };
@@ -185,6 +202,7 @@ export default function Home() {
     if (!discard && pendingWork.current.size) return false;
     if (importBusy.current) return false;
     await saveQueue.current;
+    await folder.flush();
     return stateRef.current === lastSaved.current && (discard || !pendingWork.current.size) && !importBusy.current;
   };
   const [saveRetry, setSaveRetry] = useState(0);
@@ -251,6 +269,7 @@ export default function Home() {
         await saveState(state, lastSaved.current!);
         lastSaved.current = state;
         setSaveError("");
+        folder.afterLocalSave();
       } catch (error) {
         console.error("Lokales Speichern fehlgeschlagen", error);
         setSaveError(`Änderungen konnten nicht lokal gespeichert werden. ${error instanceof Error ? error.message : "Bitte sichern Sie den aktuellen Stand als JSON und versuchen Sie das Speichern erneut."}`);
@@ -269,6 +288,18 @@ export default function Home() {
       undo ? 7000 : 3500,
     );
   };
+  const folder = useFolderStorage({
+    ready,
+    committed: useCallback(() => lastSaved.current, []),
+    waitForLocal: useCallback(() => saveQueue.current, []),
+    adoptState: useCallback(async (next: AppState) => {
+      await saveQueue.current;
+      await saveState(next, lastSaved.current!);
+      lastSaved.current = next; stateRef.current = next; setState(next);
+    }, []),
+    notify: useCallback((text: string) => notifyRef.current(text), []),
+  });
+  const notifyRef = useRef(notify); notifyRef.current = notify;
   const update = (fn: (s: AppState) => AppState) =>
     setState((s) => fn(structuredClone(s)));
   const statement = useMemo(() => buildStatement(state, month), [state, month]);
@@ -297,7 +328,7 @@ export default function Home() {
     <PendingWork.Provider value={reportPending}>
     {transactionSaving && <div className="import-saving" role="status">Lokale Änderungen werden vollständig gespeichert …</div>}
     {updatePreparing && <div className="import-saving" role="status">Update wird vorbereitet · bitte kurz warten …</div>}
-    <div className="app-shell" inert={transactionSaving || updatePreparing}>
+    <div className="app-shell" inert={transactionSaving || updatePreparing || folder.busy}>
       <aside className={`sidebar ${sidebar ? "open" : ""}`}>
         <div className="brand">
           <div className="brand-mark"><img src="./favicon.svg" alt="" width="42" height="42" /></div>
@@ -329,6 +360,7 @@ export default function Home() {
             </button>
           ))}
         </nav>
+        <FolderStatusLine folder={folder} open={() => navigate("Datensicherung")} />
         <a className="suite-link" href="../Projektzentrale/" target="projektzentrale" rel="noopener">
           <ArrowLeft size={16} aria-hidden="true" />
           <span><b>Projektzentrale</b><small>Spektron · alle Apps</small></span>
@@ -355,6 +387,7 @@ export default function Home() {
           <button onClick={() => exportBackup(state)}>JSON-Sicherung herunterladen</button>
           <button onClick={() => setSaveRetry((n) => n + 1)}>Speichern erneut versuchen</button>
         </div>}
+        <FolderBanner folder={folder} openBackup={() => navigate("Datensicherung")} />
         <header className="topbar">
           <button
             className="icon mobile-only"
@@ -471,7 +504,7 @@ export default function Home() {
             <SettingsPanel state={state} update={update} notify={notify} />
           )}
           {tab === "Datensicherung" && (
-            <Backup state={state} setState={setState} notify={notify} />
+            <Backup state={state} setState={setState} notify={notify} folder={folder} />
           )}
         </div>
       </main>
@@ -525,7 +558,9 @@ export default function Home() {
           )}
         </div>
       )}
-    </div></PendingWork.Provider>
+    </div>
+    <FolderConflictDialog folder={folder} />
+    </PendingWork.Provider>
   );
 }
 
@@ -3699,10 +3734,12 @@ function Backup({
   state,
   setState,
   notify,
+  folder,
 }: {
   state: AppState;
   setState: (s: AppState) => void;
   notify: (s: string) => void;
+  folder: FolderStorage;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [restoring, setRestoring] = useState(false);
@@ -3720,13 +3757,15 @@ function Backup({
     } finally { setRestoring(false); }
   };
   const reset = async () => {
-    if (!confirm("Wirklich alle lokalen Daten löschen?")) return;
+    const linked = folder.status.kind === "ok";
+    if (!confirm(linked ? "Wirklich alle Daten löschen? Auch die Datei im SpesenKit-Ordner wird geleert; der vorherige Stand bleibt als spesenkit.vorher.json im Ordner „Daten“." : "Wirklich alle lokalen Daten löschen?")) return;
     // Use the guarded autosave transaction, including its cross-tab check.
     setState(structuredClone(emptyState));
     notify("Lokale Daten gelöscht");
   };
   return (
     <div className="backup-grid">
+      <FolderCard folder={folder} />
       <section className="card backup-card">
         <div className="backup-icon">
           <Download />
