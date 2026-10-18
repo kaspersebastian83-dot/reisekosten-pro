@@ -38,13 +38,18 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
 }) {
   const [status, setStatusState] = useState<FolderStatus>({ kind: "checking" });
   const statusRef = useRef(status);
-  const setStatus = useCallback((next: FolderStatus) => { statusRef.current = next; setStatusState(next); }, []);
+  const setStatus = useCallback((next: FolderStatus) => {
+    if (next.kind === "ok" && !next.pending) unsynced.current = false;
+    statusRef.current = next; setStatusState(next);
+  }, []);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const wanted = useRef(false);
   const lastError = useRef<Error | null>(null);
   const [busy, setBusy] = useState(false);
   /** Zuletzt bekannter Ordner: für die Berechtigungsabfrage direkt im Klick (ohne vorherige Datenbankabfrage). */
   const knownHandle = useRef<FolderLink["handle"] | null>(null);
+  /** Lokale Änderungen, die noch nicht im Ordner sind, weil er gerade nicht beschreibbar ist. */
+  const unsynced = useRef(false);
 
   const linkName = (link?: FolderLink | null) => link?.label || link?.handle.name || FOLDER_NAME;
   const okStatus = (link: FolderLink, pending = false): FolderStatus => ({ kind: "ok", name: linkName(link), revision: link.revision, savedAt: link.savedAt, pending });
@@ -125,7 +130,8 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     } catch (error) {
       lastError.current = error instanceof Error ? error : new Error(message(error));
       const link = await suiteLinks.get().catch(() => undefined);
-      if (error instanceof FolderError && error.code === "conflict" && link) { void reconcile(link); return; }
+      // Erst den neuen Abgleich abwarten, damit wartende Aktionen (Abschluss) den echten Stand sehen.
+      if (error instanceof FolderError && error.code === "conflict" && link) { await reconcile(link); return; }
       if (error instanceof FolderError && error.code === "permission") { setStatus({ kind: "permission", name: linkName(link) }); return; }
       if (error instanceof FolderError && error.code === "invalid") { setStatus({ kind: "invalid", name: linkName(link), message: error.message }); return; }
       setStatus({ kind: "error", name: linkName(link), message: message(error) });
@@ -135,7 +141,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   /** Nach jedem erfolgreichen lokalen Speichern: Ordnerdatei nachziehen (zusammengefasst, der Reihe nach). */
   const afterLocalSave = useCallback(() => {
     const kind = statusRef.current.kind;
-    if (kind !== "ok" && kind !== "error") return;
+    if (kind !== "ok" && kind !== "error") { if (kind !== "none" && kind !== "unsupported") unsynced.current = true; return; }
     wanted.current = true;
     if (statusRef.current.kind === "ok") setStatus({ ...statusRef.current, pending: true });
     queue.current = queue.current.then(writeNow);
@@ -242,7 +248,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
       const now = statusRef.current;
-      if ((now.kind === "ok" && now.pending) || now.kind === "error" || now.kind === "conflict" || now.kind === "missing") { event.preventDefault(); event.returnValue = ""; }
+      if ((now.kind === "ok" && now.pending) || now.kind === "error" || now.kind === "conflict" || now.kind === "missing" || now.kind === "invalid" || unsynced.current) { event.preventDefault(); event.returnValue = ""; }
     };
     addEventListener("beforeunload", warn);
     return () => removeEventListener("beforeunload", warn);
@@ -295,6 +301,11 @@ export function FolderBanner({ folder, openBackup }: { folder: FolderStorage; op
     <AlertTriangle size={20} aria-hidden="true" />
     <div><b>Letzte Änderungen sind nicht im SpesenKit-Ordner gespeichert.</b><p>{status.message} Im Browser sind sie gespeichert.</p></div>
     <button className="primary" onClick={() => void folder.retry()} disabled={busy}><RefreshCw size={17} />Erneut speichern</button>
+  </div>;
+  if (status.kind === "conflict") return <div className="folder-banner error" role="alert">
+    <AlertTriangle size={20} aria-hidden="true" />
+    <div><b>Offene Entscheidung: Welcher Datenstand gilt?</b><p>SpesenKit-Ordner und Browser weichen voneinander ab. Bis zur Entscheidung wird nur im Browser gespeichert.</p></div>
+    <button className="primary" onClick={() => void folder.retry()} disabled={busy}>Jetzt entscheiden</button>
   </div>;
   if (status.kind === "missing" || status.kind === "invalid") return <div className="folder-banner error" role="alert">
     <AlertTriangle size={20} aria-hidden="true" />

@@ -134,6 +134,11 @@ try {
     await page.getByLabel('Name', { exact: true }).fill('Zweite lokale Änderung');
     await page.getByRole('button', { name: 'Einstellungen speichern', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Welcher Datenstand gilt?' });
+    // „Später entscheiden“: Hinweis bleibt sichtbar und führt zurück zur Entscheidung.
+    await dialog.getByRole('button', { name: 'Später entscheiden' }).click();
+    assert.match(await banner.innerText(), /Offene Entscheidung/);
+    assert.equal(await folderStatus(page), 'conflict');
+    await banner.getByRole('button', { name: 'Jetzt entscheiden' }).click();
     await dialog.getByRole('button', { name: 'Ordnerstand übernehmen' }).click();
     await until(async () => (await folderStatus(page)) === 'ok', 'Status ok nach Übernahme');
     const local = await idbState(page);
