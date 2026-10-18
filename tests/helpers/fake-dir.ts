@@ -39,6 +39,10 @@ export class FakeDir implements DirHandleLike {
       },
     };
   }
+  async *values() {
+    for (const name of this.dirs.keys()) yield { kind: "directory" as const, name };
+    for (const name of this.files.keys()) yield { kind: "file" as const, name };
+  }
   async removeEntry(name: string) { if (!this.files.delete(name) && !this.dirs.delete(name)) throw new DOMException("missing", "NotFoundError"); }
   file(...path: string[]): string | Blob | undefined {
     let dir: FakeDir = this;

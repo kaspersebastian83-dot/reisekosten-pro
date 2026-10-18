@@ -32,6 +32,7 @@ export interface DirHandleLike {
   getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<DirHandleLike>;
   getFileHandle(name: string, options?: { create?: boolean }): Promise<FileHandleLike>;
   removeEntry?(name: string): Promise<void>;
+  values?(): AsyncIterable<{ kind: "file" | "directory"; name: string }>;
   queryPermission?(descriptor: { mode: "readwrite" }): Promise<Permission>;
   requestPermission?(descriptor: { mode: "readwrite" }): Promise<Permission>;
 }
@@ -126,7 +127,7 @@ export async function readDataFile(root: DirHandleLike): Promise<FolderFile | nu
  * Schreibt den Datenbestand nur, wenn die Datei noch die erwartete Revision hat (sonst Konflikt), legt den
  * bisherigen Stand als spesenkit.vorher.json ab und liest das Ergebnis zur Kontrolle zurück.
  */
-export async function writeDataFile(root: DirHandleLike, state: AppState, expectedRevision: number, app?: FolderFileContent["app"], now = new Date(), options: { replaceInvalid?: boolean } = {}): Promise<WriteResult> {
+export async function writeDataFile(root: DirHandleLike, state: AppState, expectedRevision: number, app?: FolderFileContent["app"], now = new Date(), options: { replaceInvalid?: boolean; /** Nach der Revisionsprüfung, vor dem Ersetzen (z. B. Tagessicherung des bisherigen Stands). */ beforeReplace?: (current: FolderFile) => Promise<void> } = {}): Promise<WriteResult> {
   let current: FolderFile | null;
   try { current = await readDataFile(root); }
   catch (error) {
@@ -142,6 +143,7 @@ export async function writeDataFile(root: DirHandleLike, state: AppState, expect
   if (currentRevision !== expectedRevision) {
     throw new FolderError("conflict", `Die Datei im SpesenKit-Ordner wurde inzwischen an anderer Stelle geändert (Stand ${currentRevision}, erwartet ${expectedRevision}). Es wurde nichts überschrieben.`);
   }
+  if (current && options.beforeReplace) await options.beforeReplace(current);
   const dir = (await subDir(root, DATA_DIR, true))!;
   if (current) await writeText(dir, PREVIOUS_FILE, current.text);
   const content: FolderFileContent = { format: FILE_FORMAT, formatVersion: FILE_FORMAT_VERSION, revision: expectedRevision + 1, savedAt: now.toISOString(), ...(app ? { app } : {}), state };
@@ -152,7 +154,7 @@ export async function writeDataFile(root: DirHandleLike, state: AppState, expect
   return { revision: content.revision, hash: await stateHash(JSON.parse(text).state), savedAt: content.savedAt };
 }
 
-const stamp = (now: Date) => {
+export const stamp = (now: Date) => {
   const z = (n: number) => String(n).padStart(2, "0");
   return `${now.getFullYear()}-${z(now.getMonth() + 1)}-${z(now.getDate())}_${z(now.getHours())}${z(now.getMinutes())}${z(now.getSeconds())}`;
 };
@@ -232,4 +234,27 @@ export async function writeNewFile(dir: DirHandleLike, name: string, data: strin
   if (await fileExists(dir, name)) return "exists" as const;
   await writeText(dir, name, typeof data === "function" ? await data() : data);
   return "written" as const;
+}
+
+/** Dateien eines Unterordners mit Größe (nur lesen; leer, wenn der Ordner fehlt). */
+export async function listFiles(root: DirHandleLike, parts: string[]) {
+  const dir = await openDir(root, parts);
+  if (!dir?.values) return [];
+  const files: { name: string; size: number }[] = [];
+  for await (const entry of dir.values()) {
+    if (entry.kind !== "file") continue;
+    try { const file = await (await dir.getFileHandle(entry.name)).getFile(); files.push({ name: entry.name, size: file.size ?? (await file.text()).length }); }
+    catch (error) { throw accessError(error, `„${entry.name}“`); }
+  }
+  return files;
+}
+export async function readFileText(root: DirHandleLike, parts: string[], name: string) {
+  const dir = await openDir(root, parts);
+  return dir ? fileText(dir, name) : null;
+}
+export async function removeFile(root: DirHandleLike, parts: string[], name: string) {
+  const dir = await openDir(root, parts);
+  if (!dir?.removeEntry) throw new FolderError("write", "Löschen wird von diesem Ordner nicht unterstützt.");
+  try { await dir.removeEntry(name); }
+  catch (error) { if (errorName(error) !== "NotFoundError") throw new FolderError("write", `„${name}“ konnte nicht entfernt werden.`); }
 }
