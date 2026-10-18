@@ -760,3 +760,11 @@ Browsercheck: `tests/batch-entry-browser-check.mjs`.
   Unter 1100 px rutscht die rechte Spalte über die Zeitleiste.
 - Leerer Monat: „Erste Dienstreise erfassen“ direkt in der Zeitleiste.
 - Reine Darstellung – keine Änderung an Berechnung, Status, Daten oder Abläufen.
+
+## Reiseformular kompakt
+
+Das Fenster „Neue Dienstreise“ ist breiter und zweispaltig: links Projekt, Reisegrund/-ziel, Abfahrt und Rückkehr in
+einer Zeile, Übernachtung, Mahlzeiten und „Weitere Angaben“; rechts Abwesenheitsdauer mit Bestätigung und die
+Verpflegungsvorschau (je Tag eine Zeile, Summe, zustandsabhängige Hinweise sichtbar, Grundhinweise aufklappbar).
+Eine Tagesreise passt ab etwa 1366 × 660 px Fensterfläche ohne Scrollen; die Speichern-Knöpfe bleiben in jedem Fall
+unten sichtbar. Unter 900 px Breite einspaltig. Keine Änderung an Pflichtfeldern, Prüfungen oder Berechnung.

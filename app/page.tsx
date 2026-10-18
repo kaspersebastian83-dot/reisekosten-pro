@@ -2121,6 +2121,7 @@ function Trips({
           }
           close={() => setEditing(null)}
           onSubmitShortcut={() => save(true)}
+          wide
         >
           <TripForm
             key={editing.id}
@@ -2171,40 +2172,28 @@ function TripForm({ trip, setTrip, settings, trips }: {
     if (place) suggestedDestination.current = place;
   };
   return (
-    <div className="form-grid manual-trip">
-      <p className="wide">Pflichtangaben sind mit * markiert. Erfasst wird deine berufliche Abwesenheit von Wohnung und erster Tätigkeitsstätte.</p>
+    // Zweispaltig: links die Eingaben, rechts Abwesenheit und Verpflegungsvorschau – passt ohne Scrollen auf übliche Bildschirme.
+    <div className="manual-trip trip-layout">
+    <div className="form-grid trip-fields">
+      <p className="wide trip-intro">Pflichtangaben mit *. Erfasst wird die berufliche Abwesenheit von Wohnung und erster Tätigkeitsstätte.</p>
       <label className="wide">Projekt *
-        <input aria-label="Projekt *" required list="trip-projects" placeholder="26.0123 Musterstadt" value={trip.order} onChange={e => changeProject(e.target.value)} />
+        <input aria-label="Projekt *" required list="trip-projects" placeholder="26.0123 Musterstadt" title="Nummer und Ort, frei eingeben oder bisheriges Projekt auswählen" value={trip.order} onChange={e => changeProject(e.target.value)} />
         <datalist id="trip-projects">{projectSuggestions(trips).map(p => <option key={p} value={p} />)}</datalist>
-        <small>Nummer und Ort, frei eingeben oder bisheriges Projekt auswählen.{existing && !projectPlace(trip.order) ? " Vorhandene Projektangabe kann unverändert bleiben." : ""}</small>
+        {existing && !projectPlace(trip.order) && <small>Vorhandene Projektangabe kann unverändert bleiben.</small>}
       </label>
       <label>Reisegrund *<input required value={trip.purpose} onChange={e => set("purpose", e.target.value)} /></label>
-      <label>Reiseziel *<input aria-label="Reiseziel *" required value={trip.destination} onChange={e => set("destination", e.target.value)} /><small>Projektort vorgeschlagen, frei überschreibbar. Vorschau nur für Inland.</small></label>
+      <label>Reiseziel *<input aria-label="Reiseziel *" required title="Projektort vorgeschlagen, frei überschreibbar. Vorschau nur für Inland." value={trip.destination} onChange={e => set("destination", e.target.value)} /></label>
+      <div className="wide trip-times">
       <label>Abfahrt Datum *<input required type="date" value={trip.date} onChange={e => setTrip({...trip, date: e.target.value, endDate: !trip.endDate || trip.endDate === trip.date ? e.target.value : trip.endDate})} /></label>
       <label>Abfahrt Uhrzeit *<input required type="time" step="1" value={trip.startTime} onChange={e => set("startTime", e.target.value)} /></label>
       <label>Rückkehr Datum *<input required type="date" value={trip.endDate || trip.date} onChange={e => set("endDate", e.target.value)} /></label>
       <label>Rückkehr Uhrzeit *<input required type="time" step="1" value={trip.endTime} onChange={e => set("endTime", e.target.value)} /></label>
-      {errors.length > 0 && (untouched
-        ? <p className="wide trip-required">Bitte Projekt, Reisegrund, Reiseziel sowie Abfahrt und Rückkehr angeben.</p>
-        : <div className="wide trip-errors" role="alert">{errors.map(e => <p key={e}>{e}</p>)}</div>)}
-      {interval && <div className="wide trip-summary"><b>Abwesenheitsdauer: {duration(interval.minutes)}</b><p>Keine Arbeitszeit. {interval.nights} Datumswechsel · {interval.nights + 1} Kalendertag(e).</p></div>}
-      {(!!interval?.nights || trip.overnight) && <div className="wide">
+      </div>
+      {(!!interval?.nights || trip.overnight) && <div className="wide trip-overnight">
         <label className="check"><input type="checkbox" checked={trip.overnight} onChange={e => set("overnight", e.target.checked)} />Alle {interval?.nights || 0} auswärtigen Übernachtungen zwischen Abfahrt und Rückkehr tatsächlich erfolgt</label>
-        <p>{days.slice(0,-1).map(d => dateDe(d.date)).join(" · ")} (jeweils Nacht auf den Folgetag)</p>
-        <small>Bei abweichenden oder fehlenden Übernachtungen nicht bestätigen; Einzelheiten in Notizen festhalten und Tagesaufteilung vor Abrechnung prüfen.</small>
+        <small>Nächte: {days.slice(0,-1).map(d => dateDe(d.date)).join(" · ")} (jeweils auf den Folgetag). Bei abweichenden oder fehlenden Übernachtungen nicht bestätigen; Einzelheiten in Notizen festhalten.</small>
       </div>}
       <MealEditor trip={trip} setTrip={setTrip} />
-      <section className="wide trip-preview" aria-label="Verpflegungsvorschau">
-        <h3>Verpflegungsvorschau · Inland</h3>
-        <p>{settings.ruleMode === "internal" ? "Achtung: interne Schwelle aus Einstellungen aktiv." : "Gespeicherte Inlandstarife und gesetzlicher Schwellenmodus."} Vorschau dieser Reise; weitere Reisen desselben Tages können die Monatsberechnung beeinflussen.</p>
-        {days.map(day => <article key={day.date}>
-          <b>{dateDe(day.date)} · {duration(day.absenceMinutes)}</b>
-          <p>{day.reason}</p><p>{euro(day.allowanceBefore)} − Frühstück {euro(day.breakfastCut)} − Mittag {euro(day.lunchCut)} − Abend {euro(day.dinnerCut)} = <b>{euro(day.allowanceAfter)}</b></p>
-        </article>)}
-        {!!days.length && <p><b>Verpflegung gesamt: {euro(round2(days.reduce((sum,d) => sum + d.allowanceAfter, 0)))}</b></p>}
-        {manualTripReviewNotes(trip).map(note => <p key={note}>{note}</p>)}
-        <p>Übernachtungspauschale: 0,00 €. Hotelrechnung separat in Kosten & Belege erfassen. Keine doppelte Erstattung; keine automatische Zuordnung.</p>
-      </section>
       <details className="wide"><summary>Weitere Angaben · Fahrzeug, Korrekturen und Notizen</summary><div className="form-grid">
       <label>Startort<input value={trip.startPlace} onChange={e => set("startPlace", e.target.value)} /></label>
       <label>Kunde<input value={trip.customer} onChange={e => set("customer", e.target.value)} /></label>
@@ -2313,7 +2302,13 @@ function TripForm({ trip, setTrip, settings, trips }: {
         />
       </label>
       </div></details>
-      <label className="check wide confirm">
+    </div>
+    <aside className="trip-side">
+      {errors.length > 0 && (untouched
+        ? <p className="trip-required">Bitte Projekt, Reisegrund, Reiseziel sowie Abfahrt und Rückkehr angeben.</p>
+        : <div className="trip-errors" role="alert">{errors.map(e => <p key={e}>{e}</p>)}</div>)}
+      {interval && <div className="trip-summary"><b>Abwesenheitsdauer: {duration(interval.minutes)}</b><p>Keine Arbeitszeit. {interval.nights} Datumswechsel · {interval.nights + 1} Kalendertag(e).</p></div>}
+      <label className="check confirm">
         <input
           type="checkbox"
           checked={trip.absenceConfirmed}
@@ -2327,6 +2322,24 @@ function TripForm({ trip, setTrip, settings, trips }: {
           </small>
         </span>
       </label>
+      <section className="trip-preview" aria-label="Verpflegungsvorschau">
+        <h3>Verpflegungsvorschau · Inland</h3>
+        {days.map(day => <article key={day.date}>
+          <div className="trip-preview-day"><b>{dateDe(day.date)} · {duration(day.absenceMinutes)}</b><b>{euro(day.allowanceAfter)}</b></div>
+          <small>{day.reason}{day.breakfastCut || day.lunchCut || day.dinnerCut ? ` · ${euro(day.allowanceBefore)} − Frühstück ${euro(day.breakfastCut)} − Mittag ${euro(day.lunchCut)} − Abend ${euro(day.dinnerCut)}` : ""}</small>
+        </article>)}
+        {!!days.length && <p className="trip-preview-total"><b>Verpflegung gesamt: {euro(round2(days.reduce((sum,d) => sum + d.allowanceAfter, 0)))}</b></p>}
+        {!days.length && <p className="muted">Erscheint, sobald Abfahrt und Rückkehr stimmen.</p>}
+        {settings.ruleMode === "internal" && <p className="trip-preview-note">Achtung: interne Schwelle aus Einstellungen aktiv.</p>}
+        {/* Zustandsabhängige Hinweise sichtbar; der immer gleiche Grundhinweis aufklappbar. */}
+        {manualTripReviewNotes(trip).slice(1).map(note => <p key={note} className="trip-preview-note">{note}</p>)}
+        <details className="trip-preview-more"><summary>Hinweise zur Vorschau</summary>
+          <p>{settings.ruleMode === "internal" ? "Interne Schwelle aus Einstellungen aktiv." : "Gespeicherte Inlandstarife und gesetzlicher Schwellenmodus."} Vorschau dieser Reise; weitere Reisen desselben Tages können die Monatsberechnung beeinflussen.</p>
+          <p>{manualTripReviewNotes(trip)[0]}</p>
+          <p>Übernachtungspauschale: 0,00 €. Hotelrechnung separat in Kosten & Belege erfassen. Keine doppelte Erstattung; keine automatische Zuordnung.</p>
+        </details>
+      </section>
+    </aside>
     </div>
   );
 }
@@ -4000,10 +4013,13 @@ function Modal({
   close,
   children,
   onSubmitShortcut,
+  wide = false,
 }: {
   title: string;
   close: () => void;
   children: React.ReactNode;
+  /** Breiteres Fenster für zweispaltige Formulare. */
+  wide?: boolean;
   /** Strg+Enter (macOS: ⌘+Enter) im Fenster. */
   onSubmitShortcut?: () => void;
 }) {
@@ -4015,7 +4031,7 @@ function Modal({
       }}
     >
       <div
-        className="modal"
+        className={wide ? "modal modal-wide" : "modal"}
         onKeyDown={onSubmitShortcut ? (e) => {
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); onSubmitShortcut(); }
         } : undefined}

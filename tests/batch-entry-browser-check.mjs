@@ -54,6 +54,9 @@ try {
       await check(`${engine} ${viewport.width}: trips in a batch – save & next keeps the window open, prefills the following day and counts`,async()=>{
         await clickAction('Dienstreise erfassen');await editor.waitFor();
         assert.equal(await editor.getByRole('button',{name:'Speichern & nächste',exact:true}).isDisabled(),true,'validation still applies');
+        // Eine Tagesreise passt auf einem üblichen Bildschirm ohne Scrollen; die Knöpfe sind immer sichtbar.
+        if(viewport.width>=1366){const body=await editor.locator('.modal-body').evaluate(b=>({sh:b.scrollHeight,ch:b.clientHeight}));assert.ok(body.sh<=body.ch+1,`trip form scrolls: ${JSON.stringify(body)}`);}
+        const actions=await editor.locator('.modal-actions').boundingBox();assert.ok(actions.y+actions.height<=viewport.height+1,'save buttons visible without scrolling');
         await editor.getByLabel('Projekt *',{exact:true}).fill('26.0123 Musterstadt');await editor.getByLabel('Reisegrund *',{exact:true}).fill('Synthetischer Termin A');
         await editor.getByLabel('Abfahrt Datum *',{exact:true}).fill('2026-06-10');await editor.getByLabel('Rückkehr Datum *',{exact:true}).fill('2026-06-10');
         await editor.getByRole('button',{name:'Speichern & nächste',exact:true}).click();
