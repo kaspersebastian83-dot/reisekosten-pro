@@ -1,5 +1,13 @@
 # Release Notes
 
+## Neues Layout der Monatsübersicht
+
+- Monatsleiste oben (alle zwölf Monate in einer Zeile) statt einer langen Liste links; die Seite gewinnt die volle Breite.
+- Kopfzeile mit Monat, Status und schlanker Werkzeugleiste statt des großen blauen Balkens und sechs gleichrangiger Knöpfe.
+- Rechts eine mitlaufende Spalte mit Erstattung, Beträgen und „Erfassen · Prüfen · Abschließen“; links die Zeitleiste.
+- Doppelte Monatsplakette oben in der Monatsübersicht entfernt; Erläuterungen zu kleinen Hinweisen bzw. aufklappbar.
+- Browserchecks an die neue Anordnung angepasst.
+
 ## Stapelerfassung am Monatsende
 
 - Reise- und Kostenformular: „Speichern & nächste“ (Strg+Enter) und „Speichern & fertig“. Das Fenster bleibt offen,

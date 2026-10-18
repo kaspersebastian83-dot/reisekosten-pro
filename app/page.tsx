@@ -443,10 +443,10 @@ export default function Home() {
               />
             </label>
             {/* Status des gewählten Monats – dieselbe Angabe wie in der Jahresleiste. */}
-            <button type="button" className={`quality ${["review", "history-review", "closed-changed"].includes(monthStatus.status) ? "warn" : "ok"}`} onClick={() => navigate("Monatsübersicht")} title="Zur Monatsübersicht">
+            {tab !== "Monatsübersicht" && <button type="button" className={`quality ${["review", "history-review", "closed-changed"].includes(monthStatus.status) ? "warn" : "ok"}`} onClick={() => navigate("Monatsübersicht")} title="Zur Monatsübersicht">
               <CircleGauge size={18} />
               <span>{monthLabel(month)} · {monthStatus.label}</span>
-            </button>
+            </button>}
           </div>
         </header>
         <div className="content">
@@ -651,7 +651,7 @@ function MonthChecks({state, month, update, notify, editTrips, editCosts, viewRu
       <p>{state.receiptInbox.filter(item => item.status !== "zugeordnet").length} Belege im Eingang insgesamt. <button className="ghost" onClick={editCosts}>Belege prüfen</button></p>
     </details>
     {confirmable.length > 0 && <div className="batch-confirm"><span><b>{confirmable.length} vollständige Fahrten</b> können gemeinsam bestätigt werden.</span><button className="primary" onClick={confirmClearTrips}>Eindeutige Zeiten bestätigen</button></div>}
-    <button className="ghost" onClick={viewRules}>Tarife und Regeln ansehen</button>
+    <button className="link" onClick={viewRules}>Tarife und Regeln ansehen</button>
   </section>;
 }
 
@@ -3080,7 +3080,7 @@ function Statements({
         openStatement={() => {if (latest) openVersion(); else create(true);}}
         comparison={comparison}
         changes={<StatementChanges comparison={comparison} creating={correctionSaving} error={correctionError} create={() => void correct()} resume={openVersion} />}
-        timeline={<MonthTimeline state={state} month={month} statement={currentStatement} edit={editClosingIssue} />}
+        timeline={<MonthTimeline state={state} month={month} statement={currentStatement} edit={editClosingIssue} startTrip={() => startEntry('trip')} />}
         checks={<MonthChecks state={state} month={month} update={update} notify={notify} editTrips={editTrips} editCosts={editCosts} viewRules={viewRules} />} />
       {reviewMonth === month && <>
       <button className="ghost workspace-hide-report" onClick={() => setReviewMonth(null)}>Zurück zur Erfassung</button>

@@ -15,27 +15,29 @@ export function MonthNavigation({state,month,onSelect,children}: {
   const currentMonth = localCalendarMonth();
   const backlog = useMemo(()=>openActivityMonths(state, new Date(),readOverview),[state,currentMonth,readOverview]);
   const chooseMonth = (value: string) => {setYear(Number(value.slice(0,4))); onSelect(value);};
+  const statusText = (row: (typeof rows)[number]) => row.tripCount ? `${row.tripCount} ${row.tripCount===1?'Reise':'Reisen'}` : row.status === 'open' ? '' : row.label;
   return <div className="month-workspace">
-    <aside className="year-navigation card" aria-label="Jahresübersicht">
+    {/* Monatsleiste: Jahr und alle zwölf Monate in einer Zeile (Handy: zwei Reihen), Stand als Symbol. */}
+    <nav className="year-navigation card" aria-label="Jahresübersicht">
       <div className="year-switch">
         <button className="ghost" aria-label="Vorheriges Jahr" disabled={year<=1} onClick={()=>setYear(y=>y-1)}><ChevronLeft size={18} /></button>
         <h2 aria-live="polite">{year}</h2>
         <button className="ghost" aria-label="Nächstes Jahr" disabled={year>=9999} onClick={()=>setYear(y=>y+1)}><ChevronRight size={18} /></button>
       </div>
-      <nav className="year-months" aria-label="Abrechnungsmonat auswählen">
-        {rows.map((row,i)=><button key={row.month} className={`year-month month-${row.status} ${row.month===month?'selected':''}`} aria-current={row.month===month?'date':undefined} aria-label={`${monthLabel(row.month)} · ${row.label} · ${row.tripCount} ${row.tripCount===1?'Reise':'Reisen'}`} title={row.reasons.join(' · ') || row.label} onClick={()=>chooseMonth(row.month)}>
+      <div className="year-months" role="group" aria-label="Abrechnungsmonat auswählen">
+        {rows.map((row,i)=><button key={row.month} className={`year-month month-${row.status} ${row.month===month?'selected':''}`} aria-current={row.month===month?'date':undefined} aria-label={`${monthLabel(row.month)} · ${row.label} · ${row.tripCount} ${row.tripCount===1?'Reise':'Reisen'}`} title={[row.label, ...row.reasons].join(' · ')} onClick={()=>chooseMonth(row.month)}>
+          <span className="month-name">{monthNames[i].slice(0,3)}</span>
           <span className="month-symbol" aria-hidden="true">{symbols[row.status]}</span>
-          <span className="month-name"><span className="month-full">{monthNames[i]}</span><span className="month-short" aria-hidden="true">{monthNames[i].slice(0,3)}</span><small>{row.tripCount} {row.tripCount===1?'Reise':'Reisen'}</small></span>
-          <span className="month-state">{row.label}</span>
+          <small className="month-state" aria-hidden="true"><span className="month-state-long">{statusText(row)}</span><span className="month-state-short">{row.tripCount || ''}</span></small>
         </button>)}
-      </nav>
-      <p className="month-mobile-key">✓ Abgeschlossen · Δ Änderungen offen · ↻ Korrekturentwurf · ? Historie prüfen · ◐ In Bearbeitung · ○ Offen · ! Prüfung erforderlich</p>
-      <p className="year-selection">Ausgewählt: <b>{monthLabel(month)}</b></p>
-      <details className="month-legend"><summary>Status verstehen</summary><p>✓ Abgeschlossen und unverändert · Δ Abschluss mit offenen Änderungen · ↻ Abschluss vorhanden, Korrekturentwurf offen · ? Historie oder Stornierung prüfen.</p><p>Grün kennzeichnet einen gespeicherten, vergleichbaren Abschluss ohne bekannte nachträgliche Änderungen. PDF und Berechnung schließen keinen Monat ab. Freigabe und Auszahlung bleiben getrennt.</p><p>Ein Korrekturentwurf ersetzt den historischen Abschluss erst nach erneuter ausdrücklicher Freigabe. Eine stornierte neuere Version reaktiviert keine ältere Version.</p></details>
-      <section className="month-backlog" aria-label="Offene Abrechnungsmonate">
-        {backlog.length ? <><b>{backlog.length} {backlog.length===1?'Monat mit offener Abrechnung':'Monate mit offenen Abrechnungen'}</b><p>Zurückliegende Monate mit Einträgen oder prüfbedürftigen Abschlüssen.</p><button className="primary" onClick={()=>chooseMonth(backlog[0].month)}>Mit {monthLabel(backlog[0].month)} beginnen</button></> : <p>Keine offenen Abrechnungsmonate mit vorhandenen Einträgen. Alles im Blick.</p>}
-      </section>
-    </aside>
+      </div>
+      <div className="year-meta">
+        <section className="month-backlog" aria-label="Offene Abrechnungsmonate">
+          {backlog.length ? <><b>{backlog.length} {backlog.length===1?'Monat mit offener Abrechnung':'Monate mit offenen Abrechnungen'}</b><button className="link" onClick={()=>chooseMonth(backlog[0].month)}>Mit {monthLabel(backlog[0].month)} beginnen</button></> : <span>Keine offenen Abrechnungsmonate mit vorhandenen Einträgen.</span>}
+        </section>
+        <details className="month-legend"><summary>Status verstehen</summary><p>✓ Abgeschlossen · Δ Änderungen offen · ↻ Korrekturentwurf · ? Historie prüfen · ◐ In Bearbeitung · ○ Offen · ! Prüfung erforderlich.</p><p>Grün kennzeichnet einen gespeicherten, vergleichbaren Abschluss ohne bekannte nachträgliche Änderungen. PDF und Berechnung schließen keinen Monat ab. Freigabe und Auszahlung bleiben getrennt.</p><p>Ein Korrekturentwurf ersetzt den historischen Abschluss erst nach erneuter ausdrücklicher Freigabe. Eine stornierte neuere Version reaktiviert keine ältere Version.</p></details>
+      </div>
+    </nav>
     <div className="month-statement">
       {children}
     </div>

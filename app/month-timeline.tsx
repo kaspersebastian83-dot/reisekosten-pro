@@ -9,9 +9,11 @@ const dayLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateStri
 const short = (date: string) => `${date.slice(8, 10)}.${date.slice(5, 7)}.`;
 
 /** Kompakte Monatsansicht: je Tag eine Zeile mit Verpflegung, darunter je Reise/Kostenposition eine Zeile. Klick bearbeitet. */
-export function MonthTimeline({state, month, statement, edit}: {
+export function MonthTimeline({state, month, statement, edit, startTrip}: {
   state: AppState; month: string; statement: StatementData;
   edit: (target: {kind: 'trip' | 'expense'; id: string}) => void;
+  /** Leerer Monat: direkter Einstieg. */
+  startTrip?: () => void;
 }) {
   const days = useMemo(() => monthTimeline(state, month, statement), [state, month, statement]);
   const counts = days.flatMap(d => d.entries).reduce((n, e) => e.kind === 'trip' ? (e.continued ? n : {...n, trips: n.trips + 1}) : {...n, expenses: n.expenses + 1}, {trips: 0, expenses: 0});
@@ -39,11 +41,11 @@ export function MonthTimeline({state, month, statement, edit}: {
   };
   return <section className="month-timeline" aria-label="Monat im Überblick">
     <h3>Monat im Überblick <small>{counts.trips} {counts.trips === 1 ? 'Dienstreise' : 'Dienstreisen'} · {counts.expenses} {counts.expenses === 1 ? 'Kostenposition' : 'Kostenpositionen'}</small></h3>
-    {days.length === 0 ? <p className="muted">Für diesen Monat ist noch nichts erfasst.</p> :
+    {days.length === 0 ? <div className="timeline-empty"><p>Für diesen Monat ist noch nichts erfasst.</p>{startTrip && <button className="ghost" onClick={startTrip}>Erste Dienstreise erfassen</button>}</div> :
       <ol className="timeline-days">{days.map(d => <li key={d.date} className="timeline-day">
         <div className="timeline-date"><b>{dayLabel(d.date)}</b>{d.allowance !== null && <small title={d.allowanceReason}>{d.allowance > 0 ? `Verpflegung ${euro(d.allowance)}` : 'keine Pauschale'}</small>}</div>
         <ul>{d.entries.map(entry => <li key={entry.kind === 'trip' ? `t-${entry.trip.id}` : `e-${entry.expense.id}`}>{row(entry)}</li>)}</ul>
       </li>)}</ol>}
-    <p className="muted">Ein Klick auf eine Zeile öffnet sie zum Bearbeiten. Die Verpflegung je Tag stammt aus der Monatsberechnung (mehrere Reisen eines Tages teilen sich eine Pauschale).</p>
+    {days.length > 0 && <p className="muted">Ein Klick auf eine Zeile öffnet sie zum Bearbeiten. Die Verpflegung je Tag stammt aus der Monatsberechnung (mehrere Reisen eines Tages teilen sich eine Pauschale).</p>}
   </section>;
 }
