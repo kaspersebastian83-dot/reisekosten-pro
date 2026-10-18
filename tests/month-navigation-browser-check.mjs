@@ -29,7 +29,7 @@ const output=await mkdtemp(path.join(tmpdir(),'reisekosten-browser-'));
 const results=[];
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
-const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Monatsübersicht');await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
@@ -101,8 +101,9 @@ try {
         const backlog=page.getByRole('region',{name:'Offene Abrechnungsmonate'});
         assert.match(await backlog.innerText(),/3 Monate mit offenen Abrechnungen/);await backlog.getByRole('button',{name:'Mit Juli 2026 beginnen',exact:true}).click();assert.equal(await picker.inputValue(),'2026-07');assert.equal(await page.locator('.year-switch h2').innerText(),'2026');
         await monthButton('August').click();
-        await nav(page,'Reisen');assert.equal(await picker.inputValue(),'2026-08');assert.equal(await page.locator('.day-card').count(),2);
-        await nav(page,'Kosten & Belege');assert.equal(await picker.inputValue(),'2026-08');assert.equal(await page.locator('.expense-card').count(),1);
+        // Reisen und Kosten des gewählten Monats stehen in der Zeitleiste; andere Bereiche behalten die Auswahl.
+        const timeline=page.getByRole('region',{name:'Monat im Überblick',exact:true});assert.equal(await timeline.locator('.timeline-entry.trip').count(),2);assert.equal(await timeline.locator('.timeline-entry.expense').count(),1);
+        await nav(page,'Einstellungen');assert.equal(await picker.inputValue(),'2026-08');
         await nav(page,'Monatsübersicht');assert.equal(await picker.inputValue(),'2026-08');assert.match(await page.getByRole('region',{name:'Monatsarbeitsbereich',exact:true}).innerText(),/August 2026/);
         await nav(page,'Monatsübersicht');assert.equal(await picker.inputValue(),'2026-08');assert.match(await page.getByRole('region',{name:'Monatsarbeitsbereich',exact:true}).innerText(),/August 2026/);assert.deepEqual(await state(page),baseline);
       });

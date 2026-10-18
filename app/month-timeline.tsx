@@ -53,6 +53,6 @@ export function MonthTimeline({state, month, statement, edit, startTrip, filter 
         <ul>{d.entries.map(entry => <li key={entry.kind === 'trip' ? `t-${entry.trip.id}` : `e-${entry.expense.id}`}>{row(entry)}</li>)}</ul>
         {d.allowance !== null && rows.get(d.date) && <div className="timeline-calc"><DayDetails day={rows.get(d.date)!} summary="Rechenweg" /></div>}
       </li>)}</ol>}
-    {days.length > 0 && <p className="muted">Ein Klick auf eine Zeile öffnet sie zum Bearbeiten. Die Verpflegung je Tag stammt aus der Monatsberechnung (mehrere Reisen eines Tages teilen sich eine Pauschale).</p>}
+    {days.length > 0 && <p className="muted">Ein Klick auf eine Zeile öffnet sie zum Bearbeiten oder Löschen. Die Verpflegung je Tag stammt aus der Monatsberechnung (mehrere Reisen eines Tages teilen sich eine Pauschale).</p>}
   </section>;
 }

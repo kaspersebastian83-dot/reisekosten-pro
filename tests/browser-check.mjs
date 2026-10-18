@@ -30,7 +30,7 @@ const results=[];
 let syntheticBackup;
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
-const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Reisen');await page.getByRole('button',{name:'Fahrten importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
+const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Monatsübersicht');await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
 const writeState=(page,value)=>page.evaluate(value=>new Promise((resolve,reject)=>{const r=indexedDB.open('reisekosten-pro',1);r.onsuccess=()=>{const tx=r.result.transaction('state','readwrite');tx.objectStore('state').put(value,'main');tx.oncomplete=()=>{r.result.close();resolve();};tx.onabort=()=>reject(tx.error);};}),value);
 const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
@@ -54,7 +54,7 @@ try {
     await importCsv();const s=await waitState(page,s=>s?.trips.length===2);assert.equal(s.trips.reduce((v,t)=>v+t.businessKm,0),38.25);assert.ok(s.trips.every(t=>t.tripType==='dienstlich'&&!t.absenceConfirmed));
     assert.match(await page.locator('.result-grid').innerText(),/1\s+Duplikate/);
     await importCsv();assert.match(await page.locator('.result-grid').innerText(),/3\s+Duplikate/);
-    await page.getByRole('button',{name:'Import abbrechen',exact:true}).click();await nav(page,'Reisen');assert.match(await page.locator('.day-list').innerText(),/9:00/);
+    await page.getByRole('button',{name:'Import abbrechen',exact:true}).click();await nav(page,'Monatsübersicht');assert.match(await page.locator('.month-timeline').innerText(),/9:00/);
     await nav(page,'Monatsübersicht');await page.getByRole('button',{name:/^(Spesenabrechnung erstellen|Abrechnung fortsetzen|Abrechnung ansehen)$/}).click();assert.match(await page.locator('.summary-grid').innerText(),/Kilometererstattung\s+0,00/);
   });
   await check('settings persist and private-car reimbursement',async()=>{
@@ -74,7 +74,7 @@ try {
     await page.getByText('Die automatische Erkennung war nicht möglich.',{exact:false}).waitFor({timeout:20000});
     await page.locator('.receipt-capture').getByLabel('Datum',{exact:true}).fill('2026-03-09');await page.locator('.receipt-capture').getByLabel('Betrag (€)',{exact:true}).fill('12.50');
     await page.getByRole('button',{name:'Nur im Eingang speichern',exact:true}).click();await waitState(page,s=>s?.receiptInbox.length===1);
-    await nav(page,'Kosten & Belege');await page.locator('.receipt-inbox').getByRole('button',{name:'Prüfen',exact:true}).click();
+    await nav(page,'Monatsübersicht');await page.getByRole('region',{name:'Beleg-Eingang',exact:true}).getByRole('button',{name:'Nacheinander zuordnen',exact:true}).click();
     await page.locator('.receipt-capture').getByLabel('Passende Reise').selectOption('');
     await page.getByRole('button',{name:'Bestätigen & Ausgabe anlegen',exact:true}).click();const s=await waitState(page,s=>s?.expenses.length===1);
     assert.equal(s.expenses[0].tripId,undefined);assert.equal(s.receiptInbox[0].status,'zugeordnet');assert.equal(s.expenses[0].receipt.type,'image/png');
@@ -107,9 +107,9 @@ try {
     await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await page.locator('input[type=month]').fill('2026-03');await nav(page,'Monatsübersicht');await page.getByRole('button',{name:'Abrechnung fortsetzen',exact:true}).click();await download(page,'Excel');await context.setOffline(false);
   });
   await check('mobile layout and menu, import, settings and receipt modal at 390px',async()=>{
-    await page.setViewportSize({width:390,height:844});for(const name of ['Monatsübersicht','Fahrten importieren','Kosten & Belege','Einstellungen']){await nav(page,name);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal page overflow in '+name);}
-    await nav(page,'Kosten & Belege');
-    await page.locator('.receipt-inbox').getByRole('button',{name:'Beleg fotografieren',exact:true}).click();
+    await page.setViewportSize({width:390,height:844});for(const name of ['Monatsübersicht','Fahrten importieren','Einstellungen']){await nav(page,name);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal page overflow in '+name);}
+    await nav(page,'Monatsübersicht');
+    await page.locator('.month-entry-workspace').getByRole('button',{name:'Beleg fotografieren / OCR',exact:true}).click();
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.waitForTimeout(300);await page.screenshot({path:path.join(output,'mobile.png')});
   });
   assert.equal(external.filter(([method])=>method!=='GET').length,0,'no receipt/data uploads');

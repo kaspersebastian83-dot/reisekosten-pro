@@ -7,10 +7,10 @@ import { isClosedStatement, type StatementComparison } from '../lib/statement-co
 import { closingPreview, groupClosingIssues } from '../lib/statement-closing';
 
 const euro = (value: number) => value.toLocaleString('de-DE', {style:'currency', currency:'EUR'});
-export function MonthWorkspace({state, month, statement, startEntry, editCosts, editTrips, openCapture, openStatement, checks, comparison, changes, timeline, openImport, inboxCount = 0, startInbox}: {
+export function MonthWorkspace({state, month, statement, startEntry, openCapture, openStatement, checks, comparison, changes, timeline, openImport, inboxCount = 0, startInbox}: {
   state: AppState; month: string; statement: StatementData;
   startEntry: (kind: 'trip' | 'Hotel' | 'Parken') => void;
-  editCosts: () => void; editTrips: () => void; openCapture: () => void; openStatement: () => void; checks: ReactNode;
+  openCapture: () => void; openStatement: () => void; checks: ReactNode;
   comparison?: StatementComparison; changes?: ReactNode; timeline?: ReactNode;
   /** Fahrtenbuch-Import (CSV). */
   openImport?: () => void;
@@ -58,11 +58,7 @@ export function MonthWorkspace({state, month, statement, startEntry, editCosts, 
     <div className="workspace-layout">
       <div className="workspace-main">
         {timeline}
-        <div className="workspace-links">
-          <button className="link" onClick={editTrips}>Alle Reisen bearbeiten</button>
-          <button className="link" onClick={editCosts}>Alle Kosten & Belege bearbeiten</button>
-          <span className="muted">Bei Rechnungen zählt das Rechnungsdatum für die Monatszuordnung.</span>
-        </div>
+        <p className="workspace-hint muted">Bei Rechnungen zählt das Rechnungsdatum für die Monatszuordnung.</p>
         {checks}
       </div>
       <aside className="workspace-side">

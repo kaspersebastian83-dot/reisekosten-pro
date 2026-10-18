@@ -99,18 +99,15 @@ import { nextExpenseDraft, nextTripDraft } from "../lib/batch-entry";
 import { openInboxItems, removeExpense, removeTrip } from "../lib/entry-removal";
 import type { TimelineFilter } from "../lib/month-timeline";
 
+// „Reisen“ und „Kosten & Belege“ sind in der Monatsübersicht aufgegangen; der Import ist von dort erreichbar.
 type Tab =
   | "Fahrten importieren"
-  | "Reisen"
-  | "Kosten & Belege"
   | "Monatsübersicht"
   | "Auswertungen"
   | "Einstellungen"
   | "Datensicherung";
 const tabs: { name: Tab; icon: typeof FileSpreadsheet }[] = [
   { name: "Monatsübersicht", icon: FileSpreadsheet },
-  { name: "Reisen", icon: ReceiptText },
-  { name: "Kosten & Belege", icon: Fuel },
   { name: "Auswertungen", icon: BarChart3 },
   { name: "Einstellungen", icon: SettingsIcon },
   { name: "Datensicherung", icon: Archive },
@@ -229,7 +226,6 @@ export default function Home() {
   const [sidebar, setSidebar] = useState(false);
   const [toast, setToast] = useState("");
   const [undoAction, setUndoAction] = useState<(() => void) | null>(null);
-  const [quickOpen, setQuickOpen] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [workspaceEntry, setWorkspaceEntry] = useState<{month: string} | null>(null);
   const [expenseDraft, setExpenseDraft] = useState<Expense | null>(null);
@@ -381,8 +377,8 @@ export default function Home() {
           {tabs.map(({ name, icon: Icon }) => (
             <button
               key={name}
-              className={tab === name || (tab === "Fahrten importieren" && name === "Reisen") ? "active" : ""}
-              aria-current={tab === name || (tab === "Fahrten importieren" && name === "Reisen") ? "page" : undefined}
+              className={tab === name || (tab === "Fahrten importieren" && name === "Monatsübersicht") ? "active" : ""}
+              aria-current={tab === name || (tab === "Fahrten importieren" && name === "Monatsübersicht") ? "page" : undefined}
               onClick={() => {
                 navigate(name);
                 setSidebar(false);
@@ -434,22 +430,6 @@ export default function Home() {
             <h1>{tab}</h1>
           </div>
           <div className="top-actions">
-            {tab !== "Auswertungen" && tab !== "Monatsübersicht" && <>
-            <button
-              className="ghost receipt-top"
-              onClick={() => setReceiptCaptureOpen(true)}
-            >
-              <Camera size={17} />
-              Beleg
-            </button>
-            <button
-              className="primary quick-top"
-              onClick={() => setQuickOpen(true)}
-            >
-              <Plus size={17} />
-              Ausgabe
-            </button>
-            </>}
             <label className="month-picker">
               Abrechnungsmonat
               <input
@@ -467,47 +447,14 @@ export default function Home() {
         </header>
         <div className="content">
           {tab === "Fahrten importieren" && (
-            <>
-            <button className="ghost import-back" onClick={() => setTab("Reisen")}>
-              Zurück zu Reisen
-            </button>
             <ImportWizard
               state={state}
               confirmImport={confirmImport}
               notify={notify}
-              go={setTab}
+              go={target => target === "Monatsübersicht" ? finishWorkspaceEntry() : setTab(target)}
             />
-            </>
           )}
           {workspaceEntry && tab !== "Monatsübersicht" && <div className="notice workspace-return"><span>Arbeitsmonat: <b>{monthLabel(workspaceEntry.month)}</b></span><button className="ghost" onClick={returnToWorkspace}>Zurück zum Monatsarbeitsbereich</button></div>}
-          {tab === "Reisen" && (
-            <Trips
-              onSaved={workspaceEntry ? finishWorkspaceEntry : undefined}
-              editing={editingTrip}
-              setEditing={setEditingTrip}
-              openImport={() => setTab("Fahrten importieren")}
-              openExpense={id => {setEditingExpenseId(id); setTab("Kosten & Belege");}}
-              state={state}
-              month={month}
-              update={update}
-              notify={notify}
-            />
-          )}
-          {tab === "Kosten & Belege" && (
-            <Expenses
-              state={state}
-              month={month}
-              update={update}
-              notify={notify}
-              openCapture={() => setReceiptCaptureOpen(true)}
-              initialDraft={expenseDraft}
-              clearInitialDraft={() => setExpenseDraft(null)}
-              workspaceMonth={workspaceEntry?.month}
-              onSaved={workspaceEntry ? finishWorkspaceEntry : undefined}
-              initialExpenseId={editingExpenseId}
-              clearInitialExpense={() => setEditingExpenseId(null)}
-            />
-          )}
           {tab === "Monatsübersicht" && (
             <MonthNavigation state={state} month={month} onSelect={selectMonth}>
             <Statements
@@ -517,8 +464,6 @@ export default function Home() {
               update={update}
               notify={notify}
               startEntry={startMonthEntry}
-              editCosts={() => {setWorkspaceEntry({month}); setTab("Kosten & Belege");}}
-              editTrips={() => {setWorkspaceEntry({month}); setTab("Reisen");}}
               openCapture={() => setReceiptCaptureOpen(true)}
               viewRules={() => setTab("Einstellungen")}
               commitClosing={commitClosing}
@@ -535,13 +480,11 @@ export default function Home() {
             </MonthNavigation>
           )}
           {tab === "Monatsübersicht" && editingTrip && (
-            <Trips formOnly state={state} month={month} update={update} notify={notify}
-              editing={editingTrip} setEditing={setEditingTrip} onSaved={finishInlineEntry}
-              openImport={() => undefined} openExpense={() => undefined} />
+            <Trips state={state} update={update} notify={notify}
+              editing={editingTrip} setEditing={setEditingTrip} onSaved={finishInlineEntry} />
           )}
           {tab === "Monatsübersicht" && inlineExpense && (
-            <Expenses formOnly state={state} month={month} update={update} notify={notify}
-              openCapture={() => setReceiptCaptureOpen(true)}
+            <Expenses state={state} update={update} notify={notify}
               initialDraft={expenseDraft} clearInitialDraft={() => setExpenseDraft(null)} workspaceMonth={month}
               initialExpenseId={editingExpenseId} clearInitialExpense={() => setEditingExpenseId(null)}
               onSaved={finishInlineEntry} onClosed={finishInlineEntry} />
@@ -555,30 +498,6 @@ export default function Home() {
           )}
         </div>
       </main>
-      {tab !== "Auswertungen" && tab !== "Monatsübersicht" && <button
-        className="quick-fab"
-        onClick={() => setQuickOpen(true)}
-        aria-label="Ausgabe schnell erfassen"
-      >
-        <Plus size={24} />
-        <span>Ausgabe</span>
-      </button>}
-      {tab !== "Auswertungen" && tab !== "Monatsübersicht" && <button
-        className="camera-fab"
-        onClick={() => setReceiptCaptureOpen(true)}
-        aria-label="Beleg fotografieren"
-      >
-        <Camera size={22} />
-      </button>}
-      {quickOpen && tab !== "Auswertungen" && (
-        <QuickExpense
-          state={state}
-          month={month}
-          update={update}
-          notify={notify}
-          close={() => setQuickOpen(false)}
-        />
-      )}
       {inboxQueue && (() => {
         const item = state.receiptInbox.find((entry) => entry.id === inboxQueue.ids[0]);
         if (!item) return null;
@@ -623,13 +542,13 @@ export default function Home() {
   );
 }
 
-function MonthChecks({state, month, update, notify, editTrips, editCosts, viewRules, showIssues, startInbox}: {
+function MonthChecks({state, month, update, notify, viewRules, showIssues, startInbox}: {
   state: AppState; month: string;
   update: (f: (s: AppState) => AppState) => void; notify: (s: string) => void;
-  editTrips: () => void; editCosts: () => void; viewRules: () => void;
-  /** Monatsübersicht: passende Einträge in der Zeitleiste zeigen statt in die Listen zu wechseln. */
-  showIssues?: (filter: TimelineFilter) => void;
-  startInbox?: () => void;
+  viewRules: () => void;
+  /** Passende Einträge in der Zeitleiste zeigen. */
+  showIssues: (filter: TimelineFilter) => void;
+  startInbox: () => void;
 }) {
   const monthTrips = state.trips.filter(
     (t) => t.date.startsWith(month) && t.tripType === "dienstlich",
@@ -676,12 +595,12 @@ function MonthChecks({state, month, update, notify, editTrips, editCosts, viewRu
       <p>{tripIssues || expenseIssues || missingReceipts || duplicates || reasons.length ? "Vorhandene Hinweise und noch ungeprüfte Einträge dieses Monats." : "Keine bekannten Prüfhinweise für diesen Monat. Dies ersetzt keine vollständige Abschlussprüfung."}</p>
       {!!reasons.length && <ul className="month-review">{reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
       <div className="check-list">
-        <CheckRow label="Ungeprüfte Reisen / Reisehinweise" value={tripIssues} go={showIssues ? () => showIssues("trips") : editTrips} />
-        <CheckRow label="Ungeprüfte Kosten / Kostenhinweise" value={expenseIssues} go={showIssues ? () => showIssues("expenses") : editCosts} />
-        <CheckRow label="Fehlende Belege" value={missingReceipts} go={showIssues ? () => showIssues("receipts") : editCosts} />
-        <CheckRow label="Mögliche Duplikate" value={duplicates} go={showIssues ? () => showIssues("duplicates") : editTrips} />
+        <CheckRow label="Ungeprüfte Reisen / Reisehinweise" value={tripIssues} go={() => showIssues("trips")} />
+        <CheckRow label="Ungeprüfte Kosten / Kostenhinweise" value={expenseIssues} go={() => showIssues("expenses")} />
+        <CheckRow label="Fehlende Belege" value={missingReceipts} go={() => showIssues("receipts")} />
+        <CheckRow label="Mögliche Duplikate" value={duplicates} go={() => showIssues("duplicates")} />
       </div>
-      <p>{openInboxItems(state).length} Belege im Eingang insgesamt. <button className="ghost" onClick={startInbox && openInboxItems(state).length ? startInbox : editCosts}>Belege prüfen</button></p>
+      <p>{openInboxItems(state).length} Belege im Eingang insgesamt.{openInboxItems(state).length > 0 && <> <button className="ghost" onClick={startInbox}>Belege nacheinander zuordnen</button></>}</p>
     </details>
     {confirmable.length > 0 && <div className="batch-confirm"><span><b>{confirmable.length} vollständige Fahrten</b> können gemeinsam bestätigt werden.</span><button className="primary" onClick={confirmClearTrips}>Eindeutige Zeiten bestätigen</button></div>}
     <button className="link" onClick={viewRules}>Tarife und Regeln ansehen</button>
@@ -704,235 +623,6 @@ function CheckRow({
       <em>{value ? value : <Check size={16} />}</em>
       <ChevronRight size={16} />
     </button>
-  );
-}
-
-const quickPresets: Array<{
-  label: string;
-  category: string;
-  payment: Expense["paymentType"];
-  vat: number;
-}> = [
-  {
-    label: "Parken",
-    category: "Parken",
-    payment: "privat vorgestreckt",
-    vat: 19,
-  },
-  { label: "Tanken", category: "Tanken", payment: "Firmenkarte", vat: 19 },
-  { label: "Hotel", category: "Hotel", payment: "privat vorgestreckt", vat: 7 },
-  { label: "Bahn", category: "Bahn", payment: "privat vorgestreckt", vat: 7 },
-  { label: "Taxi", category: "Taxi", payment: "privat vorgestreckt", vat: 7 },
-  {
-    label: "Sonstiges",
-    category: "sonstige Nebenkosten",
-    payment: "privat vorgestreckt",
-    vat: 19,
-  },
-];
-
-function QuickExpense({
-  state,
-  month,
-  update,
-  notify,
-  close,
-}: {
-  state: AppState;
-  month: string;
-  update: (f: (s: AppState) => AppState) => void;
-  notify: (s: string, undo?: () => void) => void;
-  close: () => void;
-}) {
-  const now = new Date().toISOString().slice(0, 10);
-  const defaultDate = now.startsWith(month) ? now : `${month}-01`;
-  const [draft, setDraft] = useState<Expense>({
-    ...blankExpense(),
-    date: defaultDate,
-    category: "Parken",
-    description: "Parken",
-    vatRate: 19,
-  });
-  const [advanced, setAdvanced] = useState(false);
-  usePendingWork(true);
-  const amountRef = useRef<HTMLInputElement>(null);
-  useEffect(() => amountRef.current?.focus(), []);
-
-  const selectPreset = (preset: (typeof quickPresets)[number]) => {
-    setDraft((d) => ({
-      ...d,
-      category: preset.category,
-      description: preset.label,
-      paymentType: preset.payment,
-      paidBy:
-        paymentPayer(preset.payment),
-      reimbursementStatus:
-        preset.payment === "privat vorgestreckt"
-          ? "offen"
-          : "nicht erstattungsfähig",
-      vatRate: preset.vat,
-    }));
-    requestAnimationFrame(() => amountRef.current?.focus());
-  };
-
-  const [readingReceipt, setReadingReceipt] = useState(false);
-  const receiptRevision = useRef(0);
-  const saving = useRef(false);
-  useEffect(() => () => {receiptRevision.current++;}, []);
-  const addReceipt = async (file?: File) => {
-    if (!file) return;
-    const revision = ++receiptRevision.current;
-    setReadingReceipt(true);
-    try {
-      const receipt = {id:uid(), ...await readReceiptFile(file)};
-      if (revision === receiptRevision.current) setDraft(d => ({...d, receipt}));
-    } catch { if (revision === receiptRevision.current) notify("Beleg konnte nicht gelesen werden. Bitte erneut auswählen."); }
-    finally { if (revision === receiptRevision.current) setReadingReceipt(false); }
-  };
-
-  const saveQuick = () => {
-    if (readingReceipt || saving.current) return;
-    if (!(Number.isFinite(draft.gross) && draft.gross > 0)) {
-      notify("Bitte zuerst einen Betrag eingeben");
-      amountRef.current?.focus();
-      return;
-    }
-    const vatRate = draft.vatRate || 0;
-    const net = round2(draft.gross / (1 + vatRate / 100));
-    const problem = linkingErrors(draft)[0] || (!validDate(draft.date) ? "Rechnungsdatum prüfen" : "") || duplicateMessage(state, draft);
-    if (problem) return notify(problem);
-    const duplicateReceipt =
-      !!draft.receipt &&
-      state.expenses.some((e) => e.receipt?.hash === draft.receipt?.hash);
-    const item: Expense = {
-      ...draft,
-      id: uid(),
-      ...cleanContext(draft),
-      tripId: draft.tripId || undefined,
-      net,
-      vat: round2(draft.gross - net),
-      status: draft.receipt ? "vollständig" : "geprüft",
-      warnings: duplicateReceipt ? ["Möglicher doppelter Beleg"] : [],
-    };
-    saving.current = true;
-    update((s) => {
-      s.expenses.push(item);
-      return s;
-    });
-    notify(`${item.category}: ${euro(item.gross)} gespeichert`, () =>
-      update((s) => {
-        s.expenses = s.expenses.filter((expense) => expense.id !== item.id);
-        return s;
-      }),
-    );
-    close();
-  };
-
-  return (
-    <div
-      className="quick-backdrop"
-      onMouseDown={(e) => e.target === e.currentTarget && close()}
-    >
-      <section className="quick-sheet" aria-label="Ausgabe schnell erfassen">
-        <header>
-          <div>
-            <p className="eyebrow">Schnellerfassung</p>
-            <h2>Ausgabe in wenigen Sekunden</h2>
-          </div>
-          <button className="icon" onClick={close} aria-label="Schließen">
-            <X />
-          </button>
-        </header>
-        <div className="quick-presets">
-          {quickPresets.map((preset) => (
-            <button
-              key={preset.label}
-              className={draft.category === preset.category ? "active" : ""}
-              onClick={() => selectPreset(preset)}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-        <div className="quick-core">
-          <label className="quick-amount">
-            Betrag
-            <div>
-              <input
-                ref={amountRef}
-                inputMode="decimal"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0,00"
-                value={draft.gross || ""}
-                onChange={(e) =>
-                  setDraft({ ...draft, gross: Number(e.target.value) })
-                }
-                onKeyDown={(e) => e.key === "Enter" && saveQuick()}
-              />
-              <span>€</span>
-            </div>
-          </label>
-          <label
-            className={`receipt-button ${draft.receipt ? "has-file" : ""}`}
-          >
-            <Camera size={21} />
-            <span>
-              {draft.receipt ? draft.receipt.name : "Beleg fotografieren"}
-            </span>
-            <input
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png,.heic,image/*"
-              capture="environment"
-              onChange={(e) => addReceipt(e.target.files?.[0])}
-            />
-          </label>
-          <button className="primary quick-save" onClick={saveQuick} disabled={readingReceipt}>
-            <Check size={20} />
-            Speichern
-          </button>
-        </div>
-        <div className="quick-link-fields">
-          <PaymentSelect value={draft.paymentType} onChange={paymentType => setDraft({...draft, paymentType, paidBy:paymentPayer(paymentType), reimbursementStatus:paymentType === "privat vorgestreckt" ? "offen" : "nicht erstattungsfähig"})} />
-          <ReceiptLinkFields value={draft} onChange={patch => setDraft({...draft, ...patch})} trips={state.trips} travelLabel="Reise" />
-        </div>
-        <button
-          className="advanced-toggle"
-          onClick={() => setAdvanced(!advanced)}
-        >
-          {advanced
-            ? "Weitere Angaben ausblenden"
-            : "Datum, Zahlungsart oder Reise ändern"}
-          <ChevronRight size={16} className={advanced ? "rotated" : ""} />
-        </button>
-        {advanced && (
-          <div className="quick-advanced">
-            <label>
-              Datum
-              <input
-                type="date"
-                value={draft.date}
-                onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-              />
-            </label>
-            <label>
-              Beschreibung
-              <input
-                value={draft.description}
-                onChange={(e) =>
-                  setDraft({ ...draft, description: e.target.value })
-                }
-              />
-            </label>
-          </div>
-        )}
-        <p className="quick-hint">
-          Datum und Steuer sind Vorschläge. Reisezuordnungen werden ausdrücklich bestätigt und
-          können später jederzeit geändert werden.
-        </p>
-      </section>
-    </div>
   );
 }
 
@@ -1738,8 +1428,8 @@ function ImportWizard({
                 <span>{result?.trips.length ? "Profil gespeichert" : "Keine neuen Daten gespeichert"}</span>
               </div>
             </div>
-            <button className="primary" onClick={() => go("Reisen")}>
-              Import prüfen
+            <button className="primary" onClick={() => go("Monatsübersicht")}>
+              Zur Monatsübersicht
               <ChevronRight size={18} />
             </button>
           </div>
@@ -1855,36 +1545,23 @@ const blankTrip = (settings: AppState["settings"]): Trip => {
   };
 };
 
+/** Reisefenster (Neu, Bearbeiten, Löschen) über der Monatsübersicht. */
 function Trips({
   state,
-  month,
   update,
   notify,
   editing,
   setEditing,
-  openImport,
-  openExpense,
   onSaved,
-  formOnly = false,
 }: {
-  /** Nur das Formular (über der Monatsübersicht), ohne Liste. */
-  formOnly?: boolean;
   state: AppState;
-  month: string;
   update: (f: (s: AppState) => AppState) => void;
   notify: (s: string) => void;
   editing: Trip | null;
   setEditing: (trip: Trip | null) => void;
-  openImport: () => void;
-  openExpense: (id: string) => void;
   onSaved?: () => void;
 }) {
   usePendingWork(!!editing);
-  const [query, setQuery] = useState("");
-  const monthly = useMemo(() => buildStatement(state, month), [state, month]);
-  const groups = monthly.rows.filter((row) => row.trips.some((trip) =>
-    [trip.destination, trip.purpose, trip.customer, trip.order].join(" ").toLowerCase().includes(query.toLowerCase()),
-  )).map((row) => [row.date, [...row.trips].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))] as const);
   // Stapelerfassung: Anzahl der in dieser Runde gespeicherten Reisen; endet, wenn das Fenster schließt.
   const [batch, setBatch] = useState(0);
   useEffect(() => { if (!editing) setBatch(0); }, [editing]);
@@ -1935,214 +1612,8 @@ function Trips({
     setEditing(null);
     notify("Reise gelöscht. Die Löschung steht im Änderungsprotokoll.");
   };
-  const mealOnDay = (
-    trip: Trip,
-    date: string,
-    meal: "breakfast" | "lunch" | "dinner",
-  ) =>
-    (trip.dailyMeals?.[date] ||
-      (trip.date === date
-        ? trip.meals
-        : { breakfast: false, lunch: false, dinner: false }))[meal];
-  const toggleDayMeal = (
-    date: string,
-    dayTrips: Trip[],
-    meal: "breakfast" | "lunch" | "dinner",
-  ) => {
-    const host = dayTrips[0];
-    if (!host) return;
-    const nextValue = !dayTrips.some((t) => mealOnDay(t, date, meal));
-    update((s) => {
-      const trip = s.trips.find((t) => t.id === host.id);
-      if (!trip) return s;
-      const isMultiDay = !!trip.endDate && trip.endDate !== trip.date;
-      if (isMultiDay || date !== trip.date) {
-        const current = trip.dailyMeals?.[date] || {
-          breakfast: false,
-          lunch: false,
-          dinner: false,
-        };
-        trip.dailyMeals = {
-          ...(trip.dailyMeals || {}),
-          [date]: { ...current, [meal]: nextValue },
-        };
-      } else {
-        trip.meals = { ...trip.meals, [meal]: nextValue };
-      }
-      return s;
-    });
-    notify(
-      `${meal === "breakfast" ? "Frühstück" : meal === "lunch" ? "Mittagessen" : "Abendessen"} ${nextValue ? "eingetragen" : "entfernt"}`,
-    );
-  };
-  const confirmDay = (dayTrips: Trip[]) => {
-    const ids = new Set(dayTrips.map((t) => t.id));
-    update((s) => {
-      s.trips = s.trips.map((trip) => {
-        if (!ids.has(trip.id)) return trip;
-        const next = { ...trip, absenceConfirmed: true };
-        next.warnings = [...validateTrip(next), ...trip.warnings.filter(w => manualTripReviewNotes(trip).includes(w))];
-        next.status = next.warnings.length ? "ungeprüft" : "geprüft";
-        return next;
-      });
-      return s;
-    });
-    notify("Abwesenheitszeit bestätigt");
-  };
   return (
     <>
-      {!formOnly && <>
-      <div className="toolbar trips-toolbar">
-        <div className="search">
-          <input
-            placeholder="Ziel, Zweck oder Kunde suchen"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        <div className="trip-actions">
-        <button
-          className="primary"
-          onClick={() => setEditing(blankTrip(state.settings))}
-        >
-          <Plus size={18} />
-          Neue Dienstreise
-        </button>
-        <button className="ghost" onClick={openImport}>
-          <Import size={18} /> Fahrten importieren
-        </button>
-        </div>
-      </div>
-      <div className="day-list">
-        {groups.length === 0 && (
-          <Empty
-            icon={<ReceiptText />}
-            title="Noch keine Reisen in diesem Monat"
-            text="Erfassen Sie Ihre Dienstreise mit Ziel, Anlass und Abwesenheitszeiten. Kosten und Belege können Sie anschließend zuordnen."
-          />
-        )}
-        {groups.map(([date, dayTrips]) => {
-          const c = monthly.rows.find((row) => row.date === date)!;
-          return (
-            <article className="day-card" key={date}>
-              <header>
-                <div className="date-tile">
-                  <b>
-                    {new Date(date + "T12:00").toLocaleDateString("de-DE", {
-                      day: "2-digit",
-                    })}
-                  </b>
-                  <span>
-                    {new Date(date + "T12:00").toLocaleDateString("de-DE", {
-                      month: "short",
-                    })}
-                  </span>
-                </div>
-                <div className="day-title">
-                  <h3>{c.destinations.join(" · ") || "Reiseziel offen"}</h3>
-                  <p>
-                    {c.firstStart}–{c.lastEnd} · {duration(c.absenceMinutes)} ·{" "}
-                    {c.totalKm} km · {dayTrips.length} Fahrt
-                    {dayTrips.length === 1 ? "" : "en"}
-                  </p>
-                </div>
-                <div className="allowance">
-                  <span>Spesen</span>
-                  <b>{euro(c.allowanceAfter)}</b>
-                </div>
-              </header>
-              {c.warnings.length > 0 && (
-                <div className="warning-line">
-                  <AlertTriangle size={16} />
-                  <span>
-                    {c.warnings[0]}
-                    {c.warnings.length > 1 &&
-                      ` + ${c.warnings.length - 1} weitere`}
-                  </span>
-                  {dayTrips.some((t) => !t.absenceConfirmed) && (
-                    <button onClick={() => confirmDay(dayTrips)}>
-                      Zeit bestätigen
-                    </button>
-                  )}
-                </div>
-              )}
-              <DayDetails day={c} />
-              <div className="day-quick-actions">
-                <span>Gestellte Mahlzeit:</span>
-                {(
-                  [
-                    ["breakfast", "Frühstück"],
-                    ["lunch", "Mittag"],
-                    ["dinner", "Abend"],
-                  ] as const
-                ).map(([meal, label]) => {
-                  const active = dayTrips.some((t) => mealOnDay(t, date, meal));
-                  return (
-                    <button
-                      key={meal}
-                      className={active ? "active" : ""}
-                      onClick={() => toggleDayMeal(date, dayTrips, meal)}
-                    >
-                      {active && <Check size={14} />}
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="formula">
-                <span>{c.reason}</span>
-                <code>
-                  {euro(c.allowanceBefore)} – {euro(c.breakfastCut)} –{" "}
-                  {euro(c.lunchCut)} – {euro(c.dinnerCut)} ={" "}
-                  <b>{euro(c.allowanceAfter)}</b>
-                </code>
-              </div>
-              <div className="trip-rows">
-                {dayTrips.map((t) => (
-                  <div key={t.id}>
-                    <span
-                      className={`status-dot ${t.warnings.length ? "warn" : "ok"}`}
-                    />
-                    <b>
-                      {t.startTime}–{t.endTime}
-                    </b>
-                    <span>
-                      {t.startPlace || "Start offen"} →{" "}
-                      {t.destination || "Ziel offen"}
-                    </span>
-                    <span>{t.purpose || "Zweck fehlt"}{t.order && <small>{t.order}</small>}</span>
-                    <span>{t.businessKm} km</span>
-                    <button
-                      className="link"
-                      onClick={() => setEditing(structuredClone(t))}
-                    >
-                      Bearbeiten
-                    </button>
-                    <button
-                      className="icon danger"
-                      onClick={() => del(t.id)}
-                      aria-label="Löschen"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                    <DayDetails day={c} tripId={t.id} />
-                    <details className="trip-linked-expenses"><summary>Zugeordnete Kosten & Belege ({state.expenses.filter(e=>e.tripId===t.id && e.status!=="storniert").length})</summary>
-                      <p>Alle Kosten dieser konkreten Reise, unabhängig vom Rechnungsmonat. Verpflegung separat in der Tagesberechnung.</p>
-                      {state.expenses.filter(e=>e.tripId===t.id && e.status!=="storniert").map(expense => <article key={expense.id}>
-                        <b>{expense.category} · {expense.gross.toLocaleString("de-DE", {minimumFractionDigits:2, maximumFractionDigits:2})} {expense.currency}</b>
-                        <p>{dateDe(expense.date)} · {paymentLabel(expense.paymentType)} · persönliche Erstattung {euro(expenseConflictsWithMileageAllowance(state.settings, state.trips, expense) ? 0 : expenseReimbursable(expense))}</p>
-                        <ReceiptAttachment receipt={expense.receipt} />
-                        <button className="ghost" onClick={()=>openExpense(expense.id)}>Kosten / Zuordnung bearbeiten</button>
-                      </article>)}
-                    </details>
-                  </div>
-                ))}
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      </>}
       {editing && (
         <Modal
           title={
@@ -2368,7 +1839,7 @@ function TripForm({ trip, setTrip, settings, trips }: {
         <details className="trip-preview-more"><summary>Hinweise zur Vorschau</summary>
           <p>{settings.ruleMode === "internal" ? "Interne Schwelle aus Einstellungen aktiv." : "Gespeicherte Inlandstarife und gesetzlicher Schwellenmodus."} Vorschau dieser Reise; weitere Reisen desselben Tages können die Monatsberechnung beeinflussen.</p>
           <p>{manualTripReviewNotes(trip)[0]}</p>
-          <p>Übernachtungspauschale: 0,00 €. Hotelrechnung separat in Kosten & Belege erfassen. Keine doppelte Erstattung; keine automatische Zuordnung.</p>
+          <p>Übernachtungspauschale: 0,00 €. Hotelrechnung separat über „Hotelrechnung“ erfassen. Keine doppelte Erstattung; keine automatische Zuordnung.</p>
         </details>
       </section>
     </aside>
@@ -2459,26 +1930,21 @@ const blankExpense = (): Expense => ({
   status: "ungeprüft",
   warnings: [],
 });
+/** Kostenfenster (Neu, Bearbeiten, Löschen) über der Monatsübersicht. */
 function Expenses({
   state,
-  month,
   update,
   notify,
-  openCapture,
   initialExpenseId,
   clearInitialExpense,
   initialDraft, clearInitialDraft, workspaceMonth, onSaved,
-  formOnly = false, onClosed,
+  onClosed,
 }: {
-  /** Nur das Formular (über der Monatsübersicht), ohne Liste. */
-  formOnly?: boolean;
   /** Formular ohne Speichern geschlossen. */
   onClosed?: () => void;
   state: AppState;
-  month: string;
   update: (f: (s: AppState) => AppState) => void;
   notify: (s: string, undo?: () => void) => void;
-  openCapture: () => void;
   initialExpenseId: string | null;
   clearInitialExpense: () => void;
   initialDraft?: Expense | null;
@@ -2491,8 +1957,8 @@ function Expenses({
   const wasEditing = useRef(false);
   useEffect(() => {
     if (editing) wasEditing.current = true;
-    else if (wasEditing.current && formOnly) { wasEditing.current = false; onClosed?.(); }
-  }, [editing, formOnly, onClosed]);
+    else if (wasEditing.current) { wasEditing.current = false; onClosed?.(); }
+  }, [editing, onClosed]);
   useEffect(() => {
     if (initialDraft) {setEditing(initialDraft); clearInitialDraft?.();}
   }, [initialDraft, clearInitialDraft]);
@@ -2507,17 +1973,7 @@ function Expenses({
   const saving = useRef(false);
   useEffect(() => {saving.current = false; receiptRevision.current++; setReadingReceipt(false);}, [editing?.id]);
   useEffect(() => () => {receiptRevision.current++;}, []);
-  const [reviewing, setReviewing] = useState<ReceiptInboxItem | null>(null);
-  usePendingWork(!!editing || !!reviewing);
-  const inboxItems = state.receiptInbox.filter(
-    (item) =>
-      item.status !== "zugeordnet" &&
-      ((item.suggestion.date || "").startsWith(month) ||
-        item.capturedAt.startsWith(month)),
-  );
-  const items = state.expenses
-    .filter((e) => e.date.startsWith(month))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  usePendingWork(!!editing);
   const mileageConflict =
     !!editing &&
     expenseConflictsWithMileageAllowance(state.settings, state.trips, editing);
@@ -2621,121 +2077,6 @@ function Expenses({
   };
   return (
     <>
-      {!formOnly && <>
-      <section
-        className={`receipt-inbox card ${inboxItems.length ? "" : "empty"}`}
-      >
-        <div className="card-head">
-          <div>
-            <p className="eyebrow">Beleg-Eingang</p>
-            <h3>
-              {inboxItems.length
-                ? `${inboxItems.length} Beleg${inboxItems.length === 1 ? " wartet" : "e warten"} auf Zuordnung`
-                : "Belege fotografieren und später zuordnen"}
-            </h3>
-          </div>
-          {inboxItems.length ? (
-            <span className="count yellow">{inboxItems.length}</span>
-          ) : (
-            <button className="primary" onClick={openCapture}>
-              <Camera size={17} /> Beleg fotografieren
-            </button>
-          )}
-        </div>
-        {inboxItems.length ? (
-          <div className="inbox-strip">
-            {inboxItems.map((item) => (
-              <article key={item.id}>
-                <div className="inbox-thumb">
-                  {item.receipt.type.startsWith("image/") &&
-                  !item.receipt.type.includes("heic") ? (
-                    // Data-URLs aus der lokalen IndexedDB benötigen keine Bildoptimierung.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.receipt.dataUrl} alt="Belegvorschau" />
-                  ) : (
-                    <ReceiptText size={24} />
-                  )}
-                </div>
-                <div>
-                  <b>{item.suggestion.merchant || "Neuer Beleg"}</b>
-                  <span>
-                    {item.suggestion.date
-                      ? dateDe(item.suggestion.date)
-                      : "Datum offen"}{" "}
-                    ·{" "}
-                    {item.suggestion.gross
-                      ? euro(item.suggestion.gross)
-                      : "Betrag offen"}
-                  </span>
-                </div>
-                <button
-                  className="primary"
-                  onClick={() => setReviewing(structuredClone(item))}
-                >
-                  Prüfen
-                </button>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="receipt-inbox-empty">
-            Fotografierte Belege können mit „Nur im Eingang speichern“ hier
-            gesammelt und später in Ruhe geprüft werden.
-          </p>
-        )}
-      </section>
-      <div className="toolbar">
-        <div>
-          <p className="muted">
-            {items.length} Kostenpositionen ·{" "}
-            {euro(items.reduce((s, e) => s + e.gross, 0))}
-          </p>
-        </div>
-        <button className="primary" onClick={() => setEditing(blankExpense())}>
-          <Plus size={18} />
-          Kosten erfassen
-        </button>
-      </div>
-      <div className="expense-grid">
-        {items.length === 0 && (
-          <Empty
-            icon={<ReceiptText />}
-            title="Noch keine Kosten erfasst"
-            text="Parken, Hotel, Tanken und weitere Reisekosten lassen sich mit Beleg dokumentieren."
-          />
-        )}
-        {items.map((e) => (
-          <article className="expense-card" key={e.id}>
-            <div className="expense-icon">
-              {e.category === "Tanken" ? <Fuel /> : <ReceiptText />}
-            </div>
-            <div>
-              <span>
-                {dateDe(e.date)} · {e.category}
-              </span>
-              <h3>{e.description || "Ohne Beschreibung"}</h3>
-              <p>
-                {paymentLabel(e.paymentType)} · {e.reimbursementStatus}
-              </p>
-              <p>{e.tripId ? `Reise: ${state.trips.find(t=>t.id===e.tripId) ? tripLabel(state.trips.find(t=>t.id===e.tripId)!) : "Zuordnung prüfen – Reise nicht mehr vorhanden"}` : "Noch keiner Dienstreise zugeordnet"}</p>
-              <ReceiptAttachment receipt={e.receipt} />
-            </div>
-            <div className="expense-amount">
-              <b>{euro(e.gross)}</b>
-              <span className={e.receipt ? "receipt-ok" : "receipt-missing"}>
-                {e.receipt ? "Beleg vorhanden" : "Beleg fehlt"}
-              </span>
-            </div>
-            <button
-              className="ghost"
-              onClick={() => setEditing(structuredClone(e))}
-            >
-              Bearbeiten
-            </button>
-          </article>
-        ))}
-      </div>
-      </>}
       {editing && (
         <Modal title="Kosten & Beleg" close={() => setEditing(null)} onSubmitShortcut={() => save(true)} wide>
           {workspaceMonth && <p className="notice" role="status">Arbeitsmonat: {monthLabel(workspaceMonth)}. Rechnungsdatum bitte am Beleg prüfen.{validDate(editing.date) && !editing.date.startsWith(workspaceMonth) && ` Diese Ausgabe erscheint wegen ihres Rechnungsdatums in ${monthLabel(editing.date.slice(0,7))}.`}</p>}
@@ -2987,16 +2328,6 @@ function Expenses({
           </div>
         </Modal>
       )}
-      {reviewing && (
-        <ReceiptCapture
-          state={state}
-          month={month}
-          update={update}
-          notify={notify}
-          initial={reviewing}
-          close={() => setReviewing(null)}
-        />
-      )}
     </>
   );
 }
@@ -3007,7 +2338,7 @@ function Statements({
   statement: currentStatement,
   update,
   notify,
-  startEntry, editCosts, editTrips, openCapture, viewRules,
+  startEntry, openCapture, viewRules,
   commitClosing, editClosingIssue, commitCorrection, folder, openImport, startInbox,
 }: {
   openImport?: () => void;
@@ -3018,8 +2349,6 @@ function Statements({
   update: (f: (s: AppState) => AppState) => void;
   notify: (s: string) => void;
   startEntry: (kind: "trip" | "Hotel" | "Parken") => void;
-  editCosts: () => void;
-  editTrips: () => void;
   openCapture: () => void;
   viewRules: () => void;
   commitClosing: (confirmation: ClosingConfirmation) => Promise<void>;
@@ -3142,13 +2471,13 @@ function Statements({
     update((s) => changeStatementStatus(s, existing!.id, status, { id: uid(), at: new Date().toISOString() }));
   return (
     <>
-      <MonthWorkspace state={state} month={month} statement={currentStatement} startEntry={startEntry} editCosts={editCosts} editTrips={editTrips} openCapture={openCapture}
+      <MonthWorkspace state={state} month={month} statement={currentStatement} startEntry={startEntry} openCapture={openCapture}
         openStatement={() => {if (latest) openVersion(); else create(true);}}
         comparison={comparison}
         changes={<StatementChanges comparison={comparison} creating={correctionSaving} error={correctionError} create={() => void correct()} resume={openVersion} />}
         openImport={openImport} inboxCount={openInboxItems(state).length} startInbox={startInbox}
         timeline={<MonthTimeline state={state} month={month} statement={currentStatement} edit={editClosingIssue} startTrip={() => startEntry('trip')} filter={timelineFilter} setFilter={setTimelineFilter} />}
-        checks={<MonthChecks state={state} month={month} update={update} notify={notify} editTrips={editTrips} editCosts={editCosts} viewRules={viewRules} startInbox={startInbox}
+        checks={<MonthChecks state={state} month={month} update={update} notify={notify} viewRules={viewRules} startInbox={startInbox ?? (() => undefined)}
           showIssues={filter => { setTimelineFilter(filter); requestAnimationFrame(() => document.querySelector('.month-timeline')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }} />} />
       {reviewMonth === month && <>
       <button className="ghost workspace-hide-report" onClick={() => setReviewMonth(null)}>Zurück zur Erfassung</button>
