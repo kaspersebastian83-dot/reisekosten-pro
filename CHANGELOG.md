@@ -1,5 +1,11 @@
 # Release Notes
 
+## Kostenformular ohne Scrollen
+
+- „Kosten & Beleg“ zweispaltig im breiten Fenster: Betrag und Beleg links, Projekt und Reisezuordnung rechts.
+- Belegauswahl als eine kompakte Zeile; Hotelzeitraum und Frühstück nebeneinander.
+- Feste Erläuterungen aufklappbar, Warnungen weiterhin sichtbar. Prüfungen und Speicherlogik unverändert.
+
 ## Reiseformular ohne Scrollen
 
 - „Neue Dienstreise“ zweispaltig im breiteren Fenster: Eingaben links, Abwesenheit, Bestätigung und

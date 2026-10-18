@@ -768,3 +768,11 @@ einer Zeile, Übernachtung, Mahlzeiten und „Weitere Angaben“; rechts Abwesen
 Verpflegungsvorschau (je Tag eine Zeile, Summe, zustandsabhängige Hinweise sichtbar, Grundhinweise aufklappbar).
 Eine Tagesreise passt ab etwa 1366 × 660 px Fensterfläche ohne Scrollen; die Speichern-Knöpfe bleiben in jedem Fall
 unten sichtbar. Unter 900 px Breite einspaltig. Keine Änderung an Pflichtfeldern, Prüfungen oder Berechnung.
+
+## Kostenformular kompakt
+
+„Kosten & Beleg“ nutzt dasselbe breite Fenster: links Datum, Kategorie, Beschreibung, Betrag, Zahlungsart, Beleg
+(eine Zeile, die ganze Fläche öffnet die Dateiauswahl) und „Weitere Angaben“; rechts Projekt, bei Hotels
+Übernachtungszeitraum und Frühstück in einer Zeile, Reisevorschläge und Reisezuordnung. Warnungen bleiben sichtbar,
+feste Erläuterungen stehen unter „Hinweise zur Zuordnung“ (`ReceiptLinkFields compact`; Schnellerfassung und
+Beleg-Eingang unverändert). Auch eine Hotelrechnung passt ab etwa 1366 × 660 px ohne Scrollen.
