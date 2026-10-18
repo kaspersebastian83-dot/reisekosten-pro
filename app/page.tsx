@@ -69,6 +69,8 @@ import { manualTripErrors, manualTripInterval, manualTripReviewNotes, projectPla
 import { cleanContext, duplicateMessage, linkingErrors, paymentLabel, paymentPayer, similarExpense, syncExpenseLink, validDate } from "../lib/receipt-linking";
 import { readReceiptFile } from "../lib/receipt-file";
 import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
+import { MonthNavigation } from "./month-navigation";
+import { isMonth, previousCalendarMonth } from "../lib/month-navigation";
 import { demoState } from "../lib/demo";
 import { applyMerchantRule, recognizeReceiptLocally } from "../lib/receipt-ocr";
 import {
@@ -148,7 +150,7 @@ export default function Home() {
   };
   const [saveRetry, setSaveRetry] = useState(0);
   const [tab, setTab] = useState<Tab>("Reisen");
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(() => previousCalendarMonth());
   const [sidebar, setSidebar] = useState(false);
   const [toast, setToast] = useState("");
   const [undoAction, setUndoAction] = useState<(() => void) | null>(null);
@@ -318,7 +320,7 @@ export default function Home() {
               <input
                 type="month"
                 value={month}
-                onChange={(e) => setMonth(e.target.value)}
+                onChange={(e) => {if (isMonth(e.target.value)) setMonth(e.target.value);}}
               />
             </label>
             <div className={`quality ${issueCount ? "warn" : "ok"}`}>
@@ -381,6 +383,7 @@ export default function Home() {
             />
           )}
           {tab === "Monatsabrechnungen" && (
+            <MonthNavigation state={state} month={month} onSelect={setMonth}>
             <Statements
               state={state}
               month={month}
@@ -388,6 +391,7 @@ export default function Home() {
               update={update}
               notify={notify}
             />
+            </MonthNavigation>
           )}
           {tab === "Auswertungen" && <Reports state={state} month={month} />}
           {tab === "Einstellungen" && (
