@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Archive,
+  ArrowLeft,
   BarChart3,
   Camera,
   Car,
@@ -299,7 +300,7 @@ export default function Home() {
     <div className="app-shell" inert={transactionSaving || updatePreparing}>
       <aside className={`sidebar ${sidebar ? "open" : ""}`}>
         <div className="brand">
-          <div className="brand-mark">SK</div>
+          <div className="brand-mark"><img src="./favicon.svg" alt="" width="42" height="42" /></div>
           <div>
             <b>SpesenKit</b>
             <small>Dienstreisen · Spesen · Abrechnungen</small>
@@ -328,6 +329,10 @@ export default function Home() {
             </button>
           ))}
         </nav>
+        <a className="suite-link" href="../Projektzentrale/" target="projektzentrale" rel="noopener">
+          <ArrowLeft size={16} aria-hidden="true" />
+          <span><b>Projektzentrale</b><small>Spektron · alle Apps</small></span>
+        </a>
         <div className="privacy-note">
           <ShieldCheck size={18} />
           <div>
