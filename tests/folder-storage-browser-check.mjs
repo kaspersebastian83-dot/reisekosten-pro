@@ -35,10 +35,21 @@ const harness = () => {
   FileSystemHandle.prototype.requestPermission = async function () { localStorage.removeItem('test-perm'); return 'granted'; };
   const original = FileSystemFileHandle.prototype.createWritable;
   FileSystemFileHandle.prototype.createWritable = async function (...args) {
-    if (flag('test-fail-write') && this.name === 'spesenkit.json') throw new DOMException('Netzlaufwerk nicht erreichbar', 'InvalidStateError');
+    const fail = flag('test-fail-write');
+    if (fail && (fail === '1' ? this.name === 'spesenkit.json' : this.name.endsWith(fail))) throw new DOMException('Netzlaufwerk nicht erreichbar', 'InvalidStateError');
     return original.apply(this, args);
   };
 };
+// Abgelegte Dateien eines Monats: Name -> { size, lastModified, head }
+const filedFiles = (page, year, month) => page.evaluate(async ({ year, month }) => {
+  try {
+    let dir = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Max Mustermann')).getDirectoryHandle('SpesenKit');
+    for (const part of ['Spesen', year, month]) dir = await dir.getDirectoryHandle(part);
+    const files = {};
+    for await (const [name, handle] of dir.entries()) { const f = await handle.getFile(); files[name] = { size: f.size, lastModified: f.lastModified, head: await f.slice(0, 4).text() }; }
+    return files;
+  } catch { return {}; }
+}, { year, month });
 const readFolder = (page) => page.evaluate(async () => {
   try {
     const app = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Max Mustermann')).getDirectoryHandle('SpesenKit');
@@ -183,9 +194,34 @@ try {
   await check('Abschluss meldet Erfolg erst, wenn er im Ordner gespeichert ist', async () => {
     assert.equal(await folderStatus(page), 'ok', 'lokal geänderter Stand wurde beim Start in den Ordner geschrieben');
     await closeMonth('2026-06');
-    await until(async () => /im SpesenKit-Ordner gespeichert/.test(await page.locator('.toast').innerText({ timeout: 500 }).catch(() => '')), 'Erfolgsmeldung');
+    await until(async () => /im SpesenKit-Ordner gespeichert\. Abgelegt in SpesenKit\\Spesen\\2026\\06/.test(await page.locator('.toast').innerText({ timeout: 500 }).catch(() => '')), 'Erfolgsmeldung mit Ablage');
     const folder = await readFolder(page);
     assert.equal(folder.file.state.statements.find((s) => s.month === '2026-06').locked, true);
+  });
+
+  await check('Ablage nach dem Abschluss: PDF und ZIP in Spesen/2026/06, Excel nur auf Wunsch, nichts überschrieben', async () => {
+    const files = await filedFiles(page, '2026', '06');
+    assert.deepEqual(Object.keys(files).sort(), ['Reisekosten_2026-06_V01.pdf', 'Reisekosten_2026-06_V01.zip']);
+    assert.equal(files['Reisekosten_2026-06_V01.pdf'].head, '%PDF'); assert.equal(files['Reisekosten_2026-06_V01.zip'].head.slice(0, 2), 'PK');
+    const section = page.getByRole('region', { name: 'Ablage im SpesenKit-Ordner' });
+    await page.locator('input[type=month]').fill('2026-06');
+    await workspace.getByRole('button', { name: /^Abrechnung (fortsetzen|ansehen)$/ }).click();
+    await until(async () => /abgelegt/.test(await section.innerText({ timeout: 1000 }).catch(() => '')), 'Ablageanzeige');
+    assert.match(await section.innerText(), /SpesenKit\\Spesen\\2026\\06/);
+    assert.equal(await section.getByRole('button', { name: 'Im SpesenKit-Ordner ablegen' }).count(), 0, 'nichts fehlt');
+    // Excel zusätzlich wählen, dann in der Abrechnung nachträglich ablegen.
+    await nav(page, 'Datensicherung');
+    await page.locator('.filing-formats').getByLabel('Excel').check();
+    await nav(page, 'Monatsübersicht'); await page.locator('input[type=month]').fill('2026-06');
+    await workspace.getByRole('button', { name: /^Abrechnung (fortsetzen|ansehen)$/ }).click();
+    await section.getByRole('button', { name: 'Im SpesenKit-Ordner ablegen' }).click();
+    await until(async () => (await filedFiles(page, '2026', '06'))['Reisekosten_2026-06_V01.xlsx'], 'Excel abgelegt');
+    const after = await filedFiles(page, '2026', '06');
+    assert.equal(after['Reisekosten_2026-06_V01.xlsx'].head.slice(0, 2), 'PK');
+    assert.deepEqual(after['Reisekosten_2026-06_V01.pdf'], files['Reisekosten_2026-06_V01.pdf'], 'PDF nicht neu geschrieben');
+    assert.equal(await section.getByRole('button', { name: 'Abrechnung drucken' }).count(), 1);
+    await page.locator('.filing-formats').count(); await nav(page, 'Datensicherung'); await page.locator('.filing-formats').getByLabel('Excel').uncheck();
+    await nav(page, 'Monatsübersicht');
   });
 
   await check('Abschluss bei nicht beschreibbarem Ordner: keine Erfolgsmeldung, klare Anzeige, nachholbar', async () => {
@@ -201,6 +237,26 @@ try {
     await page.evaluate(() => localStorage.removeItem('test-fail-write'));
     await banner.getByRole('button', { name: 'Erneut speichern' }).click();
     await until(async () => (await readFolder(page))?.file.state.statements.find((s) => s.month === '2026-07')?.locked, 'Abschluss im Ordner nachgeholt');
+    // Die beim Abschluss nicht mögliche Ablage bleibt als Hinweis stehen und lässt sich nachholen.
+    assert.deepEqual(await filedFiles(page, '2026', '07'), {});
+    await until(async () => /noch nicht im SpesenKit-Ordner abgelegt/.test(await banner.innerText({ timeout: 500 }).catch(() => '')), 'Ablagehinweis');
+    await banner.getByRole('button', { name: 'Erneut ablegen' }).click();
+    await until(async () => Object.keys(await filedFiles(page, '2026', '07')).length === 2, 'Ablage Juli nachgeholt');
+    await until(async () => (await banner.count()) === 0, 'Hinweis verschwindet');
+  });
+
+  await check('Fehler nur bei der Ablage: Abschluss bleibt gültig, Hinweis „Erneut ablegen“', async () => {
+    const seeded = await idbState(page);
+    seeded.trips.push({ ...seeded.trips[0], id: 'mai-trip', date: '2026-05-06', endDate: '2026-05-06' });
+    await writeIdb(page, seeded); await page.reload(); await ready(page);
+    await page.evaluate(() => localStorage.setItem('test-fail-write', 'V01.zip'));
+    await closeMonth('2026-05');
+    await until(async () => /noch nicht im SpesenKit-Ordner abgelegt/.test(await banner.innerText({ timeout: 500 }).catch(() => '')), 'Ablagehinweis');
+    assert.equal((await readFolder(page)).file.state.statements.find((s) => s.month === '2026-05').locked, true, 'Datenstand gesichert');
+    assert.deepEqual(Object.keys(await filedFiles(page, '2026', '05')), ['Reisekosten_2026-05_V01.pdf']);
+    await page.evaluate(() => localStorage.removeItem('test-fail-write'));
+    await banner.getByRole('button', { name: 'Erneut ablegen' }).click();
+    await until(async () => Object.keys(await filedFiles(page, '2026', '05')).length === 2, 'ZIP nachgeholt');
   });
 
   await check('nach Neustart ohne Berechtigung: Zugriff bestätigen, Abschluss bis dahin gesperrt', async () => {

@@ -664,7 +664,28 @@ Organisatorisch nötig: Ordnerrechte nur für den jeweiligen Mitarbeiter (die Da
 unverschlüsselt) und eine Sicherung des Laufwerks außerhalb des Servers.
 
 Bekannte Grenze: Belege liegen als Base64 in der Datei; bei vielen Fotos wird sie groß und bei jeder Änderung
-vollständig neu geschrieben. Automatische Ablage von PDF/Excel/ZIP (3.3b) und Sicherungsgenerationen (3.3c) folgen.
+vollständig neu geschrieben. Sicherungsgenerationen (3.3c) folgen.
+
+## Schritt 3.3b: Ablage abgeschlossener Abrechnungen
+
+Nach einem erfolgreichen Monatsabschluss (Datenstand im Ordner gesichert) legt SpesenKit die Dateien der Version ab:
+
+```text
+<gewählter Ordner>\SpesenKit\Spesen\2026\09\
+  Reisekosten_2026-09_V01.pdf    Standard
+  Reisekosten_2026-09_V01.zip    Standard (PDF, Abrechnungs-JSON, Belege – wie „ZIP + Belege“)
+  Reisekosten_2026-09_V01.xlsx   optional
+  Reisekosten_2026-09_V02.pdf    Korrektur: neue Version daneben
+```
+
+- Inhalt und Dateinamen entstehen über dieselben Funktionen wie die Export-Knöpfe, aus dem gespeicherten Stand der
+  Version (historische Belege/Profilangaben, Korrekturhinweis bei V02+).
+- Vorhandene Dateien werden nie überschrieben; abgelegt werden nur fehlende Formate. Nur abgeschlossene Versionen.
+- Formatwahl unter *Datensicherung → SpesenKit-Ordner* (pro Browserprofil, wie der Ordner selbst).
+- Scheitert die Ablage, bleibt der Abschluss gültig; ein Hinweis „Erneut ablegen“ bleibt sichtbar. War der Ordner
+  schon beim Abschluss nicht beschreibbar, erscheint der Hinweis, sobald er wieder bereit ist.
+- In der Abrechnungsansicht einer abgeschlossenen Version: Ablagestand je Datei, „Im SpesenKit-Ordner ablegen“ und
+  „Abrechnung drucken“ (PDF mit Druckdialog).
 
 ```sh
 npm run build

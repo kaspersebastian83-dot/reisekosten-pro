@@ -1,5 +1,12 @@
 # Release Notes
 
+## Ablage abgeschlossener Abrechnungen (Schritt 3.3b)
+
+- Nach dem Abschluss: PDF und ZIP (optional Excel) automatisch in `SpesenKit/Spesen/Jahr/Monat`, gleiche Inhalte und
+  Namen wie die Export-Knöpfe; nie überschreiben, Korrekturen als V02 daneben.
+- Abrechnungsansicht: Ablagestand, „Im SpesenKit-Ordner ablegen“, „Abrechnung drucken“.
+- Ablagefehler ändern den Abschluss nicht; Hinweis mit „Erneut ablegen“.
+
 ## Persönlicher SpesenKit-Ordner (Schritt 3.3a)
 
 - Einmal den persönlichen Mitarbeiterordner wählen; jede Änderung wird zusätzlich in

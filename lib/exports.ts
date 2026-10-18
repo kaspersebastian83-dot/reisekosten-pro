@@ -296,6 +296,14 @@ export function pdfFile(data: StatementData, state: AppState, number: string, co
   return { name: statementExportFilename(data.month, 'pdf', context), blob: doc.output("blob") as Blob };
 }
 
+/** Öffnet die PDF dieses Stands mit Druckdialog; ohne Pop-up-Erlaubnis wird sie stattdessen heruntergeladen. */
+export function printPdf(data: StatementData, state: AppState, number: string, context?: StatementExportContext) {
+  const doc = buildPdfDocument(data, state, number, context);
+  doc.autoPrint();
+  const opened = window.open(doc.output("bloburl") as unknown as string, "_blank");
+  if (!opened) doc.save(statementExportFilename(data.month, 'pdf', context));
+}
+
 export function exportPdf(
   data: StatementData,
   state: AppState,

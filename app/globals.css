@@ -2754,3 +2754,16 @@ button:focus-visible { outline: 3px solid #5a93d0; outline-offset: 3px; }
   .folder-banner button { width: 100%; justify-content: center; }
   .conflict-grid { grid-template-columns: 1fr; }
 }
+
+/* Ablage abgeschlossener Abrechnungen */
+.statement-filing .card-head button { display: inline-flex; align-items: center; gap: 6px; }
+.statement-filing code { overflow-wrap: anywhere; }
+.filing-list { list-style: none; margin: 10px 0 14px; padding: 0; display: grid; gap: 6px; }
+.filing-list li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.filing-list li span { font-weight: 700; overflow-wrap: anywhere; min-width: 0; }
+.filing-list li small { color: var(--muted); margin-left: auto; flex-shrink: 0; }
+.filing-list li.ok svg { color: #2e8b57; }
+.filing-list li.missing svg { color: var(--yellow); }
+.filing-formats { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px 12px; margin: 14px 0; display: flex; flex-wrap: wrap; gap: 8px 18px; min-width: 0; }
+.filing-formats legend { font-size: 13px; font-weight: 700; padding: 0 4px; max-width: 100%; overflow-wrap: anywhere; }
+.filing-formats label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }

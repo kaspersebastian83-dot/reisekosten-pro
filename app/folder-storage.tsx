@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, FolderOpen, HardDrive, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FolderOpen, HardDrive, Printer, RefreshCw } from "lucide-react";
 import {
   DATA_DIR, DATA_FILE, FOLDER_NAME, FolderError, decideReconcile, isEmptyState, readDataFile, resolveAppFolder,
   stateHash, stateSummary, writeDataFile, writeSafetyCopy, type FolderFile, type FolderLink,
 } from "../lib/folder-store";
 import { folderSupported, pickFolder, suiteLinks, withFolderLock } from "../lib/suite-link";
+import { defaultFilingFormats, filedStatus, fileStatement, filingFormatLabels, type FilingFormat, type FilingFormats, type FilingReport } from "../lib/statement-filing";
+import { printPdf } from "../lib/exports";
+import type { StatementSnapshot } from "../lib/types";
 import { appRelease } from "../lib/release";
 import type { AppState } from "../lib/types";
 
@@ -48,6 +51,9 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   const [busy, setBusy] = useState(false);
   /** Zuletzt bekannter Ordner: für die Berechtigungsabfrage direkt im Klick (ohne vorherige Datenbankabfrage). */
   const knownHandle = useRef<FolderLink["handle"] | null>(null);
+  const [filingFormats, setFilingFormatsState] = useState<FilingFormats>(defaultFilingFormats);
+  /** Abgeschlossen, aber Dateien noch nicht abgelegt: bleibt sichtbar, bis es geklappt hat. */
+  const [filingIssue, setFilingIssue] = useState<{ snapshotId: string; label: string; message: string } | null>(null);
   /** Lokale Änderungen, die noch nicht im Ordner sind, weil er gerade nicht beschreibbar ist. */
   const unsynced = useRef(false);
 
@@ -102,6 +108,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     catch (error) { setStatus({ kind: "error", name: FOLDER_NAME, message: `Gemeinsamer App-Speicher nicht lesbar: ${message(error)}` }); return; }
     if (!link) { setStatus({ kind: "none" }); return; }
     knownHandle.current = link.handle;
+    setFilingFormatsState({ ...defaultFilingFormats, ...link.filing });
     const permission = await link.handle.queryPermission?.({ mode: "readwrite" }).catch(() => "denied" as const) ?? "granted";
     if (permission !== "granted") { setStatus({ kind: "permission", name: linkName(link) }); return; }
     await reconcile(link);
@@ -254,7 +261,43 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     return () => removeEventListener("beforeunload", warn);
   }, []);
 
-  return { status, busy, afterLocalSave, flush, blocking, link, confirmAccess, resolveConflict, recreate, retry, disconnect };
+  /** Formatwahl für die Ablage (pro Browserprofil gespeichert, wie der Ordner selbst). */
+  const setFilingFormats = useCallback(async (next: FilingFormats) => {
+    setFilingFormatsState(next);
+    await withFolderLock(async () => {
+      const current = await suiteLinks.get();
+      if (current) await suiteLinks.set({ ...current, filing: next });
+    }).catch(() => undefined);
+  }, []);
+
+  /** Legt eine abgeschlossene Version im Ordner ab (fehlende Formate). Fehler bleiben als Hinweis sichtbar. */
+  const fileVersion = useCallback(async (snapshotId: string, label: string): Promise<FilingReport> => {
+    try {
+      if (statusRef.current.kind !== "ok") throw new Error(blockingText(statusRef.current) || "Kein verbundener, beschreibbarer SpesenKit-Ordner.");
+      const report = await withFolderLock(async () => {
+        const current = await suiteLinks.get();
+        if (!current) throw new Error("Kein SpesenKit-Ordner verbunden.");
+        return fileStatement(current.handle, committed()!, snapshotId, { ...defaultFilingFormats, ...current.filing });
+      });
+      setFilingIssue((issue) => issue?.snapshotId === snapshotId ? null : issue);
+      return report;
+    } catch (error) {
+      setFilingIssue({ snapshotId, label, message: message(error) });
+      throw error;
+    }
+  }, [committed]);
+
+  /** Abschluss steht lokal, Ordner war nicht beschreibbar: Ablage merken, Hinweis erscheint, sobald der Ordner wieder bereit ist. */
+  const deferFiling = useCallback((snapshotId: string, label: string, reason: string) => setFilingIssue({ snapshotId, label, message: reason }), []);
+
+  const checkFiled = useCallback(async (snapshotId: string) => {
+    if (statusRef.current.kind !== "ok") return null;
+    const current = await suiteLinks.get().catch(() => undefined);
+    if (!current) return null;
+    return filedStatus(current.handle, committed()!, snapshotId);
+  }, [committed]);
+
+  return { status, busy, afterLocalSave, flush, blocking, link, confirmAccess, resolveConflict, recreate, retry, disconnect, filingFormats, setFilingFormats, fileVersion, checkFiled, filingIssue, deferFiling };
 }
 export type FolderStorage = ReturnType<typeof useFolderStorage>;
 
@@ -302,6 +345,11 @@ export function FolderBanner({ folder, openBackup }: { folder: FolderStorage; op
     <div><b>Letzte Änderungen sind nicht im SpesenKit-Ordner gespeichert.</b><p>{status.message} Im Browser sind sie gespeichert.</p></div>
     <button className="primary" onClick={() => void folder.retry()} disabled={busy}><RefreshCw size={17} />Erneut speichern</button>
   </div>;
+  if (status.kind === "ok" && folder.filingIssue) { const issue = folder.filingIssue; return <div className="folder-banner warn" role="alert">
+    <AlertTriangle size={20} aria-hidden="true" />
+    <div><b>{issue.label} ist abgeschlossen und gespeichert – die Dateien sind noch nicht im SpesenKit-Ordner abgelegt.</b><p>{issue.message}</p></div>
+    <button className="primary" onClick={() => void folder.fileVersion(issue.snapshotId, issue.label).catch(() => undefined)} disabled={busy}><RefreshCw size={17} />Erneut ablegen</button>
+  </div>; }
   if (status.kind === "conflict") return <div className="folder-banner error" role="alert">
     <AlertTriangle size={20} aria-hidden="true" />
     <div><b>Offene Entscheidung: Welcher Datenstand gilt?</b><p>SpesenKit-Ordner und Browser weichen voneinander ab. Bis zur Entscheidung wird nur im Browser gespeichert.</p></div>
@@ -358,6 +406,9 @@ export function FolderCard({ folder }: { folder: FolderStorage }) {
     </div>
     {status.kind === "unsupported" ? <p>Dieser Browser kann keinen Ordner verwenden. Bitte SpesenKit in Microsoft Edge oder Google Chrome öffnen.</p> : <>
       <p>Wähle einmal deinen persönlichen Mitarbeiterordner (zum Beispiel <code>H:\Mitarbeiter\Dein Name</code>). SpesenKit legt darin den Ordner <code>{FOLDER_NAME}</code> an und speichert jede Änderung in <code>{FOLDER_NAME}/{DATA_DIR}/{DATA_FILE}</code>. So sind deine Daten auch nach dem Abmelden und an jedem Terminalserver da.</p>
+      {status.kind === "ok" && <fieldset className="filing-formats"><legend>Nach dem Monatsabschluss automatisch ablegen in <code>{`${FOLDER_NAME}\\Spesen\\Jahr\\Monat`}</code></legend>
+        {(Object.keys(filingFormatLabels) as FilingFormat[]).map((format) => <label key={format} className="check"><input type="checkbox" checked={folder.filingFormats[format]} onChange={(e) => void folder.setFilingFormats({ ...folder.filingFormats, [format]: e.target.checked })} />{filingFormatLabels[format]}</label>)}
+      </fieldset>}
       {status.kind === "ok" && <dl className="folder-facts"><div><dt>Ordner</dt><dd>{status.name}</dd></div><div><dt>Zuletzt gespeichert</dt><dd>{status.savedAt ? time(status.savedAt) : "–"}</dd></div><div><dt>Stand</dt><dd>{status.revision}</dd></div></dl>}
       {status.kind === "missing" && <p className="error-text">Die Datei fehlt im Ordner „{status.name}“. Wurde der Ordner verschoben, wähle ihn neu. Sonst kann die Datei aus dem Browserstand neu angelegt werden.</p>}
       {status.kind === "invalid" && <p className="error-text">{status.message} Wähle einen anderen Ordner oder lege die Datei bewusst neu an. Die unlesbare Datei bleibt dann als Kopie in „Sicherungen“ erhalten.</p>}
@@ -370,6 +421,34 @@ export function FolderCard({ folder }: { folder: FolderStorage }) {
         {linked && <button className="ghost" disabled={busy} onClick={() => void folder.disconnect()}>Verbindung trennen</button>}
       </div>
       <p className="muted">Wichtig: Nur du solltest Zugriff auf diesen Ordner haben – die Datei enthält deine Reisen und Belege unverschlüsselt. Bitte das Laufwerk zusätzlich regelmäßig außerhalb des Servers sichern lassen.</p>
+    </>}
+  </section>;
+}
+
+/** Ablage einer abgeschlossenen Version in der Abrechnungsansicht: Stand anzeigen, fehlende Dateien ablegen, drucken. */
+export function StatementFiling({ folder, snapshot, label, print }: { folder: FolderStorage; snapshot: StatementSnapshot; label: string; print: () => void }) {
+  const [filed, setFiled] = useState<Awaited<ReturnType<FolderStorage["checkFiled"]>>>(null);
+  const [working, setWorking] = useState(false);
+  const [note, setNote] = useState("");
+  const { status, checkFiled, fileVersion, filingFormats } = folder;
+  const refresh = useCallback(() => { checkFiled(snapshot.id).then(setFiled, () => setFiled(null)); }, [checkFiled, snapshot.id]);
+  useEffect(() => { setNote(""); refresh(); }, [refresh, status.kind, folder.filingIssue]);
+  const formats = (Object.keys(filingFormatLabels) as FilingFormat[]);
+  const missing = filed ? formats.filter((f) => filingFormats[f] && !filed.present[f]) : [];
+  return <section className="card statement-filing" aria-label="Ablage im SpesenKit-Ordner">
+    <div className="card-head"><div><p className="eyebrow">Ablage</p><h3>Im SpesenKit-Ordner</h3></div>
+      <button className="ghost" onClick={print}><Printer size={17} />Abrechnung drucken</button></div>
+    {status.kind !== "ok" ? <p className="muted">{status.kind === "none" || status.kind === "unsupported" ? "Kein SpesenKit-Ordner verbunden. Die Dateien lassen sich über die Export-Knöpfe herunterladen." : "Der SpesenKit-Ordner ist gerade nicht bereit (Hinweis oben)."}</p> : !filed ? <p className="muted">Ablage wird geprüft …</p> : <>
+      <p><code>{filed.folder}</code></p>
+      <ul className="filing-list">{formats.filter((f) => filingFormats[f] || filed.present[f]).map((f) => <li key={f} className={filed.present[f] ? "ok" : "missing"}>{filed.present[f] ? <CheckCircle2 size={16} aria-hidden="true" /> : <AlertTriangle size={16} aria-hidden="true" />}<span>{filed.names[f]}</span><small>{filed.present[f] ? "abgelegt" : "fehlt"}</small></li>)}</ul>
+      {missing.length > 0 && <button className="primary" disabled={working} onClick={async () => {
+        setWorking(true); setNote("");
+        try { const report = await fileVersion(snapshot.id, label); setNote(report.written.length ? `Abgelegt: ${report.written.join(", ")}` : "Alles war bereits abgelegt."); }
+        catch (error) { setNote(`Nicht abgelegt: ${message(error)}`); }
+        finally { setWorking(false); refresh(); }
+      }}>Im SpesenKit-Ordner ablegen</button>}
+      {note && <p className="muted" role="status">{note}</p>}
+      <p className="muted">Vorhandene Dateien werden nie überschrieben. Eine Korrektur wird als neue Version daneben abgelegt.</p>
     </>}
   </section>;
 }
