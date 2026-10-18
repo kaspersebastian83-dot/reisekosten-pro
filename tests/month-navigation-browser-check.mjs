@@ -7,6 +7,7 @@ import { readFile, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
+import { closeStatementInBrowser } from './close-statement-browser.mjs';
 const require = createRequire(import.meta.url);
 const engines = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const engine = process.env.BROWSER_ENGINE || 'chromium';
@@ -72,7 +73,7 @@ try {
         await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===1);const before=await state(page);
         assert.equal((await download(page,'PDF')).bytes.subarray(0,4).toString(),'%PDF');assert.equal((await download(page,'Excel')).bytes.subarray(0,2).toString(),'PK');
         assert.deepEqual(await state(page),before);assert.match(await monthButton('Januar').getAttribute('class'),/month-working/);
-        await page.locator('.statement-actions select').selectOption('freigegeben');const saved=await waitState(page,s=>s?.statements[0].locked);frozen=saved.statements[0];
+        await closeStatementInBrowser(page);const saved=await waitState(page,s=>s?.statements[0].locked);frozen=saved.statements[0];
         assert.match(await monthButton('Januar').getAttribute('class'),/month-closed/);assert.match(await monthButton('Januar').getAttribute('aria-label'),/Abgeschlossen/);
         await monthButton('Oktober').click();await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();const drafts=await waitState(page,s=>s?.statements.length===2);
         assert.match(await monthButton('Oktober').getAttribute('class'),/month-open/);
@@ -107,7 +108,7 @@ try {
       });
       await check(`${engine} ${viewport.width}: normal close updates backlog; offline reload keeps records and resets only session selection`,async()=>{
         await page.getByRole('button',{name:'Mit Juli 2026 beginnen',exact:true}).click();await page.getByRole('button',{name:'Spesenabrechnung erstellen',exact:true}).click();await waitState(page,s=>s?.statements.length===4);
-        await page.locator('.statement-actions select').selectOption('freigegeben');await waitState(page,s=>s?.statements.find(s=>s.month==='2026-07')?.locked);
+        await closeStatementInBrowser(page);await waitState(page,s=>s?.statements.find(s=>s.month==='2026-07')?.locked);
         assert.equal(await picker.inputValue(),'2026-07');await page.getByRole('button',{name:'Mit August 2026 beginnen',exact:true}).click();assert.equal(await picker.inputValue(),'2026-08');
         const before=await state(page);assert.deepEqual(before.statements[0],frozen);assert.deepEqual(before.trips,baseline.trips);assert.deepEqual(before.expenses,baseline.expenses);
         await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
