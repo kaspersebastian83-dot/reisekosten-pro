@@ -1,100 +1,100 @@
-# SpesenKit – Startanleitung
+# SpesenKit – Anleitung
 
-Für die Veröffentlichung als installierbare Web-App siehe
+Stand: Version 1.8.0. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
+Büro-Terminal (RDP, eigenes Windows-Profil) in **Edge oder Chrome** genutzt.
+
+**App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ – oder in der
+Projektzentrale ganz unten rechts unter „Weitere Apps“ auf **SpesenKit**.
+
+## Einmal einrichten
+
+1. **Einstellungen:** Name, Wohnadresse, erste Tätigkeitsstätte und Fahrzeuge
+   eintragen (Dienstwagen oder Privatwagen; beim Privatwagen Kilometerpauschale
+   oder tatsächliche Kosten). Das meistens genutzte Fahrzeug als **Standard**
+   markieren.
+2. **Ordner einrichten** (gelber Hinweis oben oder links unten): einen eigenen
+   Ordner wählen, z. B. im persönlichen Laufwerk. SpesenKit legt darin den
+   Ordner `SpesenKit` an und speichert jede Änderung dort. Ohne diesen Ordner
+   liegen die Daten nur im Browser – beim Abmelden oder an einem anderen
+   Terminalserver können sie dann fehlen.
+3. Nach einem Neustart des Browsers fragt SpesenKit einmal nach dem Zugriff auf
+   den Ordner: **Zugriff bestätigen**.
+
+## So läuft ein Monat
+
+Alles passiert in der **Monatsübersicht**.
+
+1. **Monat wählen:** oben in der Monatsleiste (Jan … Dez, Symbol = Stand des
+   Monats). „Mit … beginnen“ springt zum ältesten Monat mit offener Abrechnung.
+2. **Erfassen** über die Knöpfe oben:
+   - **Dienstreise erfassen** – Projekt (Nummer und Ort, z. B. `26.0123 Köln`),
+     Reisegrund, Ziel, Abfahrt und Rückkehr, Mahlzeiten. Rechts stehen
+     Abwesenheitsdauer und Verpflegungsvorschau.
+   - **Hotelrechnung** und **Sonstige Kosten** – Datum (Rechnungsdatum),
+     Betrag, Zahlungsart, Beleg als Datei; rechts Projekt und Reisezuordnung.
+   - **Beleg fotografieren** – Beleg ablegen und später zuordnen.
+   - **Fahrtenbuch importieren** – Vimcar-CSV oder andere CSV/XLSX.
+3. **Viele Einträge am Stück:** **Speichern & nächste** (oder Strg+Enter) hält
+   das Fenster offen und belegt den nächsten Eintrag vor (Reise: Folgetag,
+   Fahrzeug, Uhrzeiten; Kosten: Datum, Zahlungsart, Reise). **Speichern &
+   fertig** schließt.
+4. **Monat im Überblick:** je Tag die Verpflegung, darunter Reisen und Kosten.
+   Ein Klick auf eine Zeile öffnet sie zum **Bearbeiten oder Löschen**.
+   „Rechenweg“ erklärt die Berechnung des Tages.
+5. **Beleg-Eingang:** Warten fotografierte Belege, erscheint „N Belege warten
+   auf Zuordnung“ – **Nacheinander zuordnen** zeigt sie der Reihe nach.
+6. **Prüfen:** Die Prüfzeilen (ungeprüfte Reisen, Kosten, fehlende Belege,
+   mögliche Duplikate) zeigen in der Zeitleiste genau die betroffenen Einträge.
+   „Eindeutige Zeiten bestätigen“ bestätigt vollständige Fahrten gesammelt.
+7. **Abschließen:** rechts **Spesenabrechnung erstellen** → Abschlussprüfung →
+   **Monatsabrechnung abschließen** → **Verbindlich abschließen**. Danach ist
+   der Stand eingefroren; spätere Änderungen erscheinen als Korrekturentwurf
+   mit neuer Version.
+8. **Ablage:** Abgeschlossene Abrechnungen legt SpesenKit selbst im Ordner unter
+   `SpesenKit\Spesen\<Jahr>\<Monat>\` ab (PDF und ZIP mit Belegen; Excel
+   zuschaltbar). „Abrechnung drucken“ öffnet die PDF zum Drucken. Exporte
+   (PDF, Excel, CSV, DATEV-CSV, ZIP) gibt es zusätzlich in der Abrechnung.
+
+Freigabe und Auszahlung sind getrennt: SpesenKit gibt nichts automatisch frei
+und zahlt nichts aus.
+
+## Sicherungen
+
+- Automatisch im Ordner `SpesenKit\Sicherungen`: einmal täglich der Stand vor
+  der ersten Änderung (14 Tage, dazu je Monat einer für 12 Monate) und nach
+  jedem Monatsabschluss (bleibt dauerhaft).
+- **Datensicherung → Jetzt sichern** legt sofort eine Sicherung an;
+  „Wiederherstellen“ fragt vorher nach und sichert den aktuellen Stand.
+- Zusätzlich lässt sich unter **Datensicherung** eine JSON-Sicherung
+  herunterladen und wieder einspielen.
+
+## Beleg-Erkennung
+
+Beim ersten Einsatz der Texterkennung wird einmalig ein Sprachmodell geladen.
+Danach läuft die Erkennung im Browser; der Beleg wird dabei nicht an den
+Anbieter der App übertragen. PDF- und HEIC-Belege bleiben im ZIP im Original
+erhalten, werden aber nicht zuverlässig automatisch gelesen oder als Bildseite
+in die PDF eingebettet. Die Vorschläge immer kurz prüfen.
+
+## Fahrtenbuch-Import
+
+Vimcar: den Monat als **CSV** exportieren (der Vimcar-PDF-Bericht enthält keine
+Uhrzeiten). Beim erkannten Vimcar-Profil zählt nur `Betrieb_km`; Arbeitsweg und
+Privatfahrten werden nicht angesetzt. Die Abwesenheit eines Tages reicht von der
+ersten bis zur letzten Betriebsfahrt. Die Importprüfung zeigt jede Zeile mit
+Status; übernommen wird erst nach Bestätigung. Danach führt „Zur
+Monatsübersicht“ zurück in den Monat.
+
+## Für Entwickler
+
+Lokal starten mit Node.js 22 oder neuer (`npm ci`, `npm run dev`; unter
+Windows `START-WINDOWS.bat`, unter macOS `START-MAC.command`). Prüfung mit
+`npm test`, Browserchecks siehe README. Veröffentlichung über GitHub Pages:
 [GITHUB-PAGES-ANLEITUNG.md](GITHUB-PAGES-ANLEITUNG.md).
-
-## Schnellstart
-
-1. Installieren Sie einmalig Node.js 22 oder neuer von `nodejs.org`.
-2. Entpacken Sie den Projektordner.
-3. Öffnen Sie im Projektordner ein Terminal.
-4. Führen Sie `npm install` aus.
-5. Starten Sie die App mit `npm run dev`.
-6. Öffnen Sie die im Terminal angezeigte lokale Adresse im Browser.
-
-Auf dem Mac genügt normalerweise ein Doppelklick auf `START-MAC.command`. Die einmalige Installation läuft automatisch und die App öffnet sich anschließend im Browser.
-
-### Windows: Download wurde unterbrochen
-
-Meldungen mit `deprecated` sind nur Hinweise aus verwendeten Bibliotheken und
-kein Fehler. Bei `ECONNRESET` wurde die Internetverbindung während der
-einmaligen Installation unterbrochen. Ab Version 1.5.1 versucht
-`START-WINDOWS.bat` den Download automatisch bis zu dreimal erneut und erkennt
-unvollständige Installationen.
-
-Falls Windows zusätzlich `EPERM` meldet, schließen Sie alle geöffneten
-Terminal- und Reisekosten-Fenster und starten Sie Windows einmal neu. Starten
-Sie anschließend wieder `START-WINDOWS.bat`. Der Paket-Zwischenspeicher liegt
-künftig im Benutzerprofil und nicht mehr im Programmordner.
-
-## Fahrten importieren
-
-1. Öffnen Sie **Fahrten importieren**.
-2. Exportieren Sie in Vimcar den gewünschten Monat als **CSV** und wählen Sie
-   diese Datei aus. Für andere Fahrtenbücher sind auch XLSX oder CSV
-   möglich.
-3. Wählen Sie das Tabellenblatt und kontrollieren Sie die vorgeschlagene Spaltenzuordnung.
-4. Prüfen Sie die Vorschau und bestätigen Sie den Import.
-5. Kontrollieren Sie anschließend unter **Reisen** die gelb markierten Abwesenheitszeiten.
-
-Beim erkannten Vimcar-Profil importiert die App nur `Betrieb_km`. Arbeitsweg-
-und Privatfahrten werden nicht als Reisekosten angesetzt. Die Abwesenheitsdauer
-eines Tages beginnt mit der ersten Betriebsfahrt und endet mit der letzten
-Betriebsfahrt; `Fahrtdauer_min` bleibt als reine Fahrzeit dokumentiert. Eine
-Privatfahrt vor der ersten Betriebsfahrt wird gelb zur Bestätigung markiert.
-
-Wohnadresse und erste Tätigkeitsstätte werden einmalig unter **Einstellungen**
-eingetragen. Nahe GPS-Hausnummern derselben Straße werden bei der
-Adresszuordnung toleriert.
-
-Der bereitgestellte Vimcar-PDF-Bericht enthält keine Uhrzeiten und reicht daher
-nicht für eine Spesenberechnung. Laden Sie den CSV-Export desselben Zeitraums
-hoch. Die App erklärt dies verständlich, wenn versehentlich die PDF gewählt
-wurde.
-
-## Monatsabrechnung
-
-1. Wählen Sie oben den Abrechnungsmonat.
-2. Folgen Sie auf der Startseite den vier Schritten **Fahrten**, **Ausgaben**, **Prüfen** und **Abschließen**.
-3. Erfassen Sie typische Kosten über **Ausgabe**. Wählen Sie beispielsweise Parken, geben Sie nur den Betrag ein und drücken Sie Enter oder **Speichern**. Datum, Zahlungsart, Steuer und Reise werden vorgeschlagen.
-4. Für einen Beleg klicken Sie auf **Beleg** beziehungsweise auf das Kamera-Symbol am unteren Bildschirmrand. Auf Smartphone und iPad öffnet sich direkt die Kamera.
-5. Die lokale Texterkennung schlägt Datum, Betrag, Händler, Kategorie und Umsatzsteuer vor. Prüfen Sie die Angaben kurz und wählen Sie **Bestätigen & Ausgabe anlegen**. Die passende Reise wird nach dem Datum vorgeschlagen.
-6. Falls Sie gerade keine Zeit haben, wählen Sie **Nur im Eingang speichern**. Offene Belege können später unter **Kosten und Belege** kontrolliert werden.
-7. Bestätigen Sie eindeutige importierte Fahrten gesammelt. Mahlzeiten lassen sich unmittelbar in den Tageskarten anklicken.
-8. Öffnen Sie **Monatsabrechnungen**, kontrollieren Sie die Einzelaufstellung und exportieren Sie PDF, Excel, CSV, DATEV-CSV oder ein ZIP-Paket. Die PDF enthält ein Belegverzeichnis und fügt JPG-/PNG-Belege als Anhangseiten ein.
-9. Nach dem Status **freigegeben** wird die Abrechnung gesperrt. Korrekturen erfolgen über eine neue Version.
-
-## Dienstwagen und Privatwagen einrichten
-
-1. Öffnen Sie **Einstellungen**.
-2. Tragen Sie unter **Fahrzeuge & Kilometererstattung** Fahrzeug/Modell und Kennzeichen ein.
-3. Wählen Sie **Dienstwagen** oder **Privatwagen**.
-4. Beim Privatwagen wählen Sie zwischen **Kilometerpauschale** und **tatsächlichen Fahrzeugkosten**.
-5. Markieren Sie das meistens verwendete Fahrzeug als **Standard** und speichern Sie die Einstellungen.
-
-Das Standardfahrzeug wird bei neuen und importierten Fahrten vorgeschlagen. In einer Reise können Sie jederzeit ein anderes Fahrzeug wählen. Für einen Dienstwagen berechnet die App keine persönliche Kilometerpauschale. Die Monatsübersicht sowie PDF-, Excel- und CSV-Export enthalten Name, Monat, Fahrzeugart, Fahrzeug/Modell und Kennzeichen.
-
-## Beleg-Eingang
-
-Der **Beleg-Eingang** ist unter **Kosten & Belege** dauerhaft sichtbar. Über **Beleg fotografieren** können Sie einen Beleg aufnehmen und mit **Nur im Eingang speichern** für die spätere Prüfung ablegen.
-
-Beim ersten Einsatz der Texterkennung wird einmalig ein Sprachmodell geladen. Danach läuft die Erkennung im Browser; der fotografierte Beleg wird dabei nicht an den Anbieter der App übertragen. PDF- und HEIC-Belege bleiben im ZIP-Export im Original erhalten, werden jedoch nicht zuverlässig automatisch gelesen oder als Bildseite in die PDF eingebettet.
-
-## Start auf dem Mac, wenn Apple die Datei blockiert
-
-1. Klicken Sie mit der rechten Maustaste auf `START-MAC.command` und wählen Sie **Öffnen**.
-2. Bestätigen Sie anschließend noch einmal **Öffnen**.
-3. Falls diese Auswahl nicht erscheint, öffnen Sie **Systemeinstellungen → Datenschutz & Sicherheit**, scrollen nach unten und klicken bei der blockierten Datei auf **Dennoch öffnen**.
-4. Als sichere Alternative öffnen Sie das Terminal, tippen `xattr -dr com.apple.quarantine ` mit einem Leerzeichen am Ende, ziehen den entpackten Projektordner in das Terminalfenster und drücken Enter. Danach können Sie `START-MAC.command` doppelklicken.
-
-## Datensicherung
-
-Unter **Datensicherung** laden Sie eine vollständige JSON-Sicherung herunter. Bewahren Sie diese Datei an einem sicheren Ort auf. Über **Sicherung wiederherstellen** lässt sich der Datenstand auf demselben oder einem anderen Gerät einspielen.
-
-## Lokale Daten und Offline-Nutzung
-
-Die App speichert Daten in IndexedDB des verwendeten Browsers. Löschen Sie die Browserdaten nicht, ohne zuvor eine Sicherung zu erstellen. Nach dem ersten erfolgreichen Laden kann die App als PWA installiert und weitgehend offline verwendet werden.
 
 ## Wichtiger fachlicher Hinweis
 
-Die Anwendung dokumentiert und berechnet Reisekosten anhand der hinterlegten, versionierten Konfiguration. Sie ersetzt keine steuerliche Einzelfallberatung. Insbesondere die Drei-Monats-Regel, erste Tätigkeitsstätte, Auslandsreisen und interne Firmenregelungen müssen bei Zweifeln fachlich geprüft werden.
+Die Anwendung dokumentiert und berechnet Reisekosten anhand der hinterlegten,
+versionierten Konfiguration. Sie ersetzt keine steuerliche Einzelfallberatung.
+Insbesondere die Drei-Monats-Regel, erste Tätigkeitsstätte, Auslandsreisen und
+interne Firmenregelungen müssen bei Zweifeln fachlich geprüft werden.

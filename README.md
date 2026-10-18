@@ -2,7 +2,16 @@
 
 Dienstreisen · Spesen · Abrechnungen
 
-GitHub-Pages-Ausgabe · Die Release-Version kommt aus [package.json](package.json).
+**App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
+1.8.0 (Release-Version aus [package.json](package.json), Änderungen in
+[CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
+
+Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
+PlanKit, BelegKit, SpesenKit; Übersicht im
+[README der Projektzentrale](https://github.com/kaspersebastian83-dot/Projektzentrale#readme)).
+SpesenKit hat keinen Projektbezug: Die Projektzentrale öffnet es unten rechts
+unter „Weitere Apps“. Früherer Name „Reisekosten Pro“; Repository, Webadresse,
+Datenbank und Speicherformat behalten den alten Namen.
 
 Datenschutzfreundliche, deutschsprachige PWA für deutsche Reisekosten- und
 Spesenabrechnungen. Dienstreisen werden manuell erfasst und mit Kosten und
@@ -11,17 +20,33 @@ Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV-, DATEV-CSV- und ZIP-Exporte.
 
+## Aktueller Stand in Kürze (1.8.0)
+
+- **Navigation:** Monatsübersicht, Auswertungen, Einstellungen, Datensicherung.
+  Erfassen, Bearbeiten, Löschen, Import, Beleg-Eingang, Prüfen und Abschluss
+  laufen über die Monatsübersicht (Monatsleiste, Werkzeugleiste, Zeitleiste
+  „Monat im Überblick“, rechte Spalte mit Erstattung und Weg zum Abschluss).
+- **Speicher:** IndexedDB `reisekosten-pro` (v1, Store `state`, Schlüssel
+  `main`) und – nach „Ordner einrichten“ – die maßgebliche Datei
+  `SpesenKit/Daten/spesenkit.json` im persönlichen Ordner, dazu Ablage
+  `SpesenKit/Spesen/<Jahr>/<Monat>/` und Sicherungen `SpesenKit/Sicherungen/`.
+- **Formulare:** Reise- und Kostenfenster zweispaltig ohne Scrollen ab etwa
+  1366 × 660 px, Stapelerfassung mit „Speichern & nächste“ (Strg+Enter).
+- Die Abschnitte ab „Entwicklungsverlauf“ beschreiben die einzelnen Schritte
+  technisch und zum Zeitpunkt ihrer Einführung; spätere Abschnitte gehen vor.
+
 ## Datenschutzmodell
 
-- Reisekosten, Belege und persönliche Einstellungen liegen ausschließlich in
-  IndexedDB des verwendeten Browsers.
+- Reisekosten, Belege und persönliche Einstellungen liegen in IndexedDB des
+  verwendeten Browsers und – sobald eingerichtet – im persönlichen
+  SpesenKit-Ordner (Datei-Zugriff des Browsers, keine Übertragung).
 - GitHub Pages stellt nur den Programmcode bereit. Es gibt keinen Server, kein
   Benutzerkonto, keine Analytik und keine Übertragung Ihrer Abrechnungsdaten an
   GitHub.
 - Persönliche Angaben sind nicht im Repository vorbelegt. Name, Adressen,
   Fahrzeug und Kennzeichen werden erst in der laufenden App eingetragen.
-- Daten sind pro Browser und Gerät getrennt. Vor Browserwechsel, Gerätewechsel
-  oder Löschen von Websitedaten immer eine JSON-Sicherung erzeugen.
+- Ohne SpesenKit-Ordner sind die Daten pro Browser und Windows-Profil getrennt.
+  Den Ordner deshalb einrichten; zusätzlich ist eine JSON-Sicherung möglich.
 
 ## Auf GitHub Pages veröffentlichen
 
@@ -64,6 +89,11 @@ relative Pfade.
 
 ## Enthaltene Kernfunktionen
 
+- Monatsübersicht als Arbeitsplatz: Monatsleiste, Werkzeugleiste, Zeitleiste
+  mit Rechenweg je Tag, Prüffilter, Weg zum Abschluss
+- verbindlicher Monatsabschluss mit eingefrorenem Stand, Korrekturversionen
+- persönlicher SpesenKit-Ordner mit Ablage und automatischen Sicherungen
+- Stapelerfassung, Beleg-Eingang der Reihe nach, Löschen mit Protokoll
 - Vimcar-CSV-Erkennung mit sicherer Trennung von Betriebsfahrt, Arbeitsweg und
   Privatfahrt
 - Tagesabwesenheit von erster bis letzter Betriebsfahrt
@@ -81,6 +111,13 @@ Die ausgelieferten Inlandswerte sind eine editierbare Anfangskonfiguration.
 Die Anwendung ersetzt keine steuerliche Einzelfallberatung. Tarife,
 Drei-Monats-Regel, erste Tätigkeitsstätte, Auslandsreisen und interne
 Firmenregelungen sind bei Zweifeln fachlich zu prüfen.
+
+## Entwicklungsverlauf
+
+Die folgenden Abschnitte sind in der Reihenfolge der Einführung geschrieben.
+Erwähnte Reiter „Reisen“ und „Kosten & Belege“, die Schnellerfassung
+„Ausgabe“ und schwebende Knöpfe gibt es seit 1.8.0 nicht mehr (siehe
+„Navigation ohne …“ am Ende).
 
 ## Start- und Deployment-Prüfung (Bugfix Oktober 2026)
 
