@@ -64,8 +64,10 @@ try {
         await fits();await page.getByRole('button',{name:'Zurück zu Reisen',exact:true}).click();
         await nav(page,'Monatsübersicht');
         assert.doesNotMatch(await page.locator('.month-entry-workspace').innerText(),/Datei importieren|Fahrtenbuch importieren/);
-        await page.locator('.quick-top:visible, .quick-fab:visible').click();
-        await page.locator('.quick-sheet').getByRole('button',{name:'Schließen'}).click();
+        // In der Monatsübersicht gibt es keine doppelten Schnellknöpfe mehr; Kosten werden dort über den Arbeitsbereich erfasst.
+        assert.equal(await page.locator('.quick-top:visible, .quick-fab:visible').count(),0);
+        await page.locator('.month-entry-workspace').getByRole('button',{name:'Sonstige Kosten erfassen',exact:true}).click();
+        assert.equal(await page.locator('.topbar h1').innerText(),'Monatsübersicht');await page.locator('.modal').getByRole('button',{name:'Abbrechen',exact:true}).click();
         await page.locator('.month-entry-workspace').getByRole('button',{name:'Beleg fotografieren / OCR',exact:true}).click();
         await fits();await page.locator('.receipt-capture').getByRole('button',{name:'Schließen'}).click();
         assert.equal(await state(page),undefined);
@@ -128,7 +130,7 @@ try {
         await page.locator('input[type=month]').fill('2026-03');
         assert.match(await page.locator('.day-list').innerText(),/14,00/);
         const id=saved.trips[0].id;
-        await nav(page,'Monatsübersicht');await page.locator('.quick-top:visible, .quick-fab:visible').click();
+        await nav(page,'Kosten & Belege');await page.locator('.quick-top:visible, .quick-fab:visible').click();
         const quick=page.locator('.quick-sheet');await quick.locator('.quick-amount input').fill('12.50');
         await quick.getByRole('button',{name:'Datum, Zahlungsart oder Reise ändern',exact:true}).click();
         await quick.getByLabel('Datum',{exact:true}).fill('2026-03-09');await quick.getByLabel(/^Reise/).selectOption(id);
