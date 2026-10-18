@@ -220,6 +220,10 @@ try {
     assert.equal(after['Reisekosten_2026-06_V01.xlsx'].head.slice(0, 2), 'PK');
     assert.deepEqual(after['Reisekosten_2026-06_V01.pdf'], files['Reisekosten_2026-06_V01.pdf'], 'PDF nicht neu geschrieben');
     assert.equal(await section.getByRole('button', { name: 'Abrechnung drucken' }).count(), 1);
+    await section.screenshot({ path: path.join(output, 'ablage-1440.png') });
+    await page.setViewportSize({ width: 390, height: 844 }); await fits(page);
+    await section.screenshot({ path: path.join(output, 'ablage-390.png') });
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.locator('.filing-formats').count(); await nav(page, 'Datensicherung'); await page.locator('.filing-formats').getByLabel('Excel').uncheck();
     await nav(page, 'Monatsübersicht');
   });
