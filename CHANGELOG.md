@@ -1,5 +1,11 @@
 # Release Notes
 
+## Suite-Einbindung und neues Icon
+
+- Neues App-Icon (Koffer mit Euro-Zeichen, Amber) für Startbildschirm, Browser-Tab und Seitenleiste; im Stil der übrigen Apps.
+- Seitenleiste: Rückweg „Projektzentrale · Spektron · alle Apps“ (`../Projektzentrale/`).
+- Unverändert: Datenbank, Berechnung, Abschluss, Service Worker, Manifest-Identität (Name, id, scope), Exporte.
+
 
 ## Fehlerbehebung: App startete nach einem Update nicht mehr
 
