@@ -1,6 +1,22 @@
 # Release Notes
 
 
+## Fehlerbehebung: App startete nach einem Update nicht mehr
+
+- Ursache: Bei der Installation einer neuen Version holte der Service Worker die
+  `index.html` aus dem HTTP-Cache des Browsers (GitHub Pages erlaubt 10 Minuten).
+  Wer die App kurz vor einem Deploy geöffnet hatte, bekam die alte `index.html`
+  neben den neuen Programmdateien gespeichert. Die alten Dateien gibt es nach dem
+  Deploy nicht mehr (404) – Anzeige „Die Anwendung konnte nicht geladen werden“,
+  dauerhaft, auch nach „Erneut laden“ (gesehen in Safari nach PR #9).
+- Die Installation lädt die App-Shell jetzt immer frisch vom Server (`cache: "reload"`)
+  und prüft, dass jede in der `index.html` genannte Programmdatei mitgespeichert ist;
+  sonst wird die Installation verworfen und beim nächsten Start wiederholt.
+- Selbstreparatur: Findet die neue Version eine laufende kaputte Version (Shell ohne
+  ihre Dateien), ersetzt sie diese sofort und lädt die betroffenen Tabs neu. Ein
+  „Erneut laden“ genügt. Intakte Versionen werden wie bisher erst nach Zustimmung
+  aller Tabs („Jetzt aktualisieren“) ersetzt. Gespeicherte Daten bleiben unberührt.
+
 ## SpesenKit – sichtbare Umbenennung
 
 - Produktname und Untertitel: SpesenKit · Dienstreisen · Spesen · Abrechnungen.

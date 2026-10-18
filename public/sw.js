@@ -6,13 +6,39 @@ const appShell = ["./", "./manifest.webmanifest", "./favicon.svg", "./icon-192.p
   (path) => new URL(path, scopeUrl).href,
 );
 
+// HTML-Shell und Programmdateien müssen zur selben Version gehören. Die Shell nennt ihre Dateien unter ./assets/.
+const shellAssets = (html) => [...html.matchAll(/(?:src|href)="(\.\/assets\/[^"]+)"/g)].map((match) => new URL(match[1], scopeUrl).href);
+// Eine Shell ist kaputt, wenn sie Dateien nennt, die nicht im selben Cache liegen (Programmdateien der Vorversion sind nach
+// einem Deploy auf dem Server gelöscht – sie kämen nur noch als 404).
+async function brokenShell(cache) {
+  const shell = await cache.match(appShell[0]);
+  if (!shell) return false;
+  for (const url of shellAssets(await shell.text())) if (!(await cache.match(url))) return true;
+  return false;
+}
+let repairPrevious = false;
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(appShell)));
-  // Eine laufende Sitzung behält ihre Programmversion bis alle Tabs geschlossen sind.
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    // cache: "reload" – nie aus dem HTTP-Cache des Browsers: GitHub Pages erlaubt dort 10 Minuten. Sonst landet nach einem
+    // Deploy die alte index.html neben den neuen Programmdateien, und deren alte Dateien gibt es auf dem Server nicht mehr.
+    await cache.addAll(appShell.map((url) => new Request(url, { cache: "reload" })));
+    if (await brokenShell(cache)) {
+      await caches.delete(CACHE);
+      throw new Error("HTML-Shell passt nicht zu den Programmdateien dieser Version – Installation beim nächsten Start erneut.");
+    }
+    // Läuft gerade eine kaputte Version (Shell ohne ihre Dateien), startet sie nie und kann kein Update bestätigen: sofort ersetzen.
+    for (const key of await caches.keys()) {
+      if (key.startsWith(CACHE_PREFIX) && key !== CACHE && await brokenShell(await caches.open(key))) repairPrevious = true;
+    }
+    if (repairPrevious) await self.skipWaiting();
+    // Sonst behält eine laufende Sitzung ihre Programmversion, bis alle Tabs geschlossen sind.
+  })());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil((async () => {
+  const activated = (async () => {
     const keys = await caches.keys();
     await Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE).map((key) => caches.delete(key)));
     // Alte 1.6.0-Caches können mehrere Pages-Unterpfade enthalten.
@@ -25,7 +51,15 @@ self.addEventListener("activate", (event) => {
       if (!(await legacy.keys()).length) await caches.delete("reisekosten-pro-v1.6.0");
     }
     await self.clients.claim();
-  })());
+  })();
+  event.waitUntil(activated);
+  // Tabs, die an der kaputten Version hängen, mit der reparierten neu laden – erst NACH der Aktivierung: Eine Navigation
+  // braucht den fertigen Service Worker; innerhalb von waitUntil warteten beide aufeinander.
+  if (repairPrevious) activated.then(async () => {
+    for (const client of await self.clients.matchAll({ type: "window" })) {
+      if (client.url.startsWith(scopeUrl.href) && "navigate" in client) client.navigate(client.url).catch(() => undefined);
+    }
+  });
 });
 
 // All app tabs must hold readiness until the explicitly requested activation.
