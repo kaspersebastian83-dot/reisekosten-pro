@@ -75,3 +75,68 @@ it("bricht ab, wenn während der Bereitschaftsprüfung ein neuer App-Tab geöffn
   expect(skipped).toBe(0);
   expect(notices).toEqual(["CAN_UPDATE", "UPDATE_BLOCKED", "new:UPDATE_BLOCKED"]);
 });
+
+// Nach einem Deploy darf die neue Version nie die alte index.html aus dem HTTP-Cache des Browsers übernehmen:
+// Sie nennt Programmdateien, die auf GitHub Pages schon gelöscht sind (404 → „Die Anwendung konnte nicht geladen werden“).
+const SCOPE = "https://example.test/reisekosten-pro/";
+const shellHtml = (asset: string) => `<script type="module" crossorigin src="./assets/${asset}"></script><link rel="stylesheet" crossorigin href="./assets/index-X.css">`;
+function swMitCaches(stores: Record<string, Map<string, string>>, network: (url: string) => string, extra: Record<string, unknown> = {}) {
+  const handlers: Record<string, (event: unknown) => void> = {};
+  const requests: { url: string; cache?: string }[] = [];
+  const store = (name: string) => (stores[name] ??= new Map());
+  const cacheApi = (name: string) => ({
+    addAll: async (list: Request[]) => { for (const r of list) { requests.push({ url: r.url, cache: r.cache }); store(name).set(r.url, network(r.url)); } },
+    match: async (key: string | Request) => { const v = store(name).get(typeof key === "string" ? key : key.url); return v == null ? undefined : new Response(v); },
+    keys: async () => [...store(name).keys()].map((u) => new Request(u)),
+  });
+  const calls = { skipWaiting: 0, navigated: [] as string[] };
+  const source = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8")
+    .replace("__BUILD_ID__", "neu").replace("/* BUILD_ASSETS */", '"./assets/index-NEU.js", "./assets/index-X.css"');
+  vm.runInNewContext(source, {
+    URL, Response, Request,
+    self: { registration: { scope: SCOPE }, skipWaiting: async () => { calls.skipWaiting++; },
+      clients: { claim: async () => undefined, matchAll: async () => [{ url: SCOPE, navigate: async (u: string) => { calls.navigated.push(u); } }] },
+      addEventListener: (n: string, fn: (event: unknown) => void) => { handlers[n] = fn; } },
+    caches: { open: async (n: string) => cacheApi(n), keys: async () => Object.keys(stores), delete: async (n: string) => { delete stores[n]; return true; } },
+    ...extra,
+  });
+  const run = async (name: string) => { let p: Promise<unknown> = Promise.resolve(); handlers[name]({ waitUntil: (x: Promise<unknown>) => { p = x; } }); await p; };
+  return { run, requests, calls, stores };
+}
+const neuesNetz = (url: string) => (url === SCOPE ? shellHtml("index-NEU.js") : "datei");
+
+it("lädt die App-Shell bei der Installation am HTTP-Cache vorbei", async () => {
+  const sw = swMitCaches({}, neuesNetz);
+  await sw.run("install");
+  expect(sw.requests.find((r) => r.url === SCOPE)?.cache).toBe("reload");
+  expect(sw.requests.every((r) => r.cache === "reload")).toBe(true);
+  expect(sw.calls.skipWaiting).toBe(0);
+});
+
+it("verwirft eine Installation, deren HTML-Shell nicht zu den Programmdateien passt", async () => {
+  const sw = swMitCaches({}, (url) => (url === SCOPE ? shellHtml("index-ALT.js") : "datei"));
+  await expect(sw.run("install")).rejects.toThrow(/passt nicht/);
+  expect(Object.keys(sw.stores)).not.toContain("reisekosten-pro:/reisekosten-pro/:neu");
+});
+
+it("ersetzt eine laufende kaputte Version sofort und lädt ihre Tabs nach der Aktivierung neu", async () => {
+  // So sah es bei SpesenKit 1.7.0 aus: alte Shell, deren Programmdateien es nicht mehr gibt
+  const kaputt = new Map([[SCOPE, shellHtml("index-ALT.js")], [SCOPE + "assets/index-NEU.js", "datei"]]);
+  const sw = swMitCaches({ "reisekosten-pro:/reisekosten-pro/:kaputt": kaputt }, neuesNetz);
+  await sw.run("install");
+  expect(sw.calls.skipWaiting).toBe(1);
+  await sw.run("activate");
+  await new Promise((r) => setTimeout(r, 0));
+  expect(Object.keys(sw.stores)).toEqual(["reisekosten-pro:/reisekosten-pro/:neu"]);
+  expect(sw.calls.navigated).toEqual([SCOPE]);
+});
+
+it("lässt eine intakte laufende Version weiterlaufen, bis alle Tabs zustimmen", async () => {
+  const intakt = new Map([[SCOPE, shellHtml("index-ALT.js")], [SCOPE + "assets/index-ALT.js", "datei"], [SCOPE + "assets/index-X.css", "datei"]]);
+  const sw = swMitCaches({ "reisekosten-pro:/reisekosten-pro/:alt": intakt }, neuesNetz);
+  await sw.run("install");
+  expect(sw.calls.skipWaiting).toBe(0);
+  await sw.run("activate");
+  await new Promise((r) => setTimeout(r, 0));
+  expect(sw.calls.navigated).toEqual([]);
+});
