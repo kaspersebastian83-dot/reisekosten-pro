@@ -88,8 +88,10 @@ try {
       });
       await check(`${engine} ${viewport.width}: unsaved cost draft survives sidebar, return and month-change requests until explicit cancel`,async()=>{
         const before=await state(page);await workspace.getByRole('button',{name:'Hotelrechnung erfassen',exact:true}).click();const modal=page.locator('.modal');await modal.getByLabel('Beschreibung',{exact:true}).fill('Ungespeicherter synthetischer Hotelentwurf');
-        await rawNav('Monatsübersicht');assert.equal(await page.locator('.topbar h1').innerText(),'Kosten & Belege');assert.equal(await modal.getByLabel('Beschreibung',{exact:true}).inputValue(),'Ungespeicherter synthetischer Hotelentwurf');
-        await page.locator('.workspace-return button').evaluate(button=>button.click());assert.equal(await modal.count(),1);await picker.fill('2026-07');assert.equal(await picker.inputValue(),'2026-06');
+        // Das Formular liegt jetzt über der Monatsübersicht; Wechsel in einen anderen Bereich oder Monat bleibt gesperrt.
+        assert.equal(await page.locator('.topbar h1').innerText(),'Monatsübersicht');
+        await rawNav('Kosten & Belege');assert.equal(await page.locator('.topbar h1').innerText(),'Monatsübersicht');assert.equal(await modal.getByLabel('Beschreibung',{exact:true}).inputValue(),'Ungespeicherter synthetischer Hotelentwurf');
+        assert.equal(await modal.count(),1);await picker.fill('2026-07');assert.equal(await picker.inputValue(),'2026-06');
         assert.deepEqual(await state(page),before);await modal.getByRole('button',{name:'Abbrechen',exact:true}).click();await nav(page,'Monatsübersicht');assert.equal(await page.locator('.workspace-return').count(),0);assert.equal(await picker.inputValue(),'2026-06');assert.deepEqual(await state(page),before);
       });
       await check(`${engine} ${viewport.width}: existing pending settings protection also prevents silent internal navigation loss`,async()=>{

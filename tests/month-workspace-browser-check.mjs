@@ -117,7 +117,9 @@ try {
         await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();assert.deepEqual(await state(page),before);
         await nav(page,'Monatsübersicht');await selectMonth('2026-06');await assertJune();
         await clickAction('Dienstreise erfassen');await editor.getByRole('button',{name:'Abbrechen',exact:true}).click();
-        await page.getByRole('button',{name:'Zurück zum Monatsarbeitsbereich',exact:true}).click();await assertJune();assert.deepEqual(await state(page),before);
+        // Abbrechen bleibt in der Monatsübersicht: kein Tab-Wechsel, kein „Zurück“ nötig.
+        assert.equal(await page.locator('.topbar h1').innerText(),'Monatsübersicht');assert.equal(await page.getByRole('button',{name:'Zurück zum Monatsarbeitsbereich',exact:true}).count(),0);
+        await assertJune();assert.deepEqual(await state(page),before);
       });
       await check(`${engine} ${viewport.width}: explicit June draft creation, continuation and PDF/Excel export never auto-close or duplicate drafts`,async()=>{
         // Dispatch both activations to the same control; opening the report scrolls the page.

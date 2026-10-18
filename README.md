@@ -713,3 +713,10 @@ PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_EXECUTABLE=/pfad/zu/chromium node 
 - „JSON auswählen“ fragt jetzt ebenfalls vor dem Ersetzen nach (mit derselben Abschluss-Warnung) und sichert bei
   verbundenem Ordner vorher den aktuellen Stand.
 - Platzbedarf: Jede Sicherung enthält die Belege (Base64). Bei vielen Fotos entsprechend Laufwerksplatz einplanen.
+
+## Fluss 1: Erfassen direkt in der Monatsübersicht
+
+Die Monatsübersicht ist der Arbeitsplatz: „Dienstreise erfassen“, „Hotelrechnung erfassen“ und „Sonstige Kosten
+erfassen“ öffnen das jeweilige Formular über dem Monat, ohne Tabwechsel. Auch Hinweise der Abschlussprüfung werden
+dort bearbeitet. Die Tabs „Reisen“ und „Kosten & Belege“ bleiben für Suche und Bearbeitung über Monate. Ungespeicherte
+Eingaben sperren weiterhin Bereichs- und Monatswechsel. Berechnung, Abschluss und Datenformat sind unverändert.

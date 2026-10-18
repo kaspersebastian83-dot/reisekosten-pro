@@ -1,5 +1,17 @@
 # Release Notes
 
+## Erfassen direkt in der Monatsübersicht (Fluss, Schritt 1)
+
+- Dienstreise, Hotelrechnung und sonstige Kosten öffnen sich als Formular über dem Monat – kein Wechsel in „Reisen“
+  bzw. „Kosten & Belege“; nach Speichern oder Abbrechen geht es im Monat weiter.
+- Hinweise aus der Abschlussprüfung werden ebenfalls dort bearbeitet; die Prüfung bleibt sichtbar.
+- Keine doppelten „Beleg“/„Ausgabe“-Knöpfe mehr oben in der Monatsübersicht.
+- Reiseformular: vor der ersten Eingabe ein ruhiger Hinweis statt roter Fehler.
+- Kostenformular: Händler, Rechnungsnummer, Steuer, Erstattungsstatus und Anteil unter „Weitere Angaben“
+  (automatisch geöffnet, wenn dort Werte stehen).
+- Browserchecks an den neuen Ablauf angepasst; `workflow-browser-check` läuft wieder vollständig,
+  `review-browser-check` bestätigt die Wiederherstellungsrückfrage aus 3.3c.
+
 ## Sicherungsstände im SpesenKit-Ordner (Schritt 3.3c)
 
 - Tägliche Sicherung des Stands vor der ersten Änderung des Tages; Aufbewahrung 14 Tage + 12 Monatsstände.
