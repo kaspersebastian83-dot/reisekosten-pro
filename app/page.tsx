@@ -230,15 +230,15 @@ export default function Home() {
   const [workspaceEntry, setWorkspaceEntry] = useState<{month: string} | null>(null);
   const [expenseDraft, setExpenseDraft] = useState<Expense | null>(null);
   const finishWorkspaceEntry = () => {if (workspaceEntry) setMonth(workspaceEntry.month); setWorkspaceEntry(null); setExpenseDraft(null); setEditingTrip(null); setTab("Monatsübersicht");};
+  /** Kostenformular direkt über der Monatsübersicht (ohne Wechsel in „Kosten & Belege“). */
+  const [inlineExpense, setInlineExpense] = useState(false);
+  const finishInlineEntry = () => {setEditingTrip(null); setExpenseDraft(null); setEditingExpenseId(null); setInlineExpense(false);};
   const startMonthEntry = (kind: "trip" | "Hotel" | "Parken") => {
     const today = new Date().toLocaleDateString("sv-SE");
     const date = localCalendarMonth() === month ? today : `${month}-01`;
-    setWorkspaceEntry({month});
-    if (kind === "trip") {
-      setEditingTrip({...blankTrip(state.settings), date, endDate: date}); setTab("Reisen");
-    } else {
-      setExpenseDraft({...blankExpense(), date, category: kind}); setTab("Kosten & Belege");
-    }
+    // Erfassen bleibt in der Monatsübersicht: das Formular öffnet sich über dem Monat, danach geht es dort weiter.
+    if (kind === "trip") setEditingTrip({...blankTrip(state.settings), date, endDate: date});
+    else { setExpenseDraft({...blankExpense(), date, category: kind}); setInlineExpense(true); }
   };
   const leaveForm = () => {
     if (!pendingWork.current.size) return true;
@@ -415,7 +415,7 @@ export default function Home() {
             <h1>{tab}</h1>
           </div>
           <div className="top-actions">
-            {tab !== "Auswertungen" && <>
+            {tab !== "Auswertungen" && tab !== "Monatsübersicht" && <>
             <button
               className="ghost receipt-top"
               onClick={() => setReceiptCaptureOpen(true)}
@@ -507,12 +507,24 @@ export default function Home() {
               commitCorrection={commitCorrection}
               folder={folder}
               editClosingIssue={target => {
-                setWorkspaceEntry({month});
-                if (target.kind === "trip") { setEditingTrip(state.trips.find(trip => trip.id === target.id) || null); setTab("Reisen"); }
-                else { setEditingExpenseId(target.id); setTab("Kosten & Belege"); }
+                // Hinweise aus der Abschlussprüfung direkt hier bearbeiten; danach bleibt die Prüfung sichtbar.
+                if (target.kind === "trip") setEditingTrip(state.trips.find(trip => trip.id === target.id) || null);
+                else { setEditingExpenseId(target.id); setInlineExpense(true); }
               }}
             />
             </MonthNavigation>
+          )}
+          {tab === "Monatsübersicht" && editingTrip && (
+            <Trips formOnly state={state} month={month} update={update} notify={notify}
+              editing={editingTrip} setEditing={setEditingTrip} onSaved={finishInlineEntry}
+              openImport={() => undefined} openExpense={() => undefined} />
+          )}
+          {tab === "Monatsübersicht" && inlineExpense && (
+            <Expenses formOnly state={state} month={month} update={update} notify={notify}
+              openCapture={() => setReceiptCaptureOpen(true)}
+              initialDraft={expenseDraft} clearInitialDraft={() => setExpenseDraft(null)} workspaceMonth={month}
+              initialExpenseId={editingExpenseId} clearInitialExpense={() => setEditingExpenseId(null)}
+              onSaved={finishInlineEntry} onClosed={finishInlineEntry} />
           )}
           {tab === "Auswertungen" && <Reports state={state} month={month} />}
           {tab === "Einstellungen" && (
@@ -1812,7 +1824,10 @@ function Trips({
   openImport,
   openExpense,
   onSaved,
+  formOnly = false,
 }: {
+  /** Nur das Formular (über der Monatsübersicht), ohne Liste. */
+  formOnly?: boolean;
   state: AppState;
   month: string;
   update: (f: (s: AppState) => AppState) => void;
@@ -1856,7 +1871,7 @@ function Trips({
       return s;
     });
     setEditing(null);
-    notify("Reise erfasst. Hotelbeleg später in Kosten & Belege ergänzen; keine Übernachtungspauschale hinzugefügt.");
+    notify("Reise gespeichert. Eine Hotelrechnung bei Bedarf über „Hotelrechnung erfassen“ ergänzen; es wird keine Übernachtungspauschale hinzugefügt.");
     onSaved?.();
   };
   const del = (id: string) =>
@@ -1933,6 +1948,7 @@ function Trips({
   };
   return (
     <>
+      {!formOnly && <>
       <div className="toolbar trips-toolbar">
         <div className="search">
           <input
@@ -2083,6 +2099,7 @@ function Trips({
           );
         })}
       </div>
+      </>}
       {editing && (
         <Modal
           title={
@@ -2120,6 +2137,9 @@ function TripForm({ trip, setTrip, settings, trips }: {
   const originalProject = trips.find(t => t.id === trip.id)?.order;
   const existing = originalProject !== undefined;
   const errors = manualTripErrors(trip, originalProject);
+  // Vor der ersten Eingabe keine roten Fehler, nur ein ruhiger Hinweis auf die Pflichtangaben.
+  const [initial] = useState(() => JSON.stringify(trip));
+  const untouched = !existing && JSON.stringify(trip) === initial;
   const interval = manualTripInterval(trip);
   const days = errors.length ? [] : [...groupTripsByDay([trip])].map(([date, dayTrips]) => calculateDay(date, dayTrips, settings));
   const selectedVehicle = settings.vehicles.find(v => v.id === trip.vehicleId);
@@ -2145,7 +2165,9 @@ function TripForm({ trip, setTrip, settings, trips }: {
       <label>Abfahrt Uhrzeit *<input required type="time" step="1" value={trip.startTime} onChange={e => set("startTime", e.target.value)} /></label>
       <label>Rückkehr Datum *<input required type="date" value={trip.endDate || trip.date} onChange={e => set("endDate", e.target.value)} /></label>
       <label>Rückkehr Uhrzeit *<input required type="time" step="1" value={trip.endTime} onChange={e => set("endTime", e.target.value)} /></label>
-      {errors.length > 0 && <div className="wide trip-errors" role="alert">{errors.map(e => <p key={e}>{e}</p>)}</div>}
+      {errors.length > 0 && (untouched
+        ? <p className="wide trip-required">Bitte Projekt, Reisegrund, Reiseziel sowie Abfahrt und Rückkehr angeben.</p>
+        : <div className="wide trip-errors" role="alert">{errors.map(e => <p key={e}>{e}</p>)}</div>)}
       {interval && <div className="wide trip-summary"><b>Abwesenheitsdauer: {duration(interval.minutes)}</b><p>Keine Arbeitszeit. {interval.nights} Datumswechsel · {interval.nights + 1} Kalendertag(e).</p></div>}
       {(!!interval?.nights || trip.overnight) && <div className="wide">
         <label className="check"><input type="checkbox" checked={trip.overnight} onChange={e => set("overnight", e.target.checked)} />Alle {interval?.nights || 0} auswärtigen Übernachtungen zwischen Abfahrt und Rückkehr tatsächlich erfolgt</label>
@@ -2382,7 +2404,12 @@ function Expenses({
   initialExpenseId,
   clearInitialExpense,
   initialDraft, clearInitialDraft, workspaceMonth, onSaved,
+  formOnly = false, onClosed,
 }: {
+  /** Nur das Formular (über der Monatsübersicht), ohne Liste. */
+  formOnly?: boolean;
+  /** Formular ohne Speichern geschlossen. */
+  onClosed?: () => void;
   state: AppState;
   month: string;
   update: (f: (s: AppState) => AppState) => void;
@@ -2396,6 +2423,12 @@ function Expenses({
   onSaved?: () => void;
 }) {
   const [editing, setEditing] = useState<Expense | null>(null);
+  // Als Formular über der Monatsübersicht: nach Speichern oder Abbrechen wieder schließen.
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (editing) wasEditing.current = true;
+    else if (wasEditing.current && formOnly) { wasEditing.current = false; onClosed?.(); }
+  }, [editing, formOnly, onClosed]);
   useEffect(() => {
     if (initialDraft) {setEditing(initialDraft); clearInitialDraft?.();}
   }, [initialDraft, clearInitialDraft]);
@@ -2506,6 +2539,7 @@ function Expenses({
   };
   return (
     <>
+      {!formOnly && <>
       <section
         className={`receipt-inbox card ${inboxItems.length ? "" : "empty"}`}
       >
@@ -2619,6 +2653,7 @@ function Expenses({
           </article>
         ))}
       </div>
+      </>}
       {editing && (
         <Modal title="Kosten & Beleg" close={() => setEditing(null)}>
           {workspaceMonth && <p className="notice" role="status">Arbeitsmonat: {monthLabel(workspaceMonth)}. Rechnungsdatum bitte am Beleg prüfen.{validDate(editing.date) && !editing.date.startsWith(workspaceMonth) && ` Diese Ausgabe erscheint wegen ihres Rechnungsdatums in ${monthLabel(editing.date.slice(0,7))}.`}</p>}
@@ -2657,24 +2692,6 @@ function Expenses({
               />
             </label>
             <label>
-              Händler / Anbieter
-              <input
-                value={editing.merchant || ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, merchant: e.target.value })
-                }
-              />
-            </label>
-            <label>
-              Rechnungsnummer
-              <input
-                value={editing.invoiceNumber || ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, invoiceNumber: e.target.value })
-                }
-              />
-            </label>
-            <label>
               Brutto (€)
               <input
                 type="number"
@@ -2692,72 +2709,9 @@ function Expenses({
                 }}
               />
             </label>
-            <label>
-              Netto (€)
-              <input
-                type="number"
-                step="0.01"
-                value={editing.net}
-                onChange={(e) =>
-                  setEditing({ ...editing, net: Number(e.target.value) })
-                }
-              />
-            </label>
-            <label>
-              USt.-Satz
-              <select
-                value={editing.vatRate}
-                onChange={(e) =>
-                  setEditing({ ...editing, vatRate: Number(e.target.value) })
-                }
-              >
-                <option value="0">0 %</option>
-                <option value="7">7 %</option>
-                <option value="19">19 %</option>
-              </select>
-            </label>
-            <label>
-              Umsatzsteuer
-              <input
-                disabled
-                value={euro(round2(editing.gross - editing.net))}
-              />
-            </label>
             <PaymentSelect value={editing.paymentType} onChange={paymentType => setEditing({...editing, paymentType, paidBy:paymentPayer(paymentType)})} />
-            <label>
-              Erstattungsstatus
-              <select
-                value={editing.reimbursementStatus}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    reimbursementStatus: e.target
-                      .value as Expense["reimbursementStatus"],
-                  })
-                }
-              >
-                <option>offen</option>
-                <option>erstattet</option>
-                <option>nicht erstattungsfähig</option>
-              </select>
-            </label>
             <ReceiptLinkFields value={editing} onChange={patch=>setEditing({...editing,...patch})} trips={state.trips} travelLabel="Reisezuordnung" />
             <div className="wide"><ReceiptAttachment receipt={editing.receipt} /></div>
-            <label>
-              Dienstlicher Anteil (%)
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={editing.businessShare}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    businessShare: Number(e.target.value),
-                  })
-                }
-              />
-            </label>
             {editing.category === "Tanken" && (
               <>
                 <label>
@@ -2832,6 +2786,92 @@ function Expenses({
                 {editing.receipt?.name || "Datei auswählen oder fotografieren"}
               </b>
             </label>
+            <details className="wide expense-more" open={!!(editing.merchant || editing.invoiceNumber || editing.businessShare !== 100 || editing.reimbursementStatus !== "offen")}>
+              <summary>Weitere Angaben · Händler, Rechnungsnummer, Steuer, Erstattungsstatus, Anteil</summary>
+              <div className="form-grid">
+              <label>
+                Händler / Anbieter
+                <input
+                  value={editing.merchant || ""}
+                  onChange={(e) =>
+                    setEditing({ ...editing, merchant: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Rechnungsnummer
+                <input
+                  value={editing.invoiceNumber || ""}
+                  onChange={(e) =>
+                    setEditing({ ...editing, invoiceNumber: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Netto (€)
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editing.net}
+                  onChange={(e) =>
+                    setEditing({ ...editing, net: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label>
+                USt.-Satz
+                <select
+                  value={editing.vatRate}
+                  onChange={(e) =>
+                    setEditing({ ...editing, vatRate: Number(e.target.value) })
+                  }
+                >
+                  <option value="0">0 %</option>
+                  <option value="7">7 %</option>
+                  <option value="19">19 %</option>
+                </select>
+              </label>
+              <label>
+                Umsatzsteuer
+                <input
+                  disabled
+                  value={euro(round2(editing.gross - editing.net))}
+                />
+              </label>
+              <label>
+                Erstattungsstatus
+                <select
+                  value={editing.reimbursementStatus}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      reimbursementStatus: e.target
+                        .value as Expense["reimbursementStatus"],
+                    })
+                  }
+                >
+                  <option>offen</option>
+                  <option>erstattet</option>
+                  <option>nicht erstattungsfähig</option>
+                </select>
+              </label>
+              <label>
+                Dienstlicher Anteil (%)
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={editing.businessShare}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      businessShare: Number(e.target.value),
+                    })
+                  }
+                />
+              </label>
+              </div>
+            </details>
           </div>
           {mileageConflict && (
             <div className="error-box">
