@@ -32,6 +32,8 @@ export interface AnnualAnalysis {
   closedMonthCount: number;
   projects: { key: string; label: string; amount: number }[];
   unassignedProjectCosts: number;
+  /** Difference between rounded daily mileage and rounded project shares. */
+  projectRoundingAdjustment: number;
 }
 
 const add = (a: number, b: number) => Math.round((a + b + Number.EPSILON) * 100) / 100;
@@ -84,6 +86,7 @@ export function buildAnnualAnalysis(state: AppState, year: number): AnnualAnalys
   const projectAmounts = new Map<string, number>();
   const projectLabels = new Map<string, Set<string>>();
   let unassignedProjectCosts = 0;
+  let projectRoundingAdjustment = 0;
   const projectCost = (key: string, amount: number) => {
     if (amount === 0) return;
     if (!key) { unassignedProjectCosts = add(unassignedProjectCosts, amount); return; }
@@ -115,10 +118,21 @@ export function buildAnnualAnalysis(state: AppState, year: number): AnnualAnalys
       const rowProjectKeys = row.trips.map(resolveTripProject);
       const allowanceProject = rowProjectKeys.length && rowProjectKeys.every(Boolean) && new Set(rowProjectKeys).size === 1 ? rowProjectKeys[0] : '';
       projectCost(allowanceProject, row.allowanceAfter);
+      const dailyMileageByProject = new Map<string, number>();
       for (const mileage of row.contributions?.mileage || []) {
         const trip = tripById.get(mileage.tripId);
-        projectCost(trip ? resolveTripProject(trip) : '', mileage.amount);
+        const key = trip ? resolveTripProject(trip) : '';
+        dailyMileageByProject.set(key, (dailyMileageByProject.get(key) || 0) + mileage.amount);
       }
+      let allocatedDailyMileage = 0;
+      for (const [key, amount] of dailyMileageByProject) {
+        const roundedProjectAmount = add(0, amount);
+        projectCost(key, roundedProjectAmount);
+        allocatedDailyMileage = add(allocatedDailyMileage, roundedProjectAmount);
+      }
+      // Monthly statements round all mileage for a day together. Keep that
+      // amount authoritative and disclose any cross-project cent remainder.
+      projectRoundingAdjustment = add(projectRoundingAdjustment, add(row.mileage, -allocatedDailyMileage));
       for (const expenseDetail of row.contributions?.expenses || []) {
         const expense = expenseById.get(expenseDetail.id);
         if (!expense) continue;
@@ -141,5 +155,5 @@ export function buildAnnualAnalysis(state: AppState, year: number): AnnualAnalys
     const consistentLabel = labels.length <= 1 ? labels[0] : '';
     return { key, label: consistentLabel || key, amount };
   }).sort((a, b) => b.amount - a.amount || a.key.localeCompare(b.key));
-  return { year, months, totals, tripCount: tripIds.size, businessKm, allowanceDayCount: allowanceDays.size, travelDayCount: travelDays.size, entryMonthCount: entryMonths.size, closedMonthCount, projects, unassignedProjectCosts };
+  return { year, months, totals, tripCount: tripIds.size, businessKm, allowanceDayCount: allowanceDays.size, travelDayCount: travelDays.size, entryMonthCount: entryMonths.size, closedMonthCount, projects, unassignedProjectCosts, projectRoundingAdjustment };
 }

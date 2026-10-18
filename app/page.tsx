@@ -3171,6 +3171,7 @@ function Reports({ state, month }: { state: AppState; month: string }) {
           <p className="analysis-note">Keine verbindliche steuerliche oder buchhalterische Zuordnung. Tagespauschalen werden nur bei einem eindeutig belegten Projekt zugeordnet.</p>
           {analysis.projects.length ? <div className="analysis-rows">{analysis.projects.map(project => <div className="analysis-row" key={project.key}><span>{project.label}</span><b>{euro(project.amount)}</b></div>)}</div> : <p className="muted">Für dieses Jahr liegen keine eindeutig zuordenbaren Projektkosten vor.</p>}
           <div className="analysis-row unassigned-row"><span>Nicht eindeutig zugeordnet</span><b>{euro(analysis.unassignedProjectCosts)}</b></div>
+          {analysis.projectRoundingAdjustment !== 0 && <><div className="analysis-row"><span>Rundungsabgleich Kilometer</span><b>{euro(analysis.projectRoundingAdjustment)}</b></div><p className="analysis-note">Abgleich zwischen den gerundeten Tageskilometerbeträgen der Monatsabrechnung und den gerundeten Projektanteilen.</p></>}
         </section>
 
         <section className="card analysis-card" aria-labelledby="reimbursements-heading">

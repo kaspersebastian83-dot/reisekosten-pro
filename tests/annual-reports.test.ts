@@ -115,6 +115,38 @@ describe('Jahresauswertungen aus Monatsberechnungen', () => {
     expect(result.unassignedProjectCosts).toBe(0);
   });
 
+  it('rundet Kilometerbeiträge je Projekt und Tag wie die Monatsabrechnung und weist Centreste transparent aus', () => {
+    const state = fresh();
+    state.trips = [
+      trip({ id: 'mileage-a', date: '2026-03-10', endDate: '2026-03-10', startTime: '08:00', endTime: '12:00', businessKm: 1.25, vehicleId: 'vehicle-private-default', vehicleType: 'privatfahrzeug', order: '26.0123 Musterstadt' }),
+      trip({ id: 'mileage-b', date: '2026-03-10', endDate: '2026-03-10', startTime: '13:00', endTime: '17:00', businessKm: 1.25, vehicleId: 'vehicle-private-default', vehicleType: 'privatfahrzeug', order: '26.0145 Köln' }),
+    ];
+
+    const result = buildAnnualAnalysis(state, 2026);
+    const march = result.months[2].statement;
+
+    expect(march.rows[0].contributions?.mileage.map(item => item.amount)).toEqual([0.375, 0.375]);
+    expect(march.rows[0].mileage).toBe(0.75);
+    expect(march.totals.mileage).toBe(0.75);
+    expect(result.projects.map(project => project.amount)).toEqual([0.38, 0.38]);
+    expect(result.projectRoundingAdjustment).toBe(-0.01);
+    expect(result.projects.reduce((sum, project) => sum + project.amount, 0) + result.unassignedProjectCosts + result.projectRoundingAdjustment).toBe(result.totals.grandTotal);
+  });
+
+  it('rundet mehrere Kilometerbeiträge desselben Projekts gemeinsam statt jeden Fahrtanteil einzeln', () => {
+    const state = fresh();
+    state.trips = [
+      trip({ id: 'mileage-a', date: '2026-03-10', endDate: '2026-03-10', startTime: '08:00', endTime: '12:00', businessKm: 1.25, vehicleId: 'vehicle-private-default', vehicleType: 'privatfahrzeug' }),
+      trip({ id: 'mileage-b', date: '2026-03-10', endDate: '2026-03-10', startTime: '13:00', endTime: '17:00', businessKm: 1.25, vehicleId: 'vehicle-private-default', vehicleType: 'privatfahrzeug' }),
+    ];
+
+    const result = buildAnnualAnalysis(state, 2026);
+
+    expect(result.months[2].statement.totals.mileage).toBe(0.75);
+    expect(result.projects.find(project => project.key === '26.0123')?.amount).toBe(result.totals.allowance + 0.75);
+    expect(result.projectRoundingAdjustment).toBe(0);
+  });
+
   it('zeigt Reisen ohne eindeutige Projektnummer als nicht zugeordnet', () => {
     const state = fresh(); state.trips = [trip({ order: '' })];
     const result = buildAnnualAnalysis(state, 2026);
