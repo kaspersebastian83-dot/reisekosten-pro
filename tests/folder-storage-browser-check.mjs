@@ -37,7 +37,24 @@ const harness = () => {
   FileSystemFileHandle.prototype.createWritable = async function (...args) {
     const fail = flag('test-fail-write');
     if (fail && (fail === '1' ? this.name === 'spesenkit.json' : this.name.endsWith(fail))) throw new DOMException('Netzlaufwerk nicht erreichbar', 'InvalidStateError');
-    return original.apply(this, args);
+    // Ein unabhängiger Schreiber umgeht absichtlich den navigator.locks-Namensraum der App.
+    if (flag('test-concurrent-save') && this.name.startsWith('spesenkit_vor_speichern_')) {
+      localStorage.removeItem('test-concurrent-save');
+      const root = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Max Mustermann')).getDirectoryHandle('SpesenKit');
+      const data = await root.getDirectoryHandle('Daten'), handle = await data.getFileHandle('spesenkit.json');
+      const file = JSON.parse(await (await handle.getFile()).text());
+      file.state.settings.profileName = 'Anderer Terminalserver'; file.revision += 1; file.savedAt = new Date().toISOString();
+      const copies = await root.getDirectoryHandle('Sicherungen');
+      const copy = await copies.getFileHandle(`spesenkit_speicherkandidat_2026-10-20_120000_${crypto.randomUUID()}.json`, { create: true });
+      const w = await original.call(copy); const text = JSON.stringify(file.state); await w.write(text); await w.close();
+      if (await (await copy.getFile()).text() !== text) throw Error('Synthetischer Kandidat nicht bestätigt');
+      const external = await original.call(handle); await external.write(JSON.stringify(file)); await external.close();
+    }
+    const writable = await original.apply(this, args);
+    if (flag('test-fail-candidate-close') && this.name.startsWith('spesenkit_speicherkandidat_')) {
+      return { write: (data) => writable.write(data), abort: () => writable.abort(), close: async () => { throw new DOMException('Sicherung nicht geschlossen', 'InvalidStateError'); } };
+    }
+    return writable;
   };
 };
 // Abgelegte Dateien eines Monats: Name -> { size, lastModified, head }
@@ -303,7 +320,7 @@ try {
   await check('Sicherungen: Tagessicherung, Abschluss-Sicherungen, „Jetzt sichern“, Wiederherstellen nur nach Bestätigung', async () => {
     const names = async () => (await readFolder(page)).copies.map((c) => c.name);
     const before = await names();
-    assert.equal(before.filter((n) => /^spesenkit_auto_\d{4}-\d{2}-\d{2}_\d{6}\.json$/.test(n)).length, 1, 'genau eine Tagessicherung heute');
+    assert.equal(before.filter((n) => /^spesenkit_auto_\d{4}-\d{2}-\d{2}_\d{6}(?:_[0-9a-f-]{36})?\.json$/.test(n)).length, 1, 'genau eine Tagessicherung heute');
     assert.ok(before.some((n) => n.startsWith('spesenkit_abschluss_2026-06_V01_')), 'Sicherung nach Abschluss Juni');
     assert.ok(before.some((n) => n.startsWith('spesenkit_abschluss_2026-05_V01_')), 'Sicherung nach Abschluss Mai (trotz Ablagefehler)');
     await nav(page, 'Datensicherung');
@@ -357,6 +374,65 @@ try {
 
   assert.deepEqual(errors, []);
   await context.close();
+
+  await check('konkurrierender Terminalserver: Entscheidung statt Erfolg; beide Kandidaten nach Neustart wiederherstellbar', async () => {
+    const ctx = await browser.newContext({ timezoneId: 'Europe/Berlin' }); await ctx.addInitScript(harness);
+    const p = await ctx.newPage(); await p.goto(url); await ready(p);
+    await p.locator('.folder-banner').getByRole('button', { name: 'Ordner einrichten' }).click();
+    await until(async () => (await folderStatus(p)) === 'ok', 'Ordner verbunden');
+    await p.evaluate(() => localStorage.setItem('test-concurrent-save', '1'));
+    await nav(p, 'Einstellungen'); await p.getByLabel('Name', { exact: true }).fill('Sitzung A');
+    await p.getByRole('button', { name: 'Einstellungen speichern', exact: true }).click();
+    const dialog = p.getByRole('dialog', { name: 'Welcher Datenstand gilt?' }); await dialog.waitFor();
+    assert.equal(await folderStatus(p), 'conflict');
+    const folder = await readFolder(p);
+    assert.equal(folder.file.state.settings.profileName, 'Anderer Terminalserver');
+    assert.equal((await idbState(p)).settings.profileName, 'Sitzung A');
+    const candidates = folder.copies.filter((copy) => copy.name.startsWith('spesenkit_speicherkandidat_'));
+    assert.ok(candidates.some((copy) => JSON.parse(copy.text).settings.profileName === 'Sitzung A'));
+    const other = candidates.find((copy) => JSON.parse(copy.text).settings.profileName === 'Anderer Terminalserver'); assert.ok(other);
+    await dialog.getByRole('button', { name: 'Browserstand behalten' }).click();
+    await until(async () => (await folderStatus(p)) === 'ok', 'Entscheidung gespeichert');
+    await p.reload(); await ready(p); await nav(p, 'Datensicherung');
+    const list = p.locator('.folder-backups'); await list.getByLabel('Speicherkandidaten und Vorgänger anzeigen').check();
+    const all = list.getByRole('button', { name: /^Alle \d+ anzeigen$/ }); if (await all.count()) await all.click();
+    p.once('dialog', (confirmation) => void confirmation.accept());
+    await list.locator(`tr[title="${other.name}"]`).getByRole('button', { name: 'Wiederherstellen' }).click();
+    await until(async () => (await readFolder(p))?.file.state.settings.profileName === 'Anderer Terminalserver', 'Speicherkandidat wiederhergestellt');
+    assert.equal((await idbState(p)).settings.profileName, 'Anderer Terminalserver');
+    assert.equal(await folderStatus(p), 'ok'); await ctx.close();
+  });
+
+  await check('fehlgeschlagene Kandidatensicherung: Fehlerstatus, Hauptdatei unverändert, Wiederholung möglich', async () => {
+    const ctx = await browser.newContext(); await ctx.addInitScript(harness);
+    const p = await ctx.newPage(); await p.goto(url); await ready(p);
+    await p.locator('.folder-banner').getByRole('button', { name: 'Ordner einrichten' }).click();
+    await until(async () => (await folderStatus(p)) === 'ok', 'Ordner verbunden');
+    const before = (await readFolder(p)).file;
+    await p.evaluate(() => localStorage.setItem('test-fail-candidate-close', '1'));
+    await nav(p, 'Einstellungen'); await p.getByLabel('Name', { exact: true }).fill('Nach Sicherungsfehler');
+    await p.getByRole('button', { name: 'Einstellungen speichern', exact: true }).click();
+    await until(async () => (await folderStatus(p)) === 'error', 'Fehler beim Sichern');
+    assert.deepEqual((await readFolder(p)).file, before);
+    assert.match(await p.locator('.folder-banner').innerText(), /nicht im SpesenKit-Ordner gespeichert/);
+    await p.evaluate(() => localStorage.removeItem('test-fail-candidate-close'));
+    await p.locator('.folder-banner').getByRole('button', { name: 'Erneut speichern' }).click();
+    await until(async () => (await folderStatus(p)) === 'ok', 'Sicherung und Schreiben wiederholt');
+    assert.equal((await readFolder(p)).file.state.settings.profileName, 'Nach Sicherungsfehler');
+    // Auch die neue Kandidatenwiederherstellung darf bei einem anschließenden Ordnerfehler keinen Erfolg melden.
+    const beforeRestore = (await readFolder(p)).file;
+    const oldCandidate = (await readFolder(p)).copies.find((copy) => copy.name.startsWith('spesenkit_speicherkandidat_') && JSON.parse(copy.text).settings.profileName === ''); assert.ok(oldCandidate);
+    await nav(p, 'Datensicherung'); const list = p.locator('.folder-backups');
+    await list.getByLabel('Speicherkandidaten und Vorgänger anzeigen').check();
+    await p.evaluate(() => localStorage.setItem('test-fail-write', '1'));
+    p.once('dialog', (confirmation) => void confirmation.accept());
+    await list.locator(`tr[title="${oldCandidate.name}"]`).getByRole('button', { name: 'Wiederherstellen' }).click();
+    await until(async () => (await folderStatus(p)) === 'error', 'Fehler beim Wiederherstellen im Ordner');
+    assert.deepEqual((await readFolder(p)).file, beforeRestore);
+    assert.equal((await idbState(p)).settings.profileName, '', 'Wiederherstellung nur lokal gespeichert');
+    assert.doesNotMatch(await p.locator('.toast').innerText().catch(() => ''), /Sicherung wiederhergestellt/);
+    await ctx.close();
+  });
 
   for (const viewport of [{ width: 390, height: 844 }, { width: 820, height: 1180 }, { width: 1440, height: 1000 }]) {
     await check(`Layout ${viewport.width}px: Hinweis, Ordnerkarte und Konfliktdialog ohne Überlauf`, async () => {

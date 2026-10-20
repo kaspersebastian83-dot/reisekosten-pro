@@ -112,6 +112,49 @@ Die Anwendung ersetzt keine steuerliche Einzelfallberatung. Tarife,
 Drei-Monats-Regel, erste Tätigkeitsstätte, Auslandsreisen und interne
 Firmenregelungen sind bei Zweifeln fachlich zu prüfen.
 
+## Gleichzeitiges Speichern in einem persönlichen Ordner
+
+Vor jedem Schreibversuch sichert die App den eigenen Datenstand als
+`Sicherungen/spesenkit_speicherkandidat_<Datum>_<Zeit>_<UUID>.json`. Vor dem Ersetzen wird auch der gelesene
+Vorgänger als `spesenkit_vor_speichern_….json` gesichert. Jede Kopie wird geschlossen und vollständig
+zurückgelesen, bevor die Hauptdatei ersetzt werden darf. Diese Kopien sind normale JSON-Sicherungen mit
+Reisen, Belegen und eingefrorenen Abrechnungen; sie werden nie automatisch gelöscht.
+
+Revision und erwarteter Inhaltsfingerabdruck werden geprüft. Vor dem Ersetzen wird die Datei erneut mit
+dem gelesenen Ausgangstext verglichen. Ein erkannter Konflikt verlangt die vorhandene Entscheidung
+„Ordnerstand übernehmen“ oder „Browserstand behalten“. Auch ein später bemerkter anderer Inhalt mit
+derselben oder einer älteren Revision verlangt eine Entscheidung.
+
+**Wiederherstellen:** Unter *Datensicherung → SpesenKit-Ordner → Sicherungen* die Auswahl
+„Speicherkandidaten und Vorgänger anzeigen“ aktivieren. Eine Kopie auswählen und den Inhalt in der
+Bestätigung prüfen. „Wiederherstellen“ sichert den aktuellen Stand und ersetzt ihn nach ausdrücklicher
+Bestätigung. Ein Kandidat kann aus einem fehlgeschlagenen oder konkurrierenden Versuch stammen; er ist
+keine Bestätigung eines erfolgreichen Schreibens und wird nicht automatisch mit dem aktuellen Stand zusammengeführt.
+Alte Sicherungsnamen ohne UUID bzw. mit Zähler bleiben lesbar.
+
+**Garantie und Grenze:** Mit dieser Speicherlogik bleiben beide konkurrierenden Speicherkandidaten
+erhalten, sobald ihre Kopien erfolgreich geschrieben und zurückgelesen wurden. Schlägt eine notwendige
+Sicherung oder Prüfung fehl, wird der eigene Schreibvorgang nicht als erfolgreich bestätigt. Die File System
+Access API bietet keine atomare serverübergreifende Operation „nur ersetzen, falls unverändert“.
+`navigator.locks` ordnet lediglich Tabs innerhalb desselben Browserprofils. Deshalb können im letzten
+Rennfenster weiterhin beide Sitzungen ihre jeweilige Hauptdatei erfolgreich zurücklesen; eine später
+überschriebene Fassung bleibt in ihren Kopien wiederherstellbar. Das ist Verlustschutz, keine globale
+Exklusivität oder automatische Zusammenführung. Spätere Änderungen werden beim nächsten Abgleich/Schreibversuch
+erkannt, nicht durch eine permanente Überwachung anderer Server.
+
+Alle beteiligten Sitzungen müssen die aktualisierte Speicherlogik verwenden. Unbeobachtete Änderungen alter
+App-Versionen oder externer Programme im letzten Rennfenster können nicht vollständig abgesichert werden.
+Ebenso ersetzt Rücklesen keine Sicherung gegen Hardwareausfall oder spätere Löschung. Jede Kopie enthält
+den vollständigen Datenbestand einschließlich Base64-Belegen: der Platzbedarf wächst mit den Schreibversuchen.
+Bei Platzmangel bleibt eine Fehlermeldung statt eines bestätigten Speichervorgangs. Eine automatische
+Bereinigung dieser Wiederherstellungskopien ist bewusst nicht eingerichtet.
+
+Regressionen: `tests/folder-concurrency.test.ts` pausiert unabhängige Schreiber ohne gemeinsame Browsersperre
+an festen Barrieren (unter anderem direkt vor Dateianlage/Schließen). Die Tests prüfen beide Kandidaten,
+Fehler bei Sicherung/Schreiben/Schließen/Rücklesen und die Wiederherstellbarkeit von Belegen und Abschlüssen.
+`tests/folder-storage-browser-check.mjs` prüft Konfliktdialog, Neustart, Kandidatenwiederherstellung und
+fehlgeschlagene Sicherungen im privaten Browserdateisystem. Ein echter SMB-/RDP-Betrieb ist damit nicht getestet.
+
 ## Entwicklungsverlauf
 
 Die folgenden Abschnitte sind in der Reihenfolge der Einführung geschrieben.
@@ -742,7 +785,8 @@ PLAYWRIGHT_MODULE=/pfad/zu/playwright BROWSER_EXECUTABLE=/pfad/zu/chromium node 
 | `spesenkit_browserstand_/ordnerstand_/ungueltig_….json` | Konflikte bzw. unlesbare Datei (3.3a) | dauerhaft |
 
 - Automatisch gelöscht werden ausschließlich Tagessicherungen mit genau diesem Namensmuster.
-- Eine fehlgeschlagene Sicherung blockiert das Speichern nicht; der Hinweis steht unter *Datensicherung*.
+- Eine fehlgeschlagene zusätzliche Tages- oder Abschluss-Sicherung wird als Hinweis angezeigt. Die notwendigen
+  Kandidaten- und Vorgängerkopien müssen dagegen erfolgreich geschrieben und geprüft sein, bevor ersetzt wird.
 - *Datensicherung → SpesenKit-Ordner* listet die Sicherungen (Zeitpunkt, Art, Größe). **Wiederherstellen** prüft die
   Datei wie „JSON auswählen“, fragt ausdrücklich nach, nennt abgeschlossene Abrechnungen, die danach nicht mehr im
   aktuellen Stand wären, und sichert vorher den aktuellen Stand. Danach wird wie bei jeder Änderung lokal und im

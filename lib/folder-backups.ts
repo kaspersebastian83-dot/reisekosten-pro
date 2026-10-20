@@ -12,24 +12,27 @@ import type { AppState } from "./types";
  *   spesenkit_browserstand_/ordnerstand_/ungueltig_  aus Konflikten bzw. unlesbarer Datei (3.3a)
  * Automatisch gelöscht werden ausschließlich Tagessicherungen mit genau diesem Namensmuster.
  */
-export type BackupKind = "auto" | "abschluss" | "manuell" | "vor_wiederherstellung" | "browserstand" | "ordnerstand" | "ungueltig" | "sonstige";
+export type BackupKind = "auto" | "abschluss" | "manuell" | "vor_wiederherstellung" | "browserstand" | "ordnerstand" | "speicherkandidat" | "vor_speichern" | "ungueltig" | "sonstige";
 export const backupKindLabels: Record<BackupKind, string> = {
   auto: "Tagessicherung", abschluss: "Monatsabschluss", manuell: "Manuell", vor_wiederherstellung: "Vor Wiederherstellung",
   browserstand: "Konflikt: Browserstand", ordnerstand: "Konflikt: Ordnerstand", ungueltig: "Unlesbare Datei", sonstige: "Sonstige",
+  speicherkandidat: "Speicherkandidat", vor_speichern: "Vor dem Speichern",
 };
 export interface BackupEntry { name: string; kind: BackupKind; detail: string; date: string; time: string; size: number; restorable: boolean }
 export interface RetentionPolicy { daily: number; monthly: number }
 export const defaultRetention: RetentionPolicy = { daily: 14, monthly: 12 };
 
-const NAME = /^spesenkit_(.+?)_(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(\d{2})(?:_\d+)?\.json$/;
-const AUTO = /^spesenkit_auto_\d{4}-\d{2}-\d{2}_\d{6}(?:_\d+)?\.json$/;
+// Bestehende Namen (ohne Suffix / mit Zähler) bleiben lesbar; neue Kopien tragen eine UUID.
+const SUFFIX = "(?:_(?:\\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))?";
+const NAME = new RegExp(`^spesenkit_(.+?)_(\\d{4}-\\d{2}-\\d{2})_(\\d{2})(\\d{2})(\\d{2})${SUFFIX}\\.json$`);
+const AUTO = new RegExp(`^spesenkit_auto_\\d{4}-\\d{2}-\\d{2}_\\d{6}${SUFFIX}\\.json$`);
 const localDate = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
 export function parseBackupName(name: string): Omit<BackupEntry, "size"> | null {
   const match = NAME.exec(name);
   if (!match) return null;
   const [, label, date, hh, mm, ss] = match;
-  const known = (["auto", "manuell", "vor_wiederherstellung", "browserstand", "ordnerstand", "ungueltig"] as const).find((kind) => label === kind);
+  const known = (["auto", "manuell", "vor_wiederherstellung", "browserstand", "ordnerstand", "speicherkandidat", "vor_speichern", "ungueltig"] as const).find((kind) => label === kind);
   const kind: BackupKind = known || (label.startsWith("abschluss_") ? "abschluss" : "sonstige");
   if (kind === "auto" && !AUTO.test(name)) return null;
   const detail = kind === "abschluss" ? label.slice("abschluss_".length).replace("_", " ") : "";

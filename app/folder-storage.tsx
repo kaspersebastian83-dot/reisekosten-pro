@@ -62,7 +62,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   const [backupRun, setBackupRun] = useState(0);
   /** Datendatei schreiben; beim ersten Speichern des Tages vorher den bisherigen Stand sichern (best effort). */
   const writeFile = (link: FolderLink, state: AppState, expected: number, options: { replaceInvalid?: boolean } = {}) =>
-    writeDataFile(link.handle, state, expected, appRelease, new Date(), { ...options, beforeReplace: async (current) => {
+    writeDataFile(link.handle, state, expected, appRelease, new Date(), { expectedHash: link.hash || undefined, ...options, beforeReplace: async (current) => {
       try { const result = await dailyBackup(link.handle, current.state); if (result.written) setBackupRun((n) => n + 1); setBackupNote(""); }
       catch (error) { setBackupNote(`Tagessicherung konnte nicht angelegt werden: ${message(error)}`); }
     } });
@@ -108,6 +108,18 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
       lastError.current = null;
     } catch (error) {
       lastError.current = error instanceof Error ? error : new Error(message(error));
+      if (error instanceof FolderError && error.code === "conflict") {
+        // Auch beim Abgleich selbst kann ein zweiter Server zwischen Lesen und Schreiben speichern.
+        // Erneut lesen, aber nicht automatisch entscheiden oder mit alter Revision weiterschreiben.
+        try {
+          const latest = await readDataFile(link.handle);
+          const local = committed();
+          if (latest && local) { setStatus({ kind: "conflict", name: linkName(link), file: latest, local }); return; }
+          if (!latest) { setStatus({ kind: "missing", name: linkName(link) }); return; }
+        } catch (failure) {
+          if (failure instanceof FolderError && failure.code === "invalid") { setStatus({ kind: "invalid", name: linkName(link), message: failure.message }); return; }
+        }
+      }
       setStatus({ kind: "error", name: linkName(link), message: message(error) });
     } finally { setBusy(false); }
   }, [committed, waitForLocal, adoptState, notify, setStatus]);
@@ -226,13 +238,16 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
           return `Ordnerstand übernommen. Der bisherige Browserstand liegt als Kopie in ${copy}.`;
         }
         const copy = await writeSafetyCopy(link.handle, "ordnerstand", file.state);
-        const result = await writeFile(link, local, file.content.revision);
+        const result = await writeFile({ ...link, hash: file.hash }, local, file.content.revision);
         const next = { ...link, ...result }; await suiteLinks.set(next); setStatus(okStatus(next));
         return `Browserstand im Ordner gespeichert. Der bisherige Ordnerstand liegt als Kopie in ${copy}.`;
       });
       if (outcome === "changed") { await reconcile(link); return; }
       notify(outcome);
-    } catch (error) { setStatus({ kind: "error", name: linkName(link), message: message(error) }); }
+    } catch (error) {
+      if (error instanceof FolderError && error.code === "conflict") await reconcile(link);
+      else setStatus({ kind: "error", name: linkName(link), message: message(error) });
+    }
     finally { setBusy(false); }
   }, [committed, waitForLocal, adoptState, notify, reconcile, setStatus]);
 
@@ -352,6 +367,10 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
       setBackupRun((n) => n + 1);
       afterLocalSave();
       await queue.current;
+      const synced = statusRef.current;
+      if (synced.kind !== "ok" || synced.pending) {
+        throw new Error(`Die Sicherung wurde im Browser geladen, aber noch nicht im SpesenKit-Ordner bestätigt. ${synced.kind === "error" ? synced.message : blockingText(synced) || "Bitte den Speicherhinweis prüfen."}`);
+      }
       notify(`Sicherung wiederhergestellt. Der vorherige Stand liegt in ${copy}.`);
     } finally { setBusy(false); }
   }, [committed, waitForLocal, adoptState, afterLocalSave, notify]);
@@ -443,7 +462,7 @@ export function FolderConflictDialog({ folder }: { folder: FolderStorage }) {
           {row(`SpesenKit-Ordner „${status.name}“`, fileSummary, `Gespeichert ${time(status.file.content.savedAt)} · Stand ${status.file.content.revision}`)}
           {row("Dieser Browser", localSummary, "Nur hier gespeichert")}
         </div>
-        <p className="muted">Nichts geht verloren: Der nicht gewählte Stand wird als Kopie in „{FOLDER_NAME}/Sicherungen“ abgelegt und kann unter Datensicherung → „JSON auswählen“ wiederhergestellt werden.</p>
+        <p className="muted">Vor der Übernahme wird der andere Stand als geprüfte Kopie in „{FOLDER_NAME}/Sicherungen“ abgelegt. Unter Datensicherung → Sicherungen lässt er sich nach Prüfung wiederherstellen. Dort bleiben auch Speicherkandidaten konkurrierender oder fehlgeschlagener Schreibversuche erhalten.</p>
         <div className="conflict-actions">
           <button className="primary" disabled={busy} onClick={() => void folder.resolveConflict("folder")}>Ordnerstand übernehmen</button>
           <button className="ghost" disabled={busy} onClick={() => void folder.resolveConflict("browser")}>Browserstand behalten</button>
@@ -521,6 +540,7 @@ const dateDe = (date: string, clock: string) => `${date.slice(8, 10)}.${date.sli
 function FolderBackups({ folder }: { folder: FolderStorage }) {
   const [entries, setEntries] = useState<BackupEntry[] | null>(null);
   const [all, setAll] = useState(false);
+  const [saveAttempts, setSaveAttempts] = useState(false);
   const [working, setWorking] = useState(false);
   const [note, setNote] = useState("");
   const { backups, backupRun } = folder;
@@ -536,17 +556,20 @@ function FolderBackups({ folder }: { folder: FolderStorage }) {
     } catch (error) { setNote(`Nicht wiederhergestellt: ${message(error)}`); }
     finally { setWorking(false); }
   };
-  const shown = entries ? (all ? entries : entries.slice(0, 10)) : [];
+  const visible = entries?.filter((entry) => saveAttempts || !["speicherkandidat", "vor_speichern"].includes(entry.kind));
+  const shown = visible ? (all ? visible : visible.slice(0, 10)) : [];
   return <div className="folder-backups">
     <div className="folder-backups-head"><h4>Sicherungen in <code>{`${FOLDER_NAME}\\${COPY_DIR}`}</code></h4>
       <button className="ghost" disabled={working || folder.busy} onClick={async () => { setWorking(true); setNote(""); try { await folder.backupNow(); setNote("Sicherung angelegt."); } catch (error) { setNote(message(error)); } finally { setWorking(false); } }}>Jetzt sichern</button></div>
-    <p className="muted">Automatisch: einmal täglich der Stand vor der ersten Änderung (die letzten 14 Tage, dazu je Monat einer für 12 Monate) und nach jedem Monatsabschluss (bleibt dauerhaft).</p>
+    <p className="muted">Automatisch: einmal täglich der Stand vor der ersten Änderung (die letzten 14 Tage, dazu je Monat einer für 12 Monate) und nach jedem Monatsabschluss. Vor jedem Schreibversuch werden zusätzlich der Speicherkandidat und der gelesene Vorgänger gesichert; diese Kopien bleiben dauerhaft.</p>
+    <p className="muted">Ein Speicherkandidat ist kein bestätigter Abschluss des Speichervorgangs: Er kann aus einem abgebrochenen oder konkurrierenden Versuch stammen. Vor dem Wiederherstellen den Inhalt prüfen; die Auswahl ersetzt den aktuellen Datenstand und führt ihn nicht automatisch zusammen.</p>
     {folder.backupNote && <p className="error-text" role="status">{folder.backupNote}</p>}
-    {entries === null ? <p className="muted">Sicherungen werden gelesen …</p> : entries.length === 0 ? <p className="muted">Noch keine Sicherungen vorhanden.</p> :
+    <label className="check"><input type="checkbox" checked={saveAttempts} onChange={(event) => setSaveAttempts(event.target.checked)} />Speicherkandidaten und Vorgänger anzeigen</label>
+    {entries === null ? <p className="muted">Sicherungen werden gelesen …</p> : !visible?.length ? <p className="muted">Keine Sicherungen in dieser Auswahl.</p> :
       <div className="table-wrap"><table className="backup-table"><thead><tr><th>Zeitpunkt</th><th>Art</th><th>Größe</th><th><span className="sr-only">Aktion</span></th></tr></thead>
         <tbody>{shown.map((entry) => <tr key={entry.name} title={entry.name}><td>{dateDe(entry.date, entry.time)}</td><td>{backupKindLabels[entry.kind]}{entry.detail ? ` ${entry.detail}` : ""}</td><td>{size(entry.size)}</td>
           <td>{entry.restorable && <button className="ghost small" disabled={working || folder.busy} onClick={() => void restore(entry)}>Wiederherstellen</button>}</td></tr>)}</tbody></table></div>}
-    {entries && entries.length > 10 && <button className="ghost" onClick={() => setAll(!all)}>{all ? "Weniger anzeigen" : `Alle ${entries.length} anzeigen`}</button>}
+    {visible && visible.length > 10 && <button className="ghost" onClick={() => setAll(!all)}>{all ? "Weniger anzeigen" : `Alle ${visible.length} anzeigen`}</button>}
     {note && <p className="muted" role="status">{note}</p>}
   </div>;
 }
