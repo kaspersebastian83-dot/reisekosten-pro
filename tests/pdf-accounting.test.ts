@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDocument, PDFName, degrees } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFDict, degrees } from 'pdf-lib';
 import JSZip from 'jszip';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -33,6 +33,14 @@ describe('Buchhaltung: PDF und eindeutige Belegzuordnung', () => {
     expect(content).toContain('413,20'); expect(content).toContain('Originalseite 2'); expect(content).toContain('Fiktiver Fahrschein');
     // Ein bereits gestrichener Rechteckpfad würde Bilder unsichtbar abschneiden (leere Anlagen).
     expect(content).toMatch(/re\s+W\s+n/); expect(content).not.toMatch(/re\s+S\s+W\s+n/);
+    // Corporate Identity auf jeder Seite, einschließlich sämtlicher Originalanlagen.
+    expect(content.match(/Dr\. Schiffers & Partner/g)).toHaveLength(document.getPageCount());
+    expect(content.match(/Spektron/g)).toHaveLength(document.getPageCount());
+    for (const page of document.getPages()) {
+      const resources = page.node.Resources()!;
+      const states = resources.lookup(PDFName.of('ExtGState'), PDFDict);
+      expect(states.values().some(value => String(document.context.lookup(value)).includes('0.045'))).toBe(true);
+    }
     expect(state).toEqual(before);
     if (process.env.PDF_SAMPLE_DIR) {
       await mkdir(process.env.PDF_SAMPLE_DIR, { recursive: true });

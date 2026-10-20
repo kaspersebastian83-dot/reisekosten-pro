@@ -1,4 +1,5 @@
-import { jsPDF } from 'jspdf';
+import { jsPDF, GState } from 'jspdf';
+import companyLogo from './assets/firmenlogo.png?inline';
 import autoTable, { type CellInput } from 'jspdf-autotable';
 import type { PDFDocument, PDFPage } from 'pdf-lib';
 import type { AppState, StatementData, Trip } from './types';
@@ -6,8 +7,11 @@ import { receiptIndex, type ReceiptEntry } from './receipt-index';
 import { correctionExportNotice, statementAmountLabel, type StatementExportContext } from './export-context';
 
 const M = 17, W = 176, TOP = 34, BOTTOM = 274;
-const navy: [number, number, number] = [32, 55, 77];
-const muted: [number, number, number] = [92, 108, 122];
+// Spektron-Palette aus app/globals.css; Firmenlogo wie in PlanKit.
+export const pdfCompanyName = 'Dr. Schiffers & Partner';
+const navy: [number, number, number] = [33, 48, 62];
+const brand: [number, number, number] = [53, 109, 168];
+const muted: [number, number, number] = [98, 120, 143];
 const clean = (value: unknown) => String(value ?? '').replace(/[\u00a0\u202f]/g, ' ').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
 const euro = (n: number) => clean(n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }));
 const date = (s: string) => s ? s.slice(0, 10).split('-').reverse().join('.') : '–';
@@ -78,9 +82,9 @@ function render(data: StatementData, state: AppState, number: string, context: S
       theme: head.length ? 'striped' : 'plain', showHead: 'everyPage', rowPageBreak: 'avoid',
       margin: { left: M, right: M, top: TOP, bottom: 23 },
       styles: { font: 'helvetica', fontSize: 8.3, cellPadding: 2.4, overflow: 'linebreak', valign: 'top', textColor: navy, lineColor: [225, 230, 235] },
-      headStyles: { fillColor: navy, textColor: [255, 255, 255], fontSize: 8.1 },
-      footStyles: { fillColor: [232, 240, 246], textColor: navy, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [246, 248, 250] },
+      headStyles: { fillColor: brand, textColor: [255, 255, 255], fontSize: 8.1 },
+      footStyles: { fillColor: [230, 240, 251], textColor: navy, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [244, 249, 254] },
       columnStyles: Object.fromEntries(widths.map((width, i) => [i, { cellWidth: width, halign: money.includes(i) ? 'right' : 'left' }])),
       willDrawPage: mark,
       didDrawCell: capture ? hook => { if (hook.section === 'body' && hook.column.index === 3) capture(hook.row.index, hook.cell.x, hook.cell.y, doc.getCurrentPageInfo().pageNumber); } : undefined,
@@ -103,7 +107,7 @@ function render(data: StatementData, state: AppState, number: string, context: S
     ...(state.settings.department ? [['Abteilung', state.settings.department]] : []),
     ...(state.settings.costCenter ? [['Kostenstelle', state.settings.costCenter]] : [])];
   table([], metadata.map(row => row.map(clean)), [36, 140]);
-  room(41); doc.setFillColor(232, 240, 246); doc.roundedRect(M, y, W, 34, 2, 2, 'F');
+  room(41); doc.setFillColor(230, 240, 251); doc.roundedRect(M, y, W, 34, 2, 2, 'F');
   doc.setTextColor(...navy); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.text(statementAmountLabel, M + 5, y + 9);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(25); doc.text(euro(data.totals.openAmount), M + 5, y + 25); y += 43;
   table(['Zusammensetzung', 'EUR'], [
@@ -196,17 +200,25 @@ function render(data: StatementData, state: AppState, number: string, context: S
   for (let page = 1; page <= total; page++) {
     doc.setPage(page); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...muted);
     doc.text(doc.splitTextToSize(clean(number), 85)[0], M, 12); doc.text(clean(`${month} · ${sections.get(page) || 'Abrechnung'}`), 193, 12, { align: 'right' });
-    doc.setDrawColor(215, 223, 230); doc.line(M, 17, 193, 17); doc.line(M, 281, 193, 281);
+    doc.setDrawColor(220, 232, 245); doc.line(M, 17, 193, 17); doc.line(M, 281, 193, 281);
     doc.text(doc.splitTextToSize(clean(`${state.settings.profileName || 'Name nicht hinterlegt'} · ${data.month}`), 138)[0], M, 287);
     doc.text(`Seite ${page} / ${total}`, 193, 287, { align: 'right' });
-    doc.setFontSize(6.5); doc.text(`SpesenKit · Erstellt ${new Date().toLocaleDateString('de-DE')} · ${context ? `Version ${context.version}` : 'Entwurf'}`, M, 292);
+    doc.setFontSize(7); doc.setTextColor(...brand); doc.text(pdfCompanyName, M, 292);
+    doc.setFontSize(6.5); doc.text('Spektron · SpesenKit', 193, 292, { align: 'right' });
   }
   return { doc, placements };
 }
 
 /** Synchroner Dokumentaufbau für bestehende Aufrufer; die Datei-Exporte ergänzen Original-PDF-Seiten. */
 export function buildStatementPdf(data: StatementData, state: AppState, number: string, context?: StatementExportContext) {
-  return render(data, state, number, context).doc;
+  const doc = render(data, state, number, context).doc;
+  for (let page = 1; page <= doc.getNumberOfPages(); page++) {
+    doc.setPage(page); doc.saveGraphicsState();
+    doc.setGState(new GState({ opacity: .045 }));
+    doc.addImage(companyLogo, 'PNG', 35, 86, 140, 140 * 462 / 517, 'Firmenlogo', 'FAST');
+    doc.restoreGraphicsState();
+  }
+  return doc;
 }
 
 /** Original-PDFs werden als Seiteninhalt eingebettet; Berechnung und Zustände werden nie verändert. */
@@ -247,6 +259,16 @@ export async function statementPdfBytes(data: StatementData, state: AppState, nu
         native.delete(placement.entry); failed.add(placement.entry); retry = true; break;
       }
     }
-    if (!retry) return target.save({ useObjectStreams: false });
+    if (!retry) {
+      // Nach dem Einbetten auch auf Originalanlagen sichtbar, ohne deren Text zu verdecken.
+      // Das transparente Original wird einmal eingebettet und auf allen Seiten wiederverwendet.
+      const watermark = await target.embedPng(pdfBytes(companyLogo));
+      const width = 140 * 72 / 25.4, height = width * watermark.height / watermark.width;
+      for (const page of target.getPages()) page.drawImage(watermark, {
+        x: (page.getWidth() - width) / 2, y: page.getHeight() - 86 * 72 / 25.4 - height,
+        width, height, opacity: .045,
+      });
+      return target.save({ useObjectStreams: false });
+    }
   }
 }

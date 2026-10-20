@@ -107,7 +107,10 @@ relative Pfade.
 
 ## PDF für die Buchhaltung
 
-Die PDF zeigt Name, Monat und persönlichen Erstattungsbetrag auf der Übersicht.
+Die PDF verwendet die blaue Spektron-Palette und das Firmenlogo von Dr. Schiffers & Partner
+als dezentes Wasserzeichen auf jeder Seite, einschließlich der Beleganlagen. Firmenname und
+„Spektron · SpesenKit“ stehen in der Fußzeile. Das Logo wird mitgeliefert; der Export lädt
+keine externe Grafik nach. Name, Monat und persönlicher Erstattungsbetrag stehen auf der Übersicht.
 Danach folgen Reisen mit Referenzen, gespeicherte Tagespauschalen und Kilometer,
 Ausgaben und ein Belegverzeichnis mit anklickbaren Anlagenseiten. Firmenzahlungen
 und bereits erstattete Ausgaben werden ausdrücklich bezeichnet.

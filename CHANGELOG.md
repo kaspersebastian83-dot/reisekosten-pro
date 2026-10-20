@@ -2,6 +2,9 @@
 
 ## Noch nicht veröffentlicht – Buchhaltungs-PDF
 
+- Corporate Identity der Spektron-Suite: blaue App-Palette, mitgeliefertes Firmenlogo als dezentes
+  Wasserzeichen auf allen Seiten und Firmenname „Dr. Schiffers & Partner“ in der Fußzeile.
+
 - A4-Abrechnung mit hervorgehobenen Stammdaten und Erstattungsbetrag, Reisen, Tagespauschalen,
   Zahlungshinweisen und nummerierter Belegzuordnung; wiederholte Tabellenköpfe und durchgehende Seitenzahlen.
 - PNG/JPEG, lange Bons mit Überlappung und sämtliche Seiten lesbarer Original-PDFs als Anlagen;
