@@ -1,5 +1,17 @@
 # Release Notes
 
+## Noch nicht veröffentlicht – Buchhaltungs-PDF
+
+- Corporate Identity der Spektron-Suite: blaue App-Palette, mitgeliefertes Firmenlogo als dezentes
+  Wasserzeichen auf allen Seiten und Firmenname „Dr. Schiffers & Partner“ in der Fußzeile.
+
+- A4-Abrechnung mit hervorgehobenen Stammdaten und Erstattungsbetrag, Reisen, Tagespauschalen,
+  Zahlungshinweisen und nummerierter Belegzuordnung; wiederholte Tabellenköpfe und durchgehende Seitenzahlen.
+- PNG/JPEG, lange Bons mit Überlappung und sämtliche Seiten lesbarer Original-PDFs als Anlagen;
+  fehlende oder nicht einbettbare Dateien werden ausdrücklich gekennzeichnet.
+- Gleiche Belegreihenfolge und zusätzliche Zuordnungsliste im ZIP. Berechnungsregeln und eingefrorene
+  Monatsstände bleiben unverändert. Reproduzierbare Musterabrechnung und gezielte Regressionstests.
+
 ## Noch nicht veröffentlicht – konkurrierende Ordnerspeicherung
 
 - Vor jedem Ersetzen von `spesenkit.json`: geprüfte Kopien des Speicherkandidaten und des gelesenen

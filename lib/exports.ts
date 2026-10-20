@@ -1,18 +1,14 @@
 import JSZip from "jszip";
 import Papa from "papaparse";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import type { AppState, StatementData } from "./types";
+import { buildStatementPdf, statementPdfBytes } from "./pdf-statement";
+import { receiptIndex } from "./receipt-index";
+import { correctionExportNotice, statementAmountLabel, type StatementExportContext } from "./export-context";
+export { correctionExportNotice, statementAmountLabel, type StatementExportContext } from "./export-context";
 
 const euro = (n: number) =>
   n.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 
-export interface StatementExportContext {
-  version: number;
-  correction: boolean;
-}
-export const correctionExportNotice = 'Korrekturversion: Die ausgewiesenen Beträge sind keine automatisch offenen Restzahlungen. Ein tatsächlicher Zahlungsbedarf muss mit bereits erfolgten Zahlungen gesondert abgestimmt werden. Vollständiger Abrechnungsstand, keine zusätzliche Buchung oder Nachzahlung.';
-export const statementAmountLabel = 'Persönlicher Erstattungsbetrag laut Abrechnungsstand';
 const versionSuffix = (context?: StatementExportContext) => context ? `V${String(context.version).padStart(2, '0')}` : 'Entwurf';
 export const statementExportFilename = (month: string, extension: string, context?: StatementExportContext, datev = false) => `${datev ? 'DATEV_' : ''}Reisekosten_${month}_${versionSuffix(context)}.${extension}`;
 
@@ -82,236 +78,27 @@ function download(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-export function buildPdfDocument(
-  data: StatementData,
-  state: AppState,
-  number: string,
-  context?: StatementExportContext,
-) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(17);
-  doc.text("Reisekostenabrechnung", 14, 16);
-  doc.setFontSize(10);
-  doc.text(context ? `Abrechnungsversion: Version ${context.version}` : 'Nicht gespeicherter Entwurf', 283, 16, { align: 'right' });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  const monthLabel = new Date(`${data.month}-01T12:00:00`).toLocaleDateString(
-    "de-DE",
-    { month: "long", year: "numeric" },
-  );
-  const vehicles = vehiclesForStatement(data, state);
-  doc.text(
-    `Name: ${state.settings.profileName || "nicht hinterlegt"}  ·  Firma: ${state.settings.company || "nicht hinterlegt"}`,
-    14,
-    23,
-  );
-  doc.text(
-    `Abrechnungsmonat: ${monthLabel}  ·  Abrechnungsnummer: ${number}${state.settings.costCenter ? `  ·  Kostenstelle: ${state.settings.costCenter}` : ""}`,
-    14,
-    28,
-  );
-  const vehicleLines = doc.splitTextToSize(
-    `Fahrzeug${vehicles.length === 1 ? "" : "e"}: ${vehicles.length ? vehicles.map(vehicleLabel).join("  |  ") : "keine Fahrzeugangabe"}`,
-    265,
-  );
-  doc.text(vehicleLines, 14, 33);
-  const noteLines: string[] = context?.correction ? doc.splitTextToSize(correctionExportNotice, 265) : [];
-  if (noteLines.length) doc.text(noteLines, 14, 33 + vehicleLines.length * 4);
-  autoTable(doc, {
-    startY: 36 + vehicleLines.length * 4 + noteLines.length * 4,
-    head: [
-      [
-        "Datum",
-        "Beginn",
-        "Ende",
-        "Abwesenheit",
-        "Ziel / Zweck",
-        "km",
-        "Spesen vor",
-        "Kürzung",
-        "Spesen nach",
-        "km-Erstattung",
-        "Hotel",
-        "Sonstiges",
-        "Persönl. Erstattung",
-      ],
-    ],
-    body: data.rows.map((r) => [
-      r.date.split("-").reverse().join("."),
-      r.firstStart,
-      r.lastEnd,
-      `${Math.floor(r.absenceMinutes / 60)}:${String(r.absenceMinutes % 60).padStart(2, "0")}`,
-      `${r.destinations.join(", ")} – ${r.trips
-        .map((t) => t.purpose)
-        .filter(Boolean)
-        .join(", ")}`,
-      r.totalKm.toLocaleString("de-DE"),
-      euro(r.allowanceBefore),
-      euro(r.breakfastCut + r.lunchCut + r.dinnerCut),
-      euro(r.allowanceAfter),
-      euro(r.mileage),
-      euro(r.accommodation),
-      euro(r.other + r.fuel),
-      euro(r.openAmount),
-    ]),
-    styles: { font: "helvetica", fontSize: 7, cellPadding: 1.6 },
-    headStyles: { fillColor: [21, 71, 52] },
-    margin: { left: 10, right: 10 },
-    didDrawPage: () => {
-      doc.setFontSize(7);
-      doc.text(
-        `Erstellt am ${new Date().toLocaleDateString("de-DE")} · Seite ${doc.getNumberOfPages()}`,
-        250,
-        202,
-      );
-    },
-  });
-  let y = ((doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || 100) + 8;
-  // Keep the longer neutral amount label and signature clear of a full table.
-  if (y + 22 > doc.internal.pageSize.getHeight() - 10) {
-    doc.addPage('a4', 'landscape'); y = 20;
-  }
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text(
-    `Spesen: ${euro(data.totals.allowance)}  |  Kilometer: ${euro(data.totals.mileage)}  |  Gesamtkosten: ${euro(data.totals.grandTotal)}`,
-    14,
-    y,
-  );
-  doc.text(`${statementAmountLabel}: ${euro(data.totals.openAmount)}`, 14, y + 5);
-  doc.setFont("helvetica", "normal");
-  doc.text(
-    "Ort/Datum: ____________________   Unterschrift Reisender: ____________________   Sachlich geprüft: ____________________   Freigabe/Buchhaltung: ____________________",
-    14,
-    y + 18,
-  );
-  const receipts = state.expenses
-    .filter((expense) => expense.date.startsWith(data.month) && expense.receipt)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  if (receipts.length) {
-    doc.addPage("a4", "landscape");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("Belegverzeichnis", 14, 17);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(
-      `${number} · ${receipts.length} Beleg${receipts.length === 1 ? "" : "e"}`,
-      14,
-      24,
-    );
-    autoTable(doc, {
-      startY: 30,
-      head: [
-        [
-          "Beleg",
-          "Datum",
-          "Kategorie",
-          "Händler / Beschreibung",
-          "Betrag",
-          "Zahlungsart",
-          "Datei",
-        ],
-      ],
-      body: receipts.map((expense, index) => [
-        `B-${data.month.replace("-", "")}-${String(index + 1).padStart(3, "0")}`,
-        expense.date.split("-").reverse().join("."),
-        expense.category,
-        expense.merchant || expense.description,
-        euro(expense.gross),
-        expense.paymentType,
-        expense.receipt!.name,
-      ]),
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [21, 71, 52] },
-      margin: { left: 14, right: 14 },
-    });
-    receipts.forEach((expense, index) => {
-      const receipt = expense.receipt!;
-      const supportedImage =
-        /^image\/(jpeg|jpg|png)$/i.test(receipt.type) ||
-        /^data:image\/(jpeg|jpg|png)/i.test(receipt.dataUrl);
-      doc.addPage("a4", "portrait");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      const receiptNumber = `B-${data.month.replace("-", "")}-${String(index + 1).padStart(3, "0")}`;
-      doc.text(
-        `${receiptNumber} · ${expense.category} · ${euro(expense.gross)}`,
-        12,
-        14,
-      );
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.text(
-        `${expense.date.split("-").reverse().join(".")} · ${expense.merchant || expense.description} · ${receipt.name}`,
-        12,
-        20,
-      );
-      if (supportedImage) {
-        try {
-          const properties = doc.getImageProperties(receipt.dataUrl);
-          const maxWidth = 186;
-          const maxHeight = 260;
-          const scale = Math.min(
-            maxWidth / properties.width,
-            maxHeight / properties.height,
-          );
-          const width = properties.width * scale;
-          const height = properties.height * scale;
-          doc.addImage(
-            receipt.dataUrl,
-            properties.fileType,
-            (210 - width) / 2,
-            27,
-            width,
-            height,
-            undefined,
-            "FAST",
-          );
-        } catch {
-          doc.text(
-            "Die Bildvorschau konnte nicht in die PDF eingebettet werden. Der Originalbeleg befindet sich im ZIP-Export.",
-            12,
-            35,
-            { maxWidth: 180 },
-          );
-        }
-      } else {
-        doc.text(
-          "Dieser Belegtyp wird im Original über das ZIP-Paket beigefügt. Eine Bildvorschau ist in der PDF nicht verfügbar.",
-          12,
-          35,
-          { maxWidth: 180 },
-        );
-      }
-    });
-  }
-  return doc;
+/** Bestehende synchrone Dokument-API; Datei-Exporte ergänzen Original-PDF-Belege. */
+export const buildPdfDocument = buildStatementPdf;
+
+/** Vollständige PDF mit Bild- und Original-PDF-Belegen für Download und Ordnerablage. */
+export async function pdfFile(data: StatementData, state: AppState, number: string, context?: StatementExportContext) {
+  const bytes = await statementPdfBytes(data, state, number, context);
+  return { name: statementExportFilename(data.month, 'pdf', context), blob: new Blob([bytes as BlobPart], { type: 'application/pdf' }) };
 }
 
-/** Dieselbe PDF wie „PDF“-Export, als Datei für die Ablage im SpesenKit-Ordner. */
-export function pdfFile(data: StatementData, state: AppState, number: string, context?: StatementExportContext) {
-  const doc = buildPdfDocument(data, state, number, context);
-  return { name: statementExportFilename(data.month, 'pdf', context), blob: doc.output("blob") as Blob };
+export async function printPdf(data: StatementData, state: AppState, number: string, context?: StatementExportContext) {
+  const bytes = await statementPdfBytes(data, state, number, context, true);
+  const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const opened = window.open(url, '_blank');
+  if (!opened) download(blob, statementExportFilename(data.month, 'pdf', context));
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-/** Öffnet die PDF dieses Stands mit Druckdialog; ohne Pop-up-Erlaubnis wird sie stattdessen heruntergeladen. */
-export function printPdf(data: StatementData, state: AppState, number: string, context?: StatementExportContext) {
-  const doc = buildPdfDocument(data, state, number, context);
-  doc.autoPrint();
-  const opened = window.open(doc.output("bloburl") as unknown as string, "_blank");
-  if (!opened) doc.save(statementExportFilename(data.month, 'pdf', context));
-}
-
-export function exportPdf(
-  data: StatementData,
-  state: AppState,
-  number: string,
-  context?: StatementExportContext,
-) {
-  const doc = buildPdfDocument(data, state, number, context);
-  doc.save(statementExportFilename(data.month, 'pdf', context));
+export async function exportPdf(data: StatementData, state: AppState, number: string, context?: StatementExportContext) {
+  const file = await pdfFile(data, state, number, context);
+  download(file.blob, file.name);
 }
 
 const rowsForExport = (data: StatementData, state: AppState) =>
@@ -459,20 +246,25 @@ export async function zipFile(
   context?: StatementExportContext,
 ) {
   const zip = new JSZip();
-  const pdf = buildPdfDocument(data, state, number, context);
+  const pdf = await pdfFile(data, state, number, context);
   zip.file(
     statementExportFilename(data.month, 'pdf', context),
-    pdf.output("arraybuffer"),
+    await pdf.blob.arrayBuffer(),
   );
   zip.file(
     `Abrechnung_${data.month}_${versionSuffix(context)}.json`,
     JSON.stringify({ number, data }, null, 2),
   );
-  state.expenses
-    .filter((e) => e.date.startsWith(data.month) && e.receipt)
-    .forEach((e) => {
-      const base64 = e.receipt!.dataUrl.split(",")[1];
-      zip.file(`Belege/${e.id}_${e.receipt!.name}`, base64, { base64: true });
-    });
+  const entries = receiptIndex(data, state);
+  for (const entry of entries) if (entry.expense.receipt && entry.archivePath) {
+    const base64 = entry.expense.receipt.dataUrl.split(',')[1];
+    zip.file(entry.archivePath, base64, { base64: true });
+  }
+  zip.file('Belegverzeichnis.csv', '\ufeff' + Papa.unparse(entries.map(entry => ({
+    Beleg: entry.number, Datum: entry.expense.date, Kostenart: entry.expense.category,
+    Beschreibung: entry.expense.description, Originalbetrag: entry.expense.gross,
+    Währung: entry.expense.currency, Datei: entry.archivePath || '',
+    Hinweis: entry.expense.receipt ? 'Originaldatei beigefügt' : 'Beleg fehlt',
+  })), { delimiter: ';' }));
   return { name: statementExportFilename(data.month, 'zip', context), blob: await zip.generateAsync({ type: "blob" }) };
 }
