@@ -1,5 +1,18 @@
 # Release Notes
 
+## Noch nicht veröffentlicht – konkurrierende Ordnerspeicherung
+
+- Vor jedem Ersetzen von `spesenkit.json`: geprüfte Kopien des Speicherkandidaten und des gelesenen
+  Vorgängers mit UUID im Namen. Sie bleiben dauerhaft in `Sicherungen`, auch bei Fehlern oder konkurrierenden
+  Terminalservern, und lassen sich unter Datensicherung wiederherstellen.
+- Revisions- und Inhaltsvergleich sowie erneute Dateivergleiche vor dem Ersetzen; erkannte fremde Stände
+  führen zur Konfliktentscheidung. Abweichender Inhalt mit gleicher/älterer Revision wird nicht automatisch geladen.
+- Kopien werden zurückgelesen; Fehler beim Sichern oder Prüfen stoppen das Ersetzen. Vorhandene Abschlüsse,
+  Datenformat 1 und ältere Sicherungsnamen bleiben kompatibel.
+- Keine globale Dateisperre: zwei getrennte Sitzungen können im letzten Rennfenster weiterhin beide ihren
+  eigenen Dateistand bestätigen. Bei aktualisierten Schreibern bleiben beide Stände als Kopien erhalten;
+  Erfolg bedeutet Rücklesebestätigung zum Prüfzeitpunkt, keine dauerhafte Exklusivität.
+
 ## 1.8.0 – Abschlussdurchlauf
 
 Zusammenfassung der Version: Ordnerablage und Sicherungen, Erfassen und Prüfen in der Monatsübersicht, Monatsleiste,

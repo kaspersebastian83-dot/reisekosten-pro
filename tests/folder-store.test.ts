@@ -113,16 +113,16 @@ describe("SpesenKit-Ordner: Datei schreiben und lesen", () => {
     await expect(writeDataFile(root, demoState(), 1, app, clock(1), { replaceInvalid: true })).rejects.toMatchObject({ code: "invalid" });
     const written = await writeDataFile(root, demoState(), 0, app, clock(1), { replaceInvalid: true });
     expect(written.revision).toBe(1);
-    expect([...root.dirs.get(COPY_DIR)!.files.values()]).toEqual(["{kaputt"]);
+    expect([...root.dirs.get(COPY_DIR)!.files.entries()].filter(([name]) => name.startsWith("spesenkit_ungueltig_")).map(([, text]) => text)).toEqual(["{kaputt"]);
   });
 
   it("schreibt Sicherungskopien im Format der JSON-Sicherung, ohne vorhandene zu überschreiben", async () => {
     const root = new FakeDir(FOLDER_NAME);
     const first = await writeSafetyCopy(root, "browserstand", demoState(), clock(5));
     const second = await writeSafetyCopy(root, "browserstand", emptyState, clock(5));
-    expect(first).toBe(`${FOLDER_NAME}/${COPY_DIR}/spesenkit_browserstand_2026-10-18_130500.json`);
-    expect(second).toBe(`${FOLDER_NAME}/${COPY_DIR}/spesenkit_browserstand_2026-10-18_130500_2.json`);
-    const restored = normalizeState(JSON.parse(root.file(COPY_DIR, "spesenkit_browserstand_2026-10-18_130500.json") as string));
+    expect(first).toMatch(/^SpesenKit\/Sicherungen\/spesenkit_browserstand_2026-10-18_130500_[0-9a-f-]{36}\.json$/);
+    expect(second).not.toBe(first);
+    const restored = normalizeState(JSON.parse(root.file(COPY_DIR, first.split("/").at(-1)!) as string));
     expect(restored.trips.length).toBe(demoState().trips.length);
   });
 });

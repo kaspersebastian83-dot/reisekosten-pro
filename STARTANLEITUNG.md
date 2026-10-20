@@ -67,6 +67,15 @@ und zahlt nichts aus.
   „Wiederherstellen“ fragt vorher nach und sichert den aktuellen Stand.
 - Zusätzlich lässt sich unter **Datensicherung** eine JSON-Sicherung
   herunterladen und wieder einspielen.
+- Vor jedem Schreibversuch bleiben zusätzlich geprüfte **Speicherkandidaten** und
+  Vorgängerstände erhalten. Unter **Datensicherung → Sicherungen → Speicherkandidaten
+  und Vorgänger anzeigen** lassen sich auch konkurrierende oder fehlgeschlagene
+  Versuche nach Prüfung wiederherstellen. Diese Kopien werden nicht automatisch
+  gelöscht und enthalten ebenfalls sämtliche Belege.
+- Bei abweichenden Datenständen ausdrücklich entscheiden, welcher Stand gilt.
+  Alle offenen Sitzungen sollten dieselbe aktuelle App-Version verwenden; eine
+  serverübergreifende Sperre gibt es nicht. Deshalb möglichst nur eine Sitzung
+  gleichzeitig bearbeiten. Die Kopien sichern die Wiederherstellung ab.
 
 ## Beleg-Erkennung
 

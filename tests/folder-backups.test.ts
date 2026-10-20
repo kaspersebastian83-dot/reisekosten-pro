@@ -46,7 +46,7 @@ describe("Sicherungsstände: Namen und Aufbewahrung", () => {
 
   it("schlägt nie Abschluss-, Konflikt-, manuelle oder fremde Dateien zum Löschen vor", () => {
     const now = at("2026-10-18");
-    const old = ["abschluss_2020-01_V01", "browserstand", "ordnerstand", "manuell", "vor_wiederherstellung", "ungueltig"].map((label) => ({ ...parseBackupName(`spesenkit_${label}_2020-01-01_090000.json`)!, size: 1 }));
+    const old = ["abschluss_2020-01_V01", "browserstand", "ordnerstand", "manuell", "vor_wiederherstellung", "speicherkandidat", "vor_speichern", "ungueltig"].map((label) => ({ ...parseBackupName(`spesenkit_${label}_2020-01-01_090000.json`)!, size: 1 }));
     const recent = Array.from({ length: 14 }, (_, i) => auto(`2026-10-${String(i + 1).padStart(2, "0")}`));
     expect(backupsToPrune([...old, ...recent, auto("2020-01-01")], now)).toEqual(["spesenkit_auto_2020-01-01_090000.json"]);
   });
@@ -58,11 +58,11 @@ describe("Sicherungsstände im Ordner", () => {
     const v1 = demoState(); const v2 = withTrip(v1, "a"); const v3 = withTrip(v2, "b");
     const backup = { beforeReplace: async (current: { state: AppState }) => { await dailyBackup(root, current.state, at("2026-10-18", "10:00:00")); } };
     await writeDataFile(root, v1, 0, app, at("2026-10-18", "09:00:00"), backup);
-    expect(await listBackups(root)).toEqual([]);
+    expect((await listBackups(root)).map((entry) => entry.kind)).toEqual(["speicherkandidat"]);
     await writeDataFile(root, v2, 1, app, at("2026-10-18", "10:00:00"), backup);
     await writeDataFile(root, v3, 2, app, at("2026-10-18", "10:05:00"), backup);
-    const list = await listBackups(root);
-    expect(list.map((e) => e.kind)).toEqual(["auto"]);
+    const list = (await listBackups(root)).filter((entry) => entry.kind === "auto");
+    expect(list).toHaveLength(1);
     const restored = await readBackup(root, list[0].name);
     expect(restored.trips.map((t) => t.id)).toEqual(v1.trips.map((t) => t.id));
     expect((await readDataFile(root))?.content.revision).toBe(3);
@@ -73,7 +73,7 @@ describe("Sicherungsstände im Ordner", () => {
     for (let day = 1; day <= 20; day++) await writeSafetyCopy(root, "auto", demoState(), at(`2026-09-${String(day).padStart(2, "0")}`));
     await writeSafetyCopy(root, "browserstand", demoState(), at("2026-01-01"));
     const result = await dailyBackup(root, demoState(), at("2026-10-18"));
-    expect(result.written).toMatch(/spesenkit_auto_2026-10-18_090000\.json$/);
+    expect(result.written).toMatch(/spesenkit_auto_2026-10-18_090000_[0-9a-f-]{36}\.json$/);
     const kinds = (await listBackups(root)).reduce<Record<string, number>>((n, e) => ({ ...n, [e.kind]: (n[e.kind] || 0) + 1 }), {});
     expect(kinds).toEqual({ auto: 14, browserstand: 1 });
     expect(result.pruned).toHaveLength(7);
@@ -84,7 +84,7 @@ describe("Sicherungsstände im Ordner", () => {
     const root = new FakeDir(FOLDER_NAME);
     const state = closed(demoState(), "2026-07", 1);
     const name = await closingBackup(root, state, "2026-07-v1", at("2026-08-02", "11:12:13"));
-    expect(name).toBe(`${FOLDER_NAME}/${COPY_DIR}/spesenkit_abschluss_2026-07_V01_2026-08-02_111213.json`);
+    expect(name).toMatch(/^SpesenKit\/Sicherungen\/spesenkit_abschluss_2026-07_V01_2026-08-02_111213_[0-9a-f-]{36}\.json$/);
     const [entry] = await listBackups(root);
     expect(entry).toMatchObject({ kind: "abschluss", detail: "2026-07 V01" });
     expect((await readBackup(root, entry.name)).statements[0].locked).toBe(true);
