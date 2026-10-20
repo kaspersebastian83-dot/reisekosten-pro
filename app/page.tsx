@@ -2365,6 +2365,8 @@ function Statements({
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [correctionSaving, setCorrectionSaving] = useState(false);
   const [correctionError, setCorrectionError] = useState("");
+  const [pdfWorking, setPdfWorking] = useState(false);
+  const pdfBusy = useRef(false);
   const correctionBusy = useRef(false);
   const reportHeading = useRef<HTMLElement>(null);
   useEffect(() => {if (reviewMonth === month) {reportHeading.current?.focus(); reportHeading.current?.scrollIntoView({block:"start"});}}, [reviewMonth, month]);
@@ -2387,6 +2389,13 @@ function Statements({
   const number =
     existing?.number ||
     `RK-${month.replace("-", "")}-${String(state.statements.length + 1).padStart(3, "0")}`;
+  const makePdf = async (print = false) => {
+    if (pdfBusy.current) return;
+    pdfBusy.current = true; setPdfWorking(true);
+    try { await (print ? printPdf : exportPdf)(statement, exportState, number, exportContext); }
+    catch { notify("Die PDF konnte nicht erstellt werden. Bitte erneut versuchen; die Abrechnung bleibt gespeichert."); }
+    finally { pdfBusy.current = false; setPdfWorking(false); }
+  };
   const usedVehicles = [
     ...new Map([
       ...statement.rows.flatMap((row) =>
@@ -2664,9 +2673,9 @@ function Statements({
           {exportContext?.correction && <p className="correction-payment-note">{correctionExportNotice} CSV-/DATEV-Exporte vor einer Übernahme mit der Buchhaltung abstimmen; frühere Versionen nicht zusätzlich buchen.</p>}
         </div>
         <div className="export-buttons">
-          <button onClick={() => exportPdf(statement, exportState, number, exportContext)}>
+          <button disabled={pdfWorking} onClick={() => void makePdf()}>
             <FileDown />
-            PDF
+            {pdfWorking ? 'PDF wird erstellt …' : 'PDF'}
           </button>
           <button onClick={() => exportExcel(statement, exportState, exportContext)}>
             <FileSpreadsheet />
@@ -2689,7 +2698,7 @@ function Statements({
           </button>
         </div>
       </section>
-      {existing && isClosedStatement(existing) && <StatementFiling folder={folder} snapshot={existing} label={`${monthLabel(month)} (Version ${existing.version})`} print={() => printPdf(statement, exportState, number, exportContext)} />}
+      {existing && isClosedStatement(existing) && <StatementFiling folder={folder} snapshot={existing} label={`${monthLabel(month)} (Version ${existing.version})`} print={() => void makePdf(true)} />}
       </>}
     </>
   );

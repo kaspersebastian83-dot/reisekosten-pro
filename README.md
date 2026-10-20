@@ -101,9 +101,39 @@ relative Pfade.
 - Mahlzeitenkürzungen und versionierte Tarife
 - Dienst- und Privatwagen mit fahrzeugbezogener Erstattungslogik
 - Kamera-/Dateierfassung, Beleg-Eingang und lokale OCR-Vorschläge
-- PDF-Abrechnung mit Belegverzeichnis und Bildanhängen
+- PDF-Abrechnung mit nummerierten Belegen, Bildanhängen und mehrseitigen Original-PDFs
 - PDF-, Excel-, CSV-, DATEV-CSV-, ZIP- und JSON-Export
 - lokale IndexedDB-Speicherung und PWA-Offlinenutzung
+
+## PDF für die Buchhaltung
+
+Die PDF zeigt Name, Monat und persönlichen Erstattungsbetrag auf der Übersicht.
+Danach folgen Reisen mit Referenzen, gespeicherte Tagespauschalen und Kilometer,
+Ausgaben und ein Belegverzeichnis mit anklickbaren Anlagenseiten. Firmenzahlungen
+und bereits erstattete Ausgaben werden ausdrücklich bezeichnet.
+
+Jede Kostenposition erhält eine Belegnummer wie `B-202609-001`. Anlagen folgen
+in derselben Reihenfolge: PNG/JPEG als lesbare Bildseiten, lange Bons überlappend
+auf mehreren Seiten, lesbare PDFs mit sämtlichen Originalseiten. Tabellenköpfe
+wiederholen sich bei Seitenumbrüchen; alle Seiten sind fortlaufend nummeriert.
+Fehlende Belege und nicht einbettbare Dateien werden sichtbar gekennzeichnet.
+Geschützte, defekte oder mit Anmerkungen bzw. Formularfeldern versehene PDFs
+sowie andere Bildformate müssen separat beigefügt werden. Der ZIP-Export enthält
+die Originaldateien und `Belegverzeichnis.csv` mit derselben Nummerierung.
+Es sind keine zusätzlichen Einstellungen nötig. Abgeschlossene Versionen nutzen
+ausschließlich ihren gespeicherten Rechenstand und Beleg-Snapshot.
+
+Eine vollständig erfundene September-Abrechnung lässt sich reproduzieren:
+
+```sh
+PDF_SAMPLE_DIR=outputs/accounting-pdf npm run test:unit -- tests/pdf-accounting.test.ts
+```
+
+Das erzeugt eine 13-seitige Muster-PDF, ZIP und Prüfdaten: 89,60 EUR Verpflegung,
+236,40 EUR Kilometer und 87,20 EUR persönliche Auslagen ergeben 413,20 EUR.
+Die sechs nummerierten Belege enthalten PNG, JPEG, einen langen Bon und zwei
+Original-PDFs. Die Tests prüfen zusätzlich fehlende/defekte Dateien, geschützte
+Darstellungen, historische Stände, Drehung/Zuschnitt und lange Tabellen.
 
 ## Fachlicher Hinweis
 

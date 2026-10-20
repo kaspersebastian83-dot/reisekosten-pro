@@ -81,9 +81,14 @@ und zahlt nichts aus.
 
 Beim ersten Einsatz der Texterkennung wird einmalig ein Sprachmodell geladen.
 Danach läuft die Erkennung im Browser; der Beleg wird dabei nicht an den
-Anbieter der App übertragen. PDF- und HEIC-Belege bleiben im ZIP im Original
-erhalten, werden aber nicht zuverlässig automatisch gelesen oder als Bildseite
-in die PDF eingebettet. Die Vorschläge immer kurz prüfen.
+Anbieter der App übertragen. Die Erkennungsvorschläge immer kurz prüfen.
+
+Die Abrechnungs-PDF nummeriert Kosten und Belege automatisch. Bildbelege und
+lesbare PDF-Belege werden in derselben Reihenfolge angehängt; lange Bons werden
+auf mehrere Seiten verteilt. HEIC, geschützte oder defekte Dateien sowie PDFs mit
+Anmerkungen oder Formularfeldern erhalten einen verständlichen Hinweis zum
+separaten Beifügen. Fehlende Belege sind ebenfalls gekennzeichnet. Der ZIP-Export
+enthält alle vorhandenen Originaldateien mit einem passenden Belegverzeichnis.
 
 ## Fahrtenbuch-Import
 

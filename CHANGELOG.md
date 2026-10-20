@@ -1,5 +1,14 @@
 # Release Notes
 
+## Noch nicht veröffentlicht – Buchhaltungs-PDF
+
+- A4-Abrechnung mit hervorgehobenen Stammdaten und Erstattungsbetrag, Reisen, Tagespauschalen,
+  Zahlungshinweisen und nummerierter Belegzuordnung; wiederholte Tabellenköpfe und durchgehende Seitenzahlen.
+- PNG/JPEG, lange Bons mit Überlappung und sämtliche Seiten lesbarer Original-PDFs als Anlagen;
+  fehlende oder nicht einbettbare Dateien werden ausdrücklich gekennzeichnet.
+- Gleiche Belegreihenfolge und zusätzliche Zuordnungsliste im ZIP. Berechnungsregeln und eingefrorene
+  Monatsstände bleiben unverändert. Reproduzierbare Musterabrechnung und gezielte Regressionstests.
+
 ## Noch nicht veröffentlicht – konkurrierende Ordnerspeicherung
 
 - Vor jedem Ersetzen von `spesenkit.json`: geprüfte Kopien des Speicherkandidaten und des gelesenen
