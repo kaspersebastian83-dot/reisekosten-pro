@@ -1,5 +1,24 @@
 # Release Notes
 
+## 1.10.0 – 26. Oktober 2026
+
+Rückmeldung aus dem Einsatz: Belegfotos sollen wiederkehrende Händler und Tankstellen erkennen.
+- **Auswahlliste im Feld „Händler“** (Beleg-Eingang und Kostenfenster): alle bisher verwendeten Händler, häufigste zuerst,
+  gleiche Namen nur einmal. Freie Eingabe bleibt möglich. Wird ein bekannter Händler gewählt, kommen Kategorie und
+  Steuersatz aus seiner gelernten Regel – außer, sie wurden im Formular schon selbst geändert.
+- **Wiedererkennen im Belegfoto:** Bekannte Händler werden im erkannten Text gefunden, auch bei kleinen Lesefehlern
+  („SHEL1“ → Shell, „Muller“ → Müller) und unabhängig von Rechtsform oder Zusätzen („ARAL AG Tankstelle 4711“ → Aral).
+  Der Händler erhält dann seinen gewohnten Namen, die Regel greift. Ein Name aus einem Wort gilt für die ganze Marke
+  („Aral“ = jede Aral-Station), „Shell Würselen“ nur für diese Station. Ist schon ein Händler erkannt, zählen einzelne
+  Markennamen nur in den Kopfzeilen (z. B. nicht „Parkhaus Aral Center“ auf einer Hotelrechnung). Händler, deren Name
+  zugleich ein übliches Belegwort ist („Netto“, „Total“), zählen nur in einer Kopfzeile ohne Betrag (Codex-Review).
+- Vorgaben eines gewählten Händlers gelten nicht als eigene Eingabe: ein anderer Händler darf sie wieder ändern
+  (Codex-Review).
+- **Lernen bei jeder gespeicherten Kostenposition** mit Händler (bisher nur im Beleg-Eingang): Kategorie, Steuersatz und
+  Zahlungsart werden zum Händler gemerkt.
+- Tests: `merchants.test.ts` (Auswahlliste, Lesefehler, genau vor allgemein, keine Zufallstreffer, Kopfzeilen, Lernen),
+  Browsercheck `haendler-browser-check.mjs` (Liste, Regel übernehmen, eigene Wahl bleibt, neuer Händler gelernt; 1440 und 390 px).
+
 ## 1.9.0 – 26. Oktober 2026
 
 Rückmeldung aus dem Einsatz: Nach dem Monatsabschluss hing die App 10–15 Sekunden.
