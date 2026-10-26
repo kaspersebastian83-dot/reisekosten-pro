@@ -38,7 +38,8 @@ export function manualTripErrors(trip: Trip, originalProject?: string) {
 
 export function manualTripReviewNotes(trip: Trip) {
   const notes = ['Inlandsvorschau nach gespeicherten Regeln. Ausland, erste Tätigkeitsstätte und Dreimonatsfrist bei Wiederholungseinsätzen sind nicht automatisch steuerlich geprüft.'];
-  if (manualTripInterval(trip)?.nights && !trip.overnight) notes.push('Datumswechsel ohne bestätigte auswärtige Übernachtungen: Die bestehende Tagesberechnung setzt An-/Abreisetage an. Anspruch und Tagesaufteilung vor Abrechnung gesondert prüfen.');
+  if (manualTripInterval(trip)?.nights === 1 && !trip.overnight) notes.push('Über Mitternacht ohne bestätigte Übernachtung: eine Tagespauschale für die ganze Reise, wenn insgesamt mehr als 8 Stunden – angesetzt am Kalendertag mit dem überwiegenden Teil (§ 9 Abs. 4a Satz 3 Nr. 3 EStG). Falls auswärts übernachtet wurde, oben bestätigen; dann gelten An- und Abreisetag.');
+  else if (manualTripInterval(trip)?.nights && !trip.overnight) notes.push('Datumswechsel ohne bestätigte auswärtige Übernachtungen: Die bestehende Tagesberechnung setzt An-/Abreisetage an. Anspruch und Tagesaufteilung vor Abrechnung gesondert prüfen.');
   if (trip.manualAbsenceMinutes != null) notes.push('Vorhandene manuelle Abwesenheitskorrektur wirkt auf die Tagesberechnung. Unter Weitere Angaben prüfen.');
   return notes;
 }

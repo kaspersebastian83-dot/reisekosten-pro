@@ -1,5 +1,20 @@
 # Release Notes
 
+## 1.8.2 – 26. Oktober 2026
+
+- Über Mitternacht ohne Übernachtung (§ 9 Abs. 4a Satz 3 Nr. 3 EStG): Beginnt eine Dienstreise an einem Tag und endet
+  am Folgetag, ohne dass „Auswärtige Übernachtung … tatsächlich erfolgt“ bestätigt ist, zählt die gesamte Abwesenheit
+  als ein Tag. Die Teilpauschale (Schwelle wie eingestellt, gesetzlich mehr als 8 Stunden) gibt es einmal, am
+  Kalendertag mit dem überwiegenden Teil; bei gleichen Teilen am Abfahrtstag mit Hinweis. Vorher bekam jede
+  Fahrt über Mitternacht An- und Abreisetag, auch eine Nachtfahrt 22:00–01:00.
+  Mit bestätigter Übernachtung, bei mehr als einem Datumswechsel oder mit manueller Abwesenheitskorrektur wie bisher.
+  Andere Fahrten am selben Tag zählen dazu. Beträge kommen weiter aus den hinterlegten Tarifen.
+- Begründung je Tag nennt die Regel; Hinweis in der Vorschau beim Erfassen. Haken bei genau einer Nacht:
+  „Auswärtige Übernachtung zwischen Abfahrt und Rückkehr tatsächlich erfolgt“.
+- Bereits abgeschlossene Monatsabrechnungen bleiben eingefroren; bei einer Korrektur zeigt der Vergleich die Änderung.
+- Tests: acht Fälle in `calculations.test.ts` (Nachtfahrt unter der Schwelle, überwiegend vor/nach Mitternacht,
+  Gleichstand, mit Übernachtung, zwei Datumswechsel, mit Tagesfahrt am selben Tag, Monatswechsel).
+
 ## 1.8.1 – 26. Oktober 2026
 
 - Speichern im selben Tab: „Bisher: …“ im Feld „Verwendetes Fahrzeug“ (Dienstreise → Weitere Angaben) ließ das

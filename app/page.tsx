@@ -1700,7 +1700,7 @@ function TripForm({ trip, setTrip, settings, trips }: {
       <label>Rückkehr Uhrzeit *<input required type="time" step="1" value={trip.endTime} onChange={e => set("endTime", e.target.value)} /></label>
       </div>
       {(!!interval?.nights || trip.overnight) && <div className="wide trip-overnight">
-        <label className="check"><input type="checkbox" checked={trip.overnight} onChange={e => set("overnight", e.target.checked)} />Alle {interval?.nights || 0} auswärtigen Übernachtungen zwischen Abfahrt und Rückkehr tatsächlich erfolgt</label>
+        <label className="check"><input type="checkbox" checked={trip.overnight} onChange={e => set("overnight", e.target.checked)} />{interval?.nights === 1 ? "Auswärtige Übernachtung zwischen Abfahrt und Rückkehr tatsächlich erfolgt" : `Alle ${interval?.nights || 0} auswärtigen Übernachtungen zwischen Abfahrt und Rückkehr tatsächlich erfolgt`}</label>
         <small>Nächte: {days.slice(0,-1).map(d => dateDe(d.date)).join(" · ")} (jeweils auf den Folgetag). Bei abweichenden oder fehlenden Übernachtungen nicht bestätigen; Einzelheiten in Notizen festhalten.</small>
       </div>}
       <MealEditor trip={trip} setTrip={setTrip} />
