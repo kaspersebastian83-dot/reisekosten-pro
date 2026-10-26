@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { receiptDataUrl } from '../lib/receipt-images';
 import type { PaymentType, Receipt, Trip } from '../lib/types';
 import { knownMerchantNamed, type KnownMerchant } from '../lib/merchants';
@@ -108,18 +108,35 @@ export function ReceiptAttachment({receipt}: {receipt?: Receipt}) {
 /**
  * Feld „Händler“ mit Auswahlliste der bisher verwendeten Händler (häufigste zuerst). Freie Eingabe bleibt möglich.
  * onChange meldet mit, ob der Name einem bekannten Händler entspricht – dann können Kategorie und Steuersatz
- * aus dessen gelernter Regel übernommen werden.
+ * aus dessen gelernter Regel übernommen werden. Das gilt erst, wenn der Name feststeht (aus der Liste gewählt oder
+ * Feld verlassen), nicht bei jedem Tastendruck: sonst bliebe die Regel eines kürzeren Händlers hängen
+ * („Star“ auf dem Weg zu „Starbucks“).
  */
 export function MerchantInput({ label, value, known, onChange, className }: {
   label: string; value: string; known: KnownMerchant[]; className?: string;
   onChange: (value: string, match?: KnownMerchant) => void;
 }) {
   const id = useId();
+  const atFocus = useRef(value);
   // Die Liste steht neben dem Feld (nicht im Label), sonst würden ihre Einträge Teil des Feldnamens.
   return <>
     <label className={className}>{label}
       <input value={value} list={known.length ? id : undefined} autoComplete="off"
-        onChange={(event) => onChange(event.target.value, knownMerchantNamed(event.target.value, known))} />
+        onFocus={(event) => { atFocus.current = event.target.value; }}
+        onChange={(event) => {
+          // Auswahl aus der Liste kommt ohne inputType (Chrome) bzw. als insertReplacementText (Firefox); Tippen, Löschen, Einfügen nicht.
+          const inputType = (event.nativeEvent as InputEvent).inputType;
+          const picked = !inputType || inputType === 'insertReplacementText';
+          onChange(event.target.value, picked ? knownMerchantNamed(event.target.value, known) : undefined);
+        }}
+        onBlur={(event) => {
+          // Feld verlassen: getippter Name steht fest. Unverändert (nur hinein- und hinausgeklickt) ändert nichts.
+          const name = event.target.value;
+          if (name === atFocus.current) return;
+          atFocus.current = name;
+          const match = knownMerchantNamed(name, known);
+          if (match) onChange(name, match);
+        }} />
     </label>
     {known.length > 0 && <datalist id={id}>{known.slice(0, 80).map((merchant) => <option key={merchant.name} value={merchant.name}>{merchant.uses > 1 ? `${merchant.uses}×` : undefined}</option>)}</datalist>}
   </>;

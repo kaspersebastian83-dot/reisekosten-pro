@@ -1,6 +1,9 @@
 import type { AppState, Settings, Tariff, VehicleProfile } from "./types";
 
-export const today = () => new Date().toISOString().slice(0, 10);
+/** Heutiges Datum im Kalender des Geräts (JJJJ-MM-TT). Nicht toISOString(): das ist UTC und liefert in Deutschland
+ *  zwischen 0 und 1 Uhr (Sommerzeit: 2 Uhr) noch den Vortag. */
+export const today = (date = new Date()) =>
+  `${String(date.getFullYear()).padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 export const initialTariffs: Tariff[] = [
   {

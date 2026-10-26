@@ -43,7 +43,7 @@ import type {
   Trip,
   VehicleProfile,
 } from "../lib/types";
-import { emptyState, expenseCategories } from "../lib/config";
+import { emptyState, expenseCategories, today } from "../lib/config";
 import {
   loadState,
   loadStateForApp,
@@ -669,7 +669,7 @@ function ReceiptCapture({
   /** z. B. „Beleg 2 von 5“ */
   position?: string;
 }) {
-  const now = new Date().toISOString().slice(0, 10);
+  const now = today();
   const [receipt, setReceipt] = useState(initial?.receipt);
   const merchants = useMemo(() => knownMerchants(state), [state.expenses, state.merchantRules]); // eslint-disable-line react-hooks/exhaustive-deps
   const receiptUrl = useReceiptDataUrl(receipt);
@@ -1949,7 +1949,7 @@ function MealEditor({
 
 const blankExpense = (): Expense => ({
   id: uid(),
-  date: new Date().toISOString().slice(0, 10),
+  date: today(),
   category: "Parken",
   description: "",
   gross: 0,
@@ -3473,6 +3473,10 @@ function Modal({
   /** Strg+Enter (macOS: ⌘+Enter) im Fenster. */
   onSubmitShortcut?: () => void;
 }) {
+  // Immer die aktuelle Fassung: Strg+Enter verlässt erst das Feld (z. B. „Händler“ übernimmt dabei die gelernte Regel)
+  // und speichert nach dem Neuzeichnen – sonst ginge der Stand von vor dem Verlassen des Felds ins Speichern.
+  const submitRef = useRef(onSubmitShortcut);
+  submitRef.current = onSubmitShortcut;
   return (
     <div
       className="modal-backdrop"
@@ -3483,7 +3487,12 @@ function Modal({
       <div
         className={wide ? "modal modal-wide" : "modal"}
         onKeyDown={onSubmitShortcut ? (e) => {
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); onSubmitShortcut(); }
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            const active = document.activeElement;
+            if (active instanceof HTMLElement && e.currentTarget.contains(active)) active.blur();
+            setTimeout(() => submitRef.current?.(), 0);
+          }
         } : undefined}
       >
         <header>

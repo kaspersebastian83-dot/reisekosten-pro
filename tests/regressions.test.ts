@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { emptyState } from "../lib/config";
+import { describe, expect, it, vi } from "vitest";
+import { emptyState, today } from "../lib/config";
 import { demoState } from "../lib/demo";
 import { buildStatement, calculateDay, groupTripsByDay } from "../lib/calculations";
 import { rowsToTrips } from "../lib/importer";
@@ -34,6 +34,17 @@ describe("Abrechnungsregressionen", () => {
       const trip = { ...demoState().trips[0], date: "2026-07-14" };
       expect([...groupTripsByDay([trip]).keys()]).toEqual(["2026-07-14"]);
     } finally { if (oldTimezone === undefined) delete process.env.TZ; else process.env.TZ = oldTimezone; }
+  });
+  it("heutiges Datum (Vorgabe für neue Kosten und Belege) nach Ortszeit, nicht UTC", () => {
+    const oldTimezone = process.env.TZ;
+    try {
+      process.env.TZ = "Europe/Berlin";
+      vi.useFakeTimers();
+      for (const [now, day] of [["2026-10-26T23:30:00Z", "2026-10-27"], ["2026-07-14T22:15:00Z", "2026-07-15"], ["2026-07-14T21:59:00Z", "2026-07-14"]]) {
+        vi.setSystemTime(new Date(now));   // 00:30 Uhr Winterzeit, 00:15 Uhr Sommerzeit, 23:59 Uhr
+        expect(today()).toBe(day);
+      }
+    } finally { vi.useRealTimers(); if (oldTimezone === undefined) delete process.env.TZ; else process.env.TZ = oldTimezone; }
   });
   it("berücksichtigt Ausgaben ohne Fahrt und ohne Kilometer-/Spesenanspruch", () => {
     const state = demoState(); state.trips = [];

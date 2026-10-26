@@ -100,6 +100,19 @@ describe("Belegbilder im SpesenKit-Ordner", () => {
     expect(writes.filter((name) => ids.includes(name))).toEqual([]);
   });
 
+  it("leere Belegdatei (abgebrochener Schreibvorgang) gilt als fehlend und wird beim nächsten Speichern geschrieben", async () => {
+    const root = new FakeDir(FOLDER_NAME);
+    const state = normalizeState(legacyState());
+    const first = await writeDataFile(root, state, 0);
+    const id = [...referencedFileIds(state)][0], belege = root.dirs.get(RECEIPT_DIR)!;
+    belege.files.set(id, "");                                      // 0 Byte: nach create, vor close abgebrochen
+    const next = structuredClone(state); next.settings.profileName = "Geändert";
+    await writeDataFile(root, next, first.revision, undefined, new Date(), { expectedHash: first.hash });
+    const written = belege.files.get(id) as Blob;
+    expect(written.size).toBeGreaterThan(0);
+    expect(sha(new Uint8Array(await written.arrayBuffer()))).toBe(id.slice(0, 64));
+  });
+
   it("liest Bilder aus dem Ordner zurück (anderer Rechner) und erkennt veränderte Dateien", async () => {
     const root = new FakeDir(FOLDER_NAME);
     const legacy = legacyState(), state = normalizeState(structuredClone(legacy));
