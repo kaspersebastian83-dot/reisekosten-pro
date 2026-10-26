@@ -89,3 +89,23 @@ describe("kompatible und sichere Sicherungen", () => {
     normalizeState(state); expect(state).toEqual(copy);
   });
 });
+
+describe("Speichern im selben Tab", () => {
+  it("Fahrt ohne Fahrzeug-ID gilt nicht als Änderung aus einem anderen Tab", async () => {
+    const { sameStoredState } = await import("../lib/storage");
+    const base = normalizeState(demoState());
+    const trip = base.trips.find((item) => item.vehicleType === "firmenfahrzeug") || base.trips[0];
+    expect(trip).toBeTruthy();
+    // So stand es nach „Bisher: …“ im Speicher (vor 1.8.1): Fahrzeug-ID leer
+    const expected = { ...base, trips: base.trips.map((item) => item === trip ? { ...item, vehicleId: undefined } : item) };
+    const current = normalizeState(structuredClone(expected));   // beim Lesen ergänzt normalizeState die ID
+    expect(JSON.stringify(current)).not.toBe(JSON.stringify(expected));
+    expect(sameStoredState(current, expected)).toBe(true);
+  });
+  it("erkennt echte Änderungen aus einem anderen Tab weiterhin", async () => {
+    const { sameStoredState } = await import("../lib/storage");
+    const base = normalizeState(demoState());
+    const andererTab = { ...base, trips: [...base.trips, { ...base.trips[0], id: "aus-anderem-tab" }] };
+    expect(sameStoredState(andererTab, base)).toBe(false);
+  });
+});

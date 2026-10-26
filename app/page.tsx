@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Archive,
   ArrowLeft,
+  BookOpen,
   BarChart3,
   Camera,
   Car,
@@ -394,6 +395,10 @@ export default function Home() {
         <a className="suite-link" href="../Projektzentrale/" target="projektzentrale" rel="noopener">
           <ArrowLeft size={16} aria-hidden="true" />
           <span><b>Projektzentrale</b><small>Spektron · alle Apps</small></span>
+        </a>
+        <a className="suite-link" href="../aidkit/#app-spesenkit" target="aidkit" rel="noopener" title="Handbuch: SpesenKit Schritt für Schritt – öffnet AidKit in einem eigenen Fenster">
+          <BookOpen size={16} aria-hidden="true" />
+          <span><b>Handbuch</b><small>SpesenKit Schritt für Schritt</small></span>
         </a>
         <div className="privacy-note">
           <ShieldCheck size={18} />
@@ -1711,7 +1716,8 @@ function TripForm({ trip, setTrip, settings, trips }: {
             const vehicle = settings.vehicles.find(
               (item) => item.id === e.target.value,
             );
-            if (!vehicle) return setTrip({ ...trip, vehicleId: undefined });
+            // „Bisher: …“ / „Bitte Fahrzeug auswählen“ heißt: unverändert lassen.
+            if (!vehicle) return;
             setTrip({
               ...trip,
               vehicleId: vehicle.id,

@@ -44,3 +44,21 @@ test("SpesenKit branding preserves PWA identity, repository paths and icon sizes
   }
   assert.match(await readFile(new URL("../dist/favicon.svg", import.meta.url), "utf8"), /<title id="title">SpesenKit<\/title>/);
 });
+
+test("Handbuch-Link zeigt auf eine feste AidKit-Adresse", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const assets = new URL("../dist/assets/", import.meta.url);
+  let found = "";
+  for (const name of await readdir(assets)) {
+    if (!name.endsWith(".js")) continue;
+    const js = await readFile(new URL(name, assets), "utf8");
+    const m = js.match(/\.\.\/aidkit\/#([a-z0-9-]+)/);
+    if (m) { found = m[1]; assert.ok(/target:\s*["'`]aidkit["'`]/.test(js), "öffnet AidKit im eigenen Fenster"); break; }
+  }
+  assert.equal(found, "app-spesenkit");
+  // Liegt AidKit daneben (lokal), mit dessen Liste der festen Adressen prüfen
+  try {
+    const anker = JSON.parse(await readFile(new URL("../../aidkit/hilfe-anker.json", import.meta.url), "utf8")).anker;
+    assert.ok(anker[found], `AidKit kennt #${found}`);
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
+});

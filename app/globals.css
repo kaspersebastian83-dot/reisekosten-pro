@@ -146,6 +146,7 @@ button:disabled {
   color: #dce8f5;
   text-decoration: none;
 }
+.suite-link + .suite-link { margin-top: 0; }
 .suite-link:hover { background: rgba(255, 255, 255, 0.1); }
 .suite-link:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .suite-link b { display: block; font-size: 13px; color: #fff; }
