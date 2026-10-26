@@ -1,6 +1,6 @@
 # SpesenKit – Anleitung
 
-Stand: Version 1.8.4. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
+Stand: Version 1.8.5. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
 Büro-Terminal (RDP, eigenes Windows-Profil) in **Edge oder Chrome** genutzt.
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ – oder in der
@@ -12,6 +12,8 @@ Projektzentrale ganz unten rechts unter „Weitere Apps“ auf **SpesenKit**.
    eintragen (Dienstwagen oder Privatwagen; beim Privatwagen Kilometerpauschale
    oder tatsächliche Kosten). Das meistens genutzte Fahrzeug als **Standard**
    markieren.
+   **Tätigkeit:** Außendienst (Dienstreisen, Fahrtenbuch, Verpflegung) oder
+   Innendienst (nur Kosten und Belege, ohne Reise- und Projektzuordnung).
 2. **Ordner einrichten** (gelber Hinweis oben oder links unten): einen eigenen
    Ordner wählen, z. B. im persönlichen Laufwerk. SpesenKit legt darin den
    Ordner `SpesenKit` an und speichert jede Änderung dort. Ohne diesen Ordner
@@ -32,6 +34,8 @@ Alles passiert in der **Monatsübersicht**.
      Abwesenheitsdauer und Verpflegungsvorschau.
    - **Hotelrechnung** und **Sonstige Kosten** – Datum (Rechnungsdatum),
      Betrag, Zahlungsart, Beleg als Datei; rechts Projekt und Reisezuordnung.
+   - Kosten, die zu keiner Reise und keinem Projekt gehören (z. B. Büromaterial):
+     **„Gehört zu keiner Reise und keinem Projekt“** anhaken – dann kein Hinweis.
    - **Beleg fotografieren** – Beleg ablegen und später zuordnen. Fotos werden dabei verkleinert
      (längste Seite 2000 Pixel), damit das Handy nicht volläuft; PDFs bleiben unverändert.
    - **Fahrtenbuch importieren** – Vimcar-CSV oder andere CSV/XLSX.
