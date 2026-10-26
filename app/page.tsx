@@ -43,7 +43,7 @@ import type {
   Trip,
   VehicleProfile,
 } from "../lib/types";
-import { emptyState, expenseCategories } from "../lib/config";
+import { emptyState, expenseCategories, today } from "../lib/config";
 import {
   loadState,
   loadStateForApp,
@@ -669,7 +669,7 @@ function ReceiptCapture({
   /** z. B. „Beleg 2 von 5“ */
   position?: string;
 }) {
-  const now = new Date().toISOString().slice(0, 10);
+  const now = today();
   const [receipt, setReceipt] = useState(initial?.receipt);
   const merchants = useMemo(() => knownMerchants(state), [state.expenses, state.merchantRules]); // eslint-disable-line react-hooks/exhaustive-deps
   const receiptUrl = useReceiptDataUrl(receipt);
@@ -1949,7 +1949,7 @@ function MealEditor({
 
 const blankExpense = (): Expense => ({
   id: uid(),
-  date: new Date().toISOString().slice(0, 10),
+  date: today(),
   category: "Parken",
   description: "",
   gross: 0,

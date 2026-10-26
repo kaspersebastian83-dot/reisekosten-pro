@@ -194,20 +194,24 @@ export function calculateDay(
             : null;
   const baseTariff = kind ? tariffFor(settings, date, kind) : undefined;
   const fullTariff = tariffFor(settings, date, "full");
+  const noMeals = { breakfast: false, lunch: false, dinner: false };
+  const mealsOn = (t: Trip, day: string) => t.dailyMeals?.[day] || (t.date === day ? t.meals : noMeals);
+  // Über Mitternacht ohne Übernachtung gibt es nur die eine Pauschale am überwiegenden Tag: Mahlzeiten beider Kalendertage
+  // dieser Reise kürzen dort, am anderen Tag nicht (sonst ginge eine Mahlzeit am anderen Tag verloren bzw. kürzte gegen 0 €).
+  const nightSplit = new Map(night.map((item) => [item.trip, item.split]));
   const meals = trips.reduce(
     (m, t) => {
-      const selected =
-        t.dailyMeals?.[date] ||
-        (t.date === date
-          ? t.meals
-          : { breakfast: false, lunch: false, dinner: false });
-      return {
-        breakfast: m.breakfast || selected.breakfast,
-        lunch: m.lunch || selected.lunch,
-        dinner: m.dinner || selected.dinner,
-      };
+      const split = nightSplit.get(t);
+      const days = !split ? [date] : split.day === date ? [t.date, t.endDate || t.date] : [];
+      for (const selected of days.map((day) => mealsOn(t, day)))
+        m = {
+          breakfast: m.breakfast || selected.breakfast,
+          lunch: m.lunch || selected.lunch,
+          dinner: m.dinner || selected.dinner,
+        };
+      return m;
     },
-    { breakfast: false, lunch: false, dinner: false },
+    { ...noMeals },
   );
   const full = fullTariff?.amount || 0;
   const breakfastCut = meals.breakfast

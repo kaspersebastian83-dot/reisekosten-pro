@@ -1,5 +1,23 @@
 # Release Notes
 
+## 1.10.1 – 26. Oktober 2026
+
+Fehlerbehebungen aus einer Durchsicht der Suite:
+- **Über Mitternacht ohne Übernachtung:** Die Reise zählt als ein Tag mit einer Pauschale (am Tag mit dem überwiegenden
+  Teil). Mahlzeiten wurden aber je Kalendertag gekürzt: ein am anderen Tag angekreuztes Abendessen oder Frühstück ging
+  verloren bzw. wurde gegen 0 € gekürzt. Jetzt kürzen die Mahlzeiten beider Tage diese eine Pauschale (gleiche Beträge
+  je Mahlzeit, nie unter 0 €). Pauschalen und übrige Regeln unverändert.
+- **Händler-Regel erst bei feststehendem Namen:** Kategorie und Steuersatz eines bekannten Händlers wurden schon beim
+  Tippen übernommen, sobald der Text einem kürzeren Händler entsprach, und blieben dann stehen („Star“ auf dem Weg zu
+  „Starbucks“ → Tanken). Jetzt gilt die Regel bei Auswahl aus der Liste oder beim Verlassen des Felds.
+- **Belegbilder im Ordner:** Eine leere Datei unter `SpesenKit/Belege/` (abgebrochener Schreibvorgang) galt als
+  vorhanden und wurde nie nachgeschrieben. Jetzt gilt sie als fehlend und wird beim nächsten Speichern geschrieben.
+- **Heutiges Datum nach Ortszeit:** Neue Kosten und Belege bekamen zwischen 0 und 1 Uhr (Sommerzeit: 2 Uhr) das Datum
+  des Vortags (UTC). Speicherformat unverändert.
+- Tests: `calculations.test.ts` (Mahlzeiten bei Nachtfahrten), `receipt-images.test.ts` (leere Belegdatei),
+  `regressions.test.ts` (Datum nach Ortszeit), Browsercheck `haendler-browser-check.mjs` („Star“ → „Starbucks“,
+  Auswahl aus der Liste).
+
 ## 1.10.0 – 26. Oktober 2026
 
 Rückmeldung aus dem Einsatz: Belegfotos sollen wiederkehrende Händler und Tankstellen erkennen.

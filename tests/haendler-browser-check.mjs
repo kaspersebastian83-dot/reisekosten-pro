@@ -42,7 +42,8 @@ try {
     const add = (id, merchant, category, date) => ({ ...structuredClone(base), id, merchant, category, date, tripId: undefined, noTrip: true, receipt: undefined, description: `${merchant} synthetisch`, status: 'vollständig', warnings: [] });
     seed.expenses.push(add('m1', 'Aral', 'Tanken', '2026-09-03'), add('m2', 'Aral', 'Tanken', '2026-09-10'), add('m3', 'ARAL', 'Tanken', '2026-09-17'), add('m4', 'Bäckerei Müller', 'sonstige Nebenkosten', '2026-09-20'));
     seed.merchantRules = [{ id: 'r-aral', merchantPattern: 'aral', category: 'Tanken', paymentType: 'privat vorgestreckt', vatRate: 19, uses: 3, updatedAt: '2026-09-17T10:00:00Z' },
-      { id: 'r-mueller', merchantPattern: 'bäckerei müller', category: 'sonstige Nebenkosten', paymentType: 'privat vorgestreckt', vatRate: 7, uses: 1, updatedAt: '2026-09-20T10:00:00Z' }];
+      { id: 'r-mueller', merchantPattern: 'bäckerei müller', category: 'sonstige Nebenkosten', paymentType: 'privat vorgestreckt', vatRate: 7, uses: 1, updatedAt: '2026-09-20T10:00:00Z' },
+      { id: 'r-star', merchantPattern: 'star', category: 'Tanken', paymentType: 'privat vorgestreckt', vatRate: 19, uses: 1, updatedAt: '2026-08-01T10:00:00Z' }];
     await writeIdb(page, seed); await page.reload(); await page.getByRole('heading', { name: 'Monatsübersicht', exact: true }).waitFor();
     const workspace = page.getByRole('region', { name: 'Monatsarbeitsbereich', exact: true });
     const editor = page.locator('.modal');
@@ -65,7 +66,7 @@ try {
 
     await check(`${viewport.width}: bekannter Händler übernimmt Kategorie und Steuersatz der Regel; Speichern lernt mit`, async () => {
       const field = editor.getByLabel('Händler / Anbieter', { exact: true });
-      await field.fill('Bäckerei Müller');
+      await field.fill('Bäckerei Müller'); await field.blur();
       assert.equal(await editor.getByLabel('Kategorie', { exact: true }).inputValue(), 'sonstige Nebenkosten');
       assert.equal(await editor.locator('label', { hasText: 'USt.-Satz' }).locator('select').inputValue(), '7');
       await editor.getByLabel('Datum', { exact: true }).fill('2026-10-05');
@@ -81,7 +82,7 @@ try {
     await check(`${viewport.width}: selbst gewählte Kategorie bleibt; neuer Händler erscheint danach in der Liste`, async () => {
       const field = await openCost();
       await editor.getByLabel('Kategorie', { exact: true }).selectOption('Parken');
-      await field.fill('Aral');
+      await field.fill('Aral'); await field.blur();
       assert.equal(await editor.getByLabel('Kategorie', { exact: true }).inputValue(), 'Parken', 'selbst gewählt bleibt');
       await field.fill('Shell Würselen');
       await editor.getByLabel('Datum', { exact: true }).fill('2026-10-06');
@@ -95,6 +96,20 @@ try {
       await editor.getByRole('button', { name: 'Abbrechen', exact: true }).click(); await editor.waitFor({ state: 'detached' });
     });
 
+    await check(`${viewport.width}: Tippen übernimmt keine Regel eines kürzeren Händlers („Star“ → „Starbucks“); Auswahl aus der Liste sofort`, async () => {
+      const field = await openCost();
+      const category = editor.getByLabel('Kategorie', { exact: true }), before = await category.inputValue();
+      assert.notEqual(before, 'Tanken');
+      await field.pressSequentially('Starbucks');
+      assert.equal(await category.inputValue(), before, 'beim Tippen über „Star“ keine Regel');
+      await field.blur();
+      assert.equal(await category.inputValue(), before, '„Starbucks“ ist nicht „Star“');
+      // Auswahl aus der Liste: Chrome meldet sie als input-Ereignis ohne inputType – Regel sofort
+      await field.evaluate((input) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Star'); input.dispatchEvent(new Event('input', { bubbles: true })); });
+      assert.equal(await category.inputValue(), 'Tanken');
+      await editor.getByRole('button', { name: 'Abbrechen', exact: true }).click(); await editor.waitFor({ state: 'detached' });
+    });
+
     await check(`${viewport.width}: Belegfoto-Eingang: Liste auch dort; zweiter gewählter Händler ersetzt die Vorgaben des ersten`, async () => {
       await context.route(/https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());   // Texterkennung offline: Eingabe von Hand
       await nav('Monatsübersicht');
@@ -105,12 +120,12 @@ try {
       await page.getByText('Die automatische Erkennung war nicht möglich.', { exact: false }).waitFor({ timeout: 30000 });
       const field = capture.getByLabel('Händler', { exact: true });
       assert.ok((await page.locator(`datalist[id="${await field.getAttribute('list')}"] option`).evaluateAll((all) => all.map((o) => o.value))).includes('Aral'));
-      await field.fill('Bäckerei Müller');
+      await field.fill('Bäckerei Müller'); await field.blur();
       assert.equal(await capture.getByLabel('Kategorie', { exact: true }).inputValue(), 'sonstige Nebenkosten');
-      await field.fill('Aral');
+      await field.fill('Aral'); await field.blur();
       assert.equal(await capture.getByLabel('Kategorie', { exact: true }).inputValue(), 'Tanken', 'Vorgabe des ersten Händlers gilt nicht als eigene Eingabe');
       await capture.getByLabel('Kategorie', { exact: true }).selectOption('Parken');
-      await field.fill('Bäckerei Müller');
+      await field.fill('Bäckerei Müller'); await field.blur();
       assert.equal(await capture.getByLabel('Kategorie', { exact: true }).inputValue(), 'Parken', 'selbst gewählte Kategorie bleibt');
       await context.unroute(/https?:\/\/(?!127\.0\.0\.1)/);
     });

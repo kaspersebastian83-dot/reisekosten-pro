@@ -291,7 +291,9 @@ export async function writeReceiptFiles(root: DirHandleLike, state: AppState) {
   }
   const unavailable: string[] = [];
   for (const id of ids) {
-    if (present ? present.has(id) : await fileExists(dir, id)) continue;   // Liste genügt: abgebrochene Schreibvorgänge hinterlassen keine Datei
+    // Fehlt in der Liste → schreiben. Steht in der Liste → wie fileExists: eine leere Datei (abgebrochener Schreibvorgang,
+    // getFileHandle({create}) legt sie sofort an) gilt als fehlend und wird neu geschrieben.
+    if ((!present || present.has(id)) && await fileExists(dir, id)) continue;
     const file = dataUrlFile(await localReceiptImage(id));
     if (!file) { unavailable.push(id); continue; }
     await writeText(dir, id, new Blob([file.bytes as BlobPart], { type: file.mime }));

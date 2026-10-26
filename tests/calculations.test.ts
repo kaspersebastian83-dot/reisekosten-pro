@@ -321,6 +321,38 @@ describe("über Mitternacht ohne Übernachtung (§ 9 Abs. 4a Satz 3 Nr. 3 EStG)"
     expect([c.firstStart, c.lastEnd]).toEqual(["20:00", "23:59"]);
     expect([d.firstStart, d.lastEnd]).toEqual(["20:00", "07:00"]);
   });
+  it("Mahlzeiten beider Kalendertage kürzen die eine Pauschale am angesetzten Tag", () => {
+    const no = { breakfast: false, lunch: false, dinner: false };
+    const cut = (date: string, kind: "breakfast" | "dinner") =>
+      round2(tariffFor(s, date, "full")!.amount * tariffFor(s, date, kind)!.amount / 100);
+    // überwiegend am Folgetag, Abendessen am Abfahrtstag (bisher verloren)
+    const [a, b] = tage(base("20:00", "07:00", { endDate: "2026-07-15", dailyMeals: { "2026-07-14": { ...no, dinner: true }, "2026-07-15": no } }));
+    expect([a.dinnerCut, a.allowanceAfter]).toEqual([0, 0]);
+    expect(b.dinnerCut).toBe(cut("2026-07-15", "dinner"));
+    expect(b.allowanceAfter).toBe(round2(teil("2026-07-15") - cut("2026-07-15", "dinner")));
+    // ältere Reisen ohne dailyMeals: meals gehören zum Abfahrtstag und wandern ebenso
+    const [c, d] = tage(base("20:00", "07:00", { endDate: "2026-07-15", meals: { ...no, dinner: true } }));
+    expect(c.dinnerCut + d.dinnerCut).toBe(cut("2026-07-15", "dinner"));
+    expect(d.dinnerCut).toBe(cut("2026-07-15", "dinner"));
+    // überwiegend am Abfahrtstag, Frühstück am Folgetag (bisher gegen 0 € gekürzt)
+    const [e, f] = tage(base("14:00", "02:00", { endDate: "2026-07-15", dailyMeals: { "2026-07-14": no, "2026-07-15": { ...no, breakfast: true } } }));
+    expect(e.breakfastCut).toBe(cut("2026-07-14", "breakfast"));
+    expect(e.allowanceAfter).toBe(round2(teil("2026-07-14") - cut("2026-07-14", "breakfast")));
+    expect([f.breakfastCut, f.allowanceAfter]).toEqual([0, 0]);
+    // beide Tage zusammen, nie unter 0
+    const [g, h] = tage(base("14:00", "02:00", { endDate: "2026-07-15", dailyMeals: { "2026-07-14": { ...no, dinner: true }, "2026-07-15": { ...no, breakfast: true } } }));
+    expect([g.breakfastCut > 0, g.dinnerCut > 0, g.allowanceAfter]).toEqual([true, true, 0]);
+    expect(h.breakfastCut + h.dinnerCut).toBe(0);
+  });
+  it("Tagesfahrt am nicht angesetzten Tag kürzt ihre eigenen Mahlzeiten weiter dort", () => {
+    const no = { breakfast: false, lunch: false, dinner: false };
+    const tag = { ...base("06:00", "16:00", { meals: { ...no, lunch: true } }), date: "2026-07-15" };
+    const nacht = base("20:00", "07:00", { endDate: "2026-07-15", dailyMeals: { "2026-07-14": { ...no, dinner: true }, "2026-07-15": no } });
+    const day = calculateDay("2026-07-15", [tag, nacht], s);
+    expect(day.lunchCut).toBeGreaterThan(0);
+    expect(day.dinnerCut).toBeGreaterThan(0);
+    expect(calculateDay("2026-07-14", [nacht], s).dinnerCut).toBe(0);
+  });
   it("Monatswechsel: Nacht 31.07.–01.08. zählt einmal", () => {
     const nacht = { ...base("15:00", "03:00", { endDate: "2026-08-01" }), date: "2026-07-31" };
     expect(calculateDay("2026-07-31", [nacht], s).allowanceBefore).toBe(teil("2026-07-31"));
