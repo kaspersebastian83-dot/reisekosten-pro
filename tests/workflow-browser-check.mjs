@@ -51,6 +51,9 @@ try {
       const handbuch=page.locator('a.suite-link').nth(1);
       assert.equal(await handbuch.getAttribute('href'),'../aidkit/#app-spesenkit','Handbuch link to the fixed AidKit chapter');
       assert.equal(await handbuch.getAttribute('target'),'aidkit');assert.match(await handbuch.innerText(),/Handbuch/);
+      const rueck=page.locator('a.suite-link').nth(2);
+      assert.match(await rueck.getAttribute('href'),/^\.\.\/rueckmeldung\/\?app=spesenkit&version=\d+\.\d+\.\d+$/,'Rückmeldung link with program and version');
+      assert.equal(await rueck.getAttribute('target'),'rueckmeldung');assert.match(await rueck.innerText(),/Rückmeldung/);
       assert.equal(await page.locator('.brand-mark').evaluate(el=>el.offsetWidth===el.offsetHeight),true,'brand symbol keeps its square proportions');
       assert.equal(await page.locator('.brand small').innerText(),'Dienstreisen · Spesen · Abrechnungen');
       await check(`${engine} ${viewport.width}: navigation, import access and empty dashboard actions`,async()=>{

@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.8.7 – 26. Oktober 2026
+
+- **Rückmeldung:** neuer Link „Rückmeldung – Fehler oder Wunsch melden“ in der Seitenleiste unter „Handbuch“. Öffnet das
+  Rückmeldeformular der Suite in einem eigenen Fenster; Programm (SpesenKit) und Version sind schon eingetragen. Es
+  werden keine Abrechnungsdaten übergeben.
+- Tests: `workflow-browser-check.mjs` prüft den Link.
+
 ## 1.8.6 – 26. Oktober 2026
 
 Restpunkte aus der Durchsicht vor dem Einsatz:
