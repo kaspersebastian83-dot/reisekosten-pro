@@ -1,5 +1,20 @@
 # Release Notes
 
+## 1.8.6 – 26. Oktober 2026
+
+Restpunkte aus der Durchsicht vor dem Einsatz:
+- **Fremdwährung:** Summen nach Kostenart (Tanken, Übernachtung, Sonstige, Gesamtkosten, vom Unternehmen bezahlt,
+  erstattet, privat vorgestreckt) rechnen mit dem gespeicherten Kurs in Euro – auf dem Bildschirm, in Excel, CSV und
+  den Auswertungen, wie schon im PDF und beim Erstattungsbetrag. Bei EUR (Kurs 1) ändert sich nichts. Hinweis: In der
+  App lässt sich derzeit keine Fremdwährung erfassen; betroffen wären nur eingespielte ältere Daten.
+- **DATEV-CSV:** keine 0,00-Zeilen mehr; Buchungstext ohne leere Teile („Auslagen Parken“ an Tagen ohne Reise).
+- **Excel:** Beträge mit Euro-Format, Kilometer mit einer Nachkommastelle; Summen im Blatt „Übersicht“ (das Blatt
+  „Reisekosten“ bleibt reine Datentabelle).
+- **Texte:** Einstellungen nennen jetzt beide Speicherorte (Browser und, sobald verbunden, SpesenKit-Ordner) statt
+  „bleiben lokal in diesem Browser“. Ordner- und Abschlusstexte durchgehend mit „Sie“.
+- Gelöschte Belege im Änderungsprotokoll: seit 1.8.3 erledigt (Protokoll ohne Belegbilder).
+- Tests: drei neue Fälle in `exports.test.ts` (Fremdwährungssummen, DATEV, Excel).
+
 ## 1.8.5 – 26. Oktober 2026
 
 Rückmeldungen aus dem Einsatz:

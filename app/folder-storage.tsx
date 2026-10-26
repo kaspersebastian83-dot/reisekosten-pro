@@ -391,7 +391,7 @@ export type FolderStorage = ReturnType<typeof useFolderStorage>;
 
 function blockingText(status: FolderStatus) {
   switch (status.kind) {
-    case "permission": return `Bitte zuerst den Zugriff auf deinen SpesenKit-Ordner „${status.name}“ bestätigen.`;
+    case "permission": return `Bitte zuerst den Zugriff auf Ihren SpesenKit-Ordner „${status.name}“ bestätigen.`;
     case "conflict": return "Bitte zuerst entscheiden, welcher Datenstand gilt (SpesenKit-Ordner oder Browser).";
     case "missing": return "Die Datei im SpesenKit-Ordner fehlt. Bitte zuerst unter Datensicherung klären.";
     case "invalid": return "Die Datei im SpesenKit-Ordner ist nicht lesbar. Bitte zuerst unter Datensicherung klären.";
@@ -420,12 +420,12 @@ export function FolderBanner({ folder, openBackup }: { folder: FolderStorage; op
   const { status, busy } = folder;
   if (status.kind === "none") return <div className="folder-banner warn" role="status">
     <AlertTriangle size={20} aria-hidden="true" />
-    <div><b>Deine Spesen liegen bisher nur in diesem Browser.</b><p>Beim Abmelden oder an einem anderen Terminalserver können sie fehlen. Richte deinen persönlichen SpesenKit-Ordner ein, dann wird jede Änderung dort gespeichert.</p></div>
+    <div><b>Ihre Spesen liegen bisher nur in diesem Browser.</b><p>Beim Abmelden oder an einem anderen Terminalserver können sie fehlen. Richten Sie Ihren persönlichen SpesenKit-Ordner ein, dann wird jede Änderung dort gespeichert.</p></div>
     <button className="primary" onClick={() => void folder.link()} disabled={busy}><FolderOpen size={17} />Ordner einrichten</button>
   </div>;
   if (status.kind === "permission") return <div className="folder-banner warn" role="alert">
     <AlertTriangle size={20} aria-hidden="true" />
-    <div><b>Bitte bestätige den Zugriff auf deinen SpesenKit-Ordner „{status.name}“.</b><p>Der Browser fragt nach einem Neustart erneut. Bis dahin werden Änderungen nur im Browser gespeichert.</p></div>
+    <div><b>Bitte bestätigen Sie den Zugriff auf Ihren SpesenKit-Ordner „{status.name}“.</b><p>Der Browser fragt nach einem Neustart erneut. Bis dahin werden Änderungen nur im Browser gespeichert.</p></div>
     <button className="primary" onClick={() => void folder.confirmAccess()} disabled={busy}>Zugriff bestätigen</button>
   </div>;
   if (status.kind === "error") return <div className="folder-banner error" role="alert">
@@ -493,13 +493,13 @@ export function FolderCard({ folder }: { folder: FolderStorage }) {
       <span className={`status-pill ${status.kind === "ok" ? "ok" : ""}`}>{status.kind === "ok" ? <><CheckCircle2 size={14} /> verbunden</> : linked ? "Handlung nötig" : "nicht eingerichtet"}</span>
     </div>
     {status.kind === "unsupported" ? <p>Dieser Browser kann keinen Ordner verwenden. Bitte SpesenKit in Microsoft Edge oder Google Chrome öffnen.</p> : <>
-      <p>Wähle einmal deinen persönlichen Mitarbeiterordner (zum Beispiel <code>H:\Mitarbeiter\Dein Name</code>). SpesenKit legt darin den Ordner <code>{FOLDER_NAME}</code> an und speichert jede Änderung in <code>{FOLDER_NAME}/{DATA_DIR}/{DATA_FILE}</code>. So sind deine Daten auch nach dem Abmelden und an jedem Terminalserver da.</p>
+      <p>Wählen Sie einmal Ihren persönlichen Mitarbeiterordner (zum Beispiel <code>H:\Mitarbeiter\Ihr Name</code>). SpesenKit legt darin den Ordner <code>{FOLDER_NAME}</code> an und speichert jede Änderung in <code>{FOLDER_NAME}/{DATA_DIR}/{DATA_FILE}</code>. So sind Ihre Daten auch nach dem Abmelden und an jedem Terminalserver da.</p>
       {status.kind === "ok" && <fieldset className="filing-formats"><legend>Nach dem Monatsabschluss automatisch ablegen in <code>{`${FOLDER_NAME}\\Spesen\\Jahr\\Monat`}</code></legend>
         {(Object.keys(filingFormatLabels) as FilingFormat[]).map((format) => <label key={format} className="check"><input type="checkbox" checked={folder.filingFormats[format]} onChange={(e) => void folder.setFilingFormats({ ...folder.filingFormats, [format]: e.target.checked })} />{filingFormatLabels[format]}</label>)}
       </fieldset>}
       {status.kind === "ok" && <dl className="folder-facts"><div><dt>Ordner</dt><dd>{status.name}</dd></div><div><dt>Zuletzt gespeichert</dt><dd>{status.savedAt ? time(status.savedAt) : "–"}</dd></div><div><dt>Stand</dt><dd>{status.revision}</dd></div></dl>}
-      {status.kind === "missing" && <p className="error-text">Die Datei fehlt im Ordner „{status.name}“. Wurde der Ordner verschoben, wähle ihn neu. Sonst kann die Datei aus dem Browserstand neu angelegt werden.</p>}
-      {status.kind === "invalid" && <p className="error-text">{status.message} Wähle einen anderen Ordner oder lege die Datei bewusst neu an. Die unlesbare Datei bleibt dann als Kopie in „Sicherungen“ erhalten.</p>}
+      {status.kind === "missing" && <p className="error-text">Die Datei fehlt im Ordner „{status.name}“. Wurde der Ordner verschoben, wählen Sie ihn neu. Sonst kann die Datei aus dem Browserstand neu angelegt werden.</p>}
+      {status.kind === "invalid" && <p className="error-text">{status.message} Wählen Sie einen anderen Ordner oder legen Sie die Datei bewusst neu an. Die unlesbare Datei bleibt dann als Kopie in „Sicherungen“ erhalten.</p>}
       {status.kind === "error" && <p className="error-text">{status.message}</p>}
       <div className="folder-actions">
         {status.kind === "permission" ? <button className="primary" disabled={busy} onClick={() => void folder.confirmAccess()}>Zugriff bestätigen</button>
@@ -509,7 +509,7 @@ export function FolderCard({ folder }: { folder: FolderStorage }) {
         {linked && <button className="ghost" disabled={busy} onClick={() => void folder.disconnect()}>Verbindung trennen</button>}
       </div>
       {status.kind === "ok" && <FolderBackups folder={folder} />}
-      <p className="muted">Wichtig: Nur du solltest Zugriff auf diesen Ordner haben – die Datei enthält deine Reisen und Belege unverschlüsselt. Bitte das Laufwerk zusätzlich regelmäßig außerhalb des Servers sichern lassen.</p>
+      <p className="muted">Wichtig: Nur Sie sollten Zugriff auf diesen Ordner haben – die Datei enthält Ihre Reisen und Belege unverschlüsselt. Bitte das Laufwerk zusätzlich regelmäßig außerhalb des Servers sichern lassen.</p>
     </>}
   </section>;
 }

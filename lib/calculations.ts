@@ -277,6 +277,9 @@ export function calculateDay(
   };
 }
 
+/** Bruttobetrag in Euro (Fremdwährung mit dem gespeicherten Kurs; EUR: Kurs 1). Für Summen nach Kostenart. */
+export const expenseGrossEur = (e: Expense) => round2(e.gross * (e.exchangeRate || 1));
+
 export function expenseReimbursable(e: Expense) {
   if (e.reimbursementStatus !== "offen") return 0;
   if (e.paymentType !== "privat vorgestreckt") return 0;
@@ -359,19 +362,19 @@ export function buildStatement(state: AppState, month: string): StatementData {
                 expense,
               ),
           )
-          .reduce((s, e) => s + e.gross, 0),
+          .reduce((s, e) => s + expenseGrossEur(e), 0),
       );
       const accommodation = round2(
         expenses
           .filter((e) => ["Hotel", "Übernachtung"].includes(e.category))
-          .reduce((s, e) => s + e.gross, 0),
+          .reduce((s, e) => s + expenseGrossEur(e), 0),
       );
       const other = round2(
         expenses
           .filter(
             (e) => !["Tanken", "Hotel", "Übernachtung"].includes(e.category),
           )
-          .reduce((s, e) => s + e.gross, 0),
+          .reduce((s, e) => s + expenseGrossEur(e), 0),
       );
       const mileageDetails = dayTrips.map((trip) => {
         const profile = vehicleForTrip(state.settings, trip);
@@ -386,17 +389,17 @@ export function buildStatement(state: AppState, month: string): StatementData {
       const companyPaid = round2(
         expenses
           .filter((e) => ["Firmenkarte", "Unternehmen"].includes(e.paymentType))
-          .reduce((s, e) => s + e.gross, 0),
+          .reduce((s, e) => s + expenseGrossEur(e), 0),
       );
       const reimbursed = round2(
         expenses
           .filter((e) => e.reimbursementStatus === "erstattet")
-          .reduce((s, e) => s + e.gross, 0),
+          .reduce((s, e) => s + expenseGrossEur(e), 0),
       );
       const privatelyAdvanced = round2(
         expenses
           .filter((e) => e.paymentType === "privat vorgestreckt")
-          .reduce((s, e) => s + e.gross, 0),
+          .reduce((s, e) => s + expenseGrossEur(e), 0),
       );
       const expenseDetails = expenses.map((expense) => {
         const excluded = expenseConflictsWithMileageAllowance(state.settings, state.trips, expense);

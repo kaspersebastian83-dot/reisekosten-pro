@@ -284,7 +284,7 @@ try {
     await page.evaluate(() => localStorage.setItem('test-perm', 'prompt'));
     await page.reload(); await ready(page);
     assert.equal(await folderStatus(page), 'permission');
-    assert.match(await banner.innerText(), /Zugriff auf deinen SpesenKit-Ordner/);
+    assert.match(await banner.innerText(), /Zugriff auf Ihren SpesenKit-Ordner/);
     await page.locator('input[type=month]').fill('2026-05');
     await banner.getByRole('button', { name: 'Zugriff bestätigen' }).click();
     await until(async () => (await folderStatus(page)) === 'ok', 'Status ok nach Bestätigung');

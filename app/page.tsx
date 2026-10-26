@@ -2881,7 +2881,7 @@ function SettingsPanel({
   return (
     <div className="settings-layout">
       <section className="card app-version"><p className="eyebrow">Über diese App</p><h3>SpesenKit {appRelease.version}</h3>
-        <p>Laufende Version{appRelease.commit ? ` · Commit ${appRelease.commit}` : ""}. Daten und Belege bleiben lokal in diesem Browser.</p>
+        <p>Laufende Version{appRelease.commit ? ` · Commit ${appRelease.commit}` : ""}. Daten und Belege werden nur in diesem Browser gespeichert und – sobald er verbunden ist – im eigenen SpesenKit-Ordner. An Internetdienste geht nichts.</p>
       </section>
       <section className="card">
         <p className="eyebrow">Profil & Unternehmen</p>

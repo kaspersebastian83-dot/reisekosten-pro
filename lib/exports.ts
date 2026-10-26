@@ -101,6 +101,8 @@ export async function exportPdf(data: StatementData, state: AppState, number: st
   download(file.blob, file.name);
 }
 
+const MONEY_COLUMNS = new Set(["SpesenVorKürzung", "Frühstückskürzung", "Mittagessenkürzung", "Abendessenkürzung", "SpesenNachKürzung", "Kilometererstattung", "Tankkosten", "Übernachtung", "SonstigeKosten", "OffenerBetrag"]);
+
 const rowsForExport = (data: StatementData, state: AppState) =>
   data.rows.map((r) => {
     const vehicles = [
@@ -167,6 +169,18 @@ export async function excelFile(data: StatementData, state: AppState, context?: 
   overview.getRow(8).font = { bold: true };
   overview.columns = [{ width: 28 }, { width: 28 }, { width: 20 }];
   overview.addRow([]);
+  // Summen dieses Abrechnungsstands (dieselben Werte wie in der App und im PDF).
+  const sumHead = overview.addRow(["Summen", "Betrag"]); sumHead.font = { bold: true };
+  for (const [label, value] of [
+    ["Verpflegungspauschalen (nach Kürzung)", data.totals.allowance],
+    ["Kilometererstattung", data.totals.mileage],
+    ["Tankkosten", data.totals.fuel],
+    ["Übernachtung", data.totals.accommodation],
+    ["Sonstige Kosten", data.totals.other],
+    ["Gesamtkosten", data.totals.grandTotal],
+    ["Persönliche Erstattung (offener Betrag)", data.totals.openAmount],
+  ] as const) overview.addRow([label, value]).getCell(2).numFmt = '#,##0.00 "€"';
+  overview.addRow([]);
   overview.addRow(['Abrechnungsversion', context ? `Version ${context.version}` : 'Nicht gespeicherter Entwurf']);
   for (const text of [statementAmountLabel + ': Die Spalte OffenerBetrag enthält den rechnerischen Betrag dieses Abrechnungsstands, keine dokumentierte Restzahlung.', ...(context?.correction ? [correctionExportNotice] : [])]) {
     const row = overview.addRow([text]);
@@ -191,6 +205,12 @@ export async function excelFile(data: StatementData, state: AppState, context?: 
     expenses.columns.forEach((column) => {
       column.width = 18;
     });
+    // Beträge mit Euro-Format, Kilometer mit einer Nachkommastelle. Die Datenzeilen bleiben reine Tabelle (Summen im Blatt „Übersicht“).
+    headers.forEach((header, index) => {
+      const column = expenses.getColumn(index + 1);
+      if (MONEY_COLUMNS.has(header)) column.numFmt = '#,##0.00 "€"';
+      else if (header === "Kilometer") column.numFmt = "#,##0.0";
+    });
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
@@ -202,13 +222,19 @@ export async function excelFile(data: StatementData, state: AppState, context?: 
   };
 }
 
+function datevText(r: StatementData["rows"][number], state: AppState) {
+  const vehicles = [...new Set(r.trips.map((trip) => vehicleDetails(state, trip).name).filter(Boolean))];
+  const categories = [...new Set((r.contributions?.expenses || []).filter((e) => e.openAmount > 0).map((e) => e.category))];
+  const what = r.trips.length ? `Reisekosten ${r.destinations.join(", ")}`.trim() : `Auslagen ${categories.join(", ")}`.trim();
+  return [what, vehicles.join(", ")].filter(Boolean).join(" · ");
+}
+
 export function exportCsv(data: StatementData, state: AppState, datev = false, context?: StatementExportContext) {
+  // DATEV: nur Tage mit einem Betrag (keine 0,00-Zeilen); Buchungstext ohne leere Teile.
   const rows: Record<string, unknown>[] = datev
-    ? data.rows.map((r) => ({
+    ? data.rows.filter((r) => r.openAmount !== 0).map((r) => ({
         Belegdatum: r.date.replaceAll("-", ""),
-        Buchungstext: `Reisekosten ${r.destinations.join(", ")} · ${[
-          ...new Set(r.trips.map((trip) => vehicleDetails(state, trip).name)),
-        ].join(", ")}`,
+        Buchungstext: datevText(r, state),
         Betrag: r.openAmount.toFixed(2).replace(".", ","),
         Währung: "EUR",
         Kostenstelle: r.trips[0]?.costCenter || "",
