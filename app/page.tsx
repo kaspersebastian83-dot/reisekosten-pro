@@ -81,6 +81,7 @@ import { changeStatementStatus, persistStatementClosing, type ClosingConfirmatio
 import { MonthNavigation } from "./month-navigation";
 import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel, monthOverview } from "../lib/month-navigation";
 import { demoState } from "../lib/demo";
+import { slimChangeLog } from "../lib/change-log";
 import { applyMerchantRule, recognizeReceiptLocally } from "../lib/receipt-ocr";
 import {
   exportBackup,
@@ -280,7 +281,8 @@ export default function Home() {
     setLoadError("");
     return loadState().then((s) => {
       lastSaved.current = s;
-      setState(s);
+      // Einmalig: Belegbilder aus älteren Protokolleinträgen entfernen – wird wie jede Änderung gespeichert.
+      setState(slimChangeLog(s));
       setReady(true);
     }).catch((error: unknown) => {
       console.error("Lokale Daten konnten nicht geladen werden", error);
@@ -330,8 +332,9 @@ export default function Home() {
     notify: useCallback((text: string) => notifyRef.current(text), []),
   });
   const notifyRef = useRef(notify); notifyRef.current = notify;
+  // Belegbilder nie ins Änderungsprotokoll kopieren (siehe lib/change-log.ts).
   const update = (fn: (s: AppState) => AppState) =>
-    setState((s) => fn(structuredClone(s)));
+    setState((s) => slimChangeLog(fn(structuredClone(s))));
   const statement = useMemo(() => buildStatement(state, month), [state, month]);
   const monthStatus = useMemo(() => monthOverview(state, month), [state, month]);
   const issueCount =

@@ -138,6 +138,14 @@ export interface WriteOptions {
   expectedHash?: string;
   /** Nach den dauerhaften Sicherungen, vor dem Ersetzen (z. B. Tagessicherung des bisherigen Stands). */
   beforeReplace?: (current: FolderFile) => Promise<void>;
+  /**
+   * Kopien des vorigen eigenen Speicherns. Sie werden nach dem bestätigten Schreiben gelöscht – aber nur, wenn die
+   * ersetzte Datei genau diesen eigenen Stand enthielt (Fingerabdruck gleich). Hat jemand anderes dazwischen
+   * gespeichert, bleiben sie als Wiederherstellungsmaterial erhalten.
+   */
+  staleCopies?: { hash: string; names: string[] };
+  /** Namen der Kopien, die dieses Speichern angelegt hat (für staleCopies beim nächsten Mal). */
+  onCopies?: (names: string[]) => void;
 }
 
 /**
@@ -152,7 +160,7 @@ export async function writeDataFile(root: DirHandleLike, state: AppState, expect
   const content: FolderFileContent = { format: FILE_FORMAT, formatVersion: FILE_FORMAT_VERSION, revision: expectedRevision + 1, savedAt: now.toISOString(), ...(app ? { app } : {}), state: snapshot };
   const text = JSON.stringify(content);
   // Schon ein veralteter Versuch bleibt wiederherstellbar; eine fehlgeschlagene Sicherung stoppt das Ersetzen.
-  await writeSafetyCopy(root, "speicherkandidat", snapshot, now);
+  const copies = [copyName(await writeSafetyCopy(root, "speicherkandidat", snapshot, now))];
   let current: FolderFile | null;
   let invalidText: string | undefined;
   try { current = await readDataFile(root); }
@@ -171,7 +179,7 @@ export async function writeDataFile(root: DirHandleLike, state: AppState, expect
   if (currentRevision !== expectedRevision || (current && options.expectedHash !== undefined && current.hash !== options.expectedHash)) {
     throw new FolderError("conflict", `Die Datei im SpesenKit-Ordner wurde inzwischen an anderer Stelle geändert (Stand ${currentRevision}, erwartet ${expectedRevision}). Es wurde nichts überschrieben.`);
   }
-  if (current) await writeSafetyCopy(root, "vor_speichern", current.state, now);
+  if (current) copies.push(copyName(await writeSafetyCopy(root, "vor_speichern", current.state, now)));
   const dir = (await subDir(root, DATA_DIR, true))!;
   const originalText = current?.text ?? invalidText ?? null;
   const unchanged = async () => {
@@ -194,8 +202,14 @@ export async function writeDataFile(root: DirHandleLike, state: AppState, expect
     catch (error) { if (error instanceof FolderError && error.code !== "invalid") throw error; }
     throw new FolderError("verify", `„${DATA_FILE}“ wurde nicht vollständig gespeichert. Der Speicherkandidat bleibt in den Sicherungen erhalten. Bitte erneut versuchen.`);
   }
+  options.onCopies?.(copies);
+  // Bestätigt: Die ersetzte Datei war genau der eigene vorige Stand → dessen Kopien sind doppelt (best effort).
+  if (current && options.staleCopies && current.hash === options.staleCopies.hash) {
+    for (const name of options.staleCopies.names) await removeFile(root, [COPY_DIR], name).catch(() => undefined);
+  }
   return { revision: content.revision, hash: await stateHash(snapshot), savedAt: content.savedAt };
 }
+const copyName = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
 export const stamp = (now: Date) => {
   const z = (n: number) => String(n).padStart(2, "0");
@@ -211,7 +225,7 @@ async function writeVerifiedCopy(root: DirHandleLike, label: string, text: strin
   if (await fileText(dir, name) !== text) throw new FolderError("verify", `Die Sicherung „${name}“ konnte nicht vollständig bestätigt werden. Die Hauptdatei wurde nicht ersetzt.`);
   return `${FOLDER_NAME}/${COPY_DIR}/${name}`;
 }
-/** Geprüfte Kopie im bestehenden JSON-Sicherungsformat. Kandidaten und Vorgänger werden nie automatisch gelöscht. */
+/** Geprüfte Kopie im bestehenden JSON-Sicherungsformat. Kandidaten und Vorgänger: siehe staleCopies und copiesToPrune. */
 export async function writeSafetyCopy(root: DirHandleLike, label: string, state: AppState, now = new Date()) {
   const snapshot = normalizeState(JSON.parse(JSON.stringify(state)) as AppState);
   return writeVerifiedCopy(root, label, JSON.stringify(snapshot, null, 2), now);

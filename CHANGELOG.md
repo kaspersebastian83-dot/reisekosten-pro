@@ -1,5 +1,23 @@
 # Release Notes
 
+## 1.8.3 – 26. Oktober 2026
+
+Weniger Kopien – auf dem Handy füllte SpesenKit den Speicher schnell.
+- **Belegfotos werden beim Erfassen verkleinert:** längste Seite höchstens 2000 Pixel, JPEG (Qualität 0,75).
+  Ein Handyfoto von 3–5 MB wird meist 0,2–0,6 MB groß und bleibt lesbar; die Originalbelege gehen an die
+  Steuerberatung. PDFs bleiben unverändert. Ist ein Bild nicht lesbar oder wäre es nicht kleiner, bleibt das Original.
+  Der Fingerabdruck kommt weiter von der Originaldatei, Duplikate werden erkannt. Bereits gespeicherte Belege
+  bleiben, wie sie sind (abgeschlossene Abrechnungen dürfen sich nicht ändern).
+- **Änderungsprotokoll ohne Belegbilder:** Jede Bearbeitung einer Kostenposition speicherte das Belegbild zweimal
+  (vorher/nachher). Jetzt steht der Beleg im Protokoll nur mit Name, Typ, Größe und Fingerabdruck. Vorhandene
+  Protokolleinträge werden beim nächsten Öffnen einmalig verschlankt. Format unverändert.
+- **SpesenKit-Ordner (PC):** Speicherkandidat und Vorgänger eines Speicherns werden beim nächsten eigenen Speichern
+  gelöscht, wenn die Datei noch genau diesen Stand enthält; hat jemand anderes dazwischen gespeichert, bleiben sie.
+  Liegengebliebene Kopien entfernt die Tagessicherung nach 7 Tagen. Tages-, Monats-, Abschluss- und manuelle
+  Sicherungen unverändert. Die Tagessicherung listet den Ordner nur noch einmal am Tag statt bei jedem Speichern.
+- Tests: `storage-copies.test.ts` (Protokoll, Kopien, Aufbewahrung, Bildgrößen) und
+  `tests/beleg-verkleinern-browser-check.mjs` (12-MB-Testfoto → 2000 × 1500 JPEG, PDF unverändert).
+
 ## 1.8.2 – 26. Oktober 2026
 
 - Über Mitternacht ohne Übernachtung (§ 9 Abs. 4a Satz 3 Nr. 3 EStG): Beginnt eine Dienstreise an einem Tag und endet

@@ -3,7 +3,7 @@
 Dienstreisen · Spesen · Abrechnungen
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
-1.8.2 (Release-Version aus [package.json](package.json), Änderungen in
+1.8.3 (Release-Version aus [package.json](package.json), Änderungen in
 [CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
 
 Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
@@ -20,7 +20,7 @@ Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV-, DATEV-CSV- und ZIP-Exporte.
 
-## Aktueller Stand in Kürze (1.8.2)
+## Aktueller Stand in Kürze (1.8.3)
 
 - **Navigation:** Monatsübersicht, Auswertungen, Einstellungen, Datensicherung.
   Erfassen, Bearbeiten, Löschen, Import, Beleg-Eingang, Prüfen und Abschluss
@@ -151,7 +151,10 @@ Vor jedem Schreibversuch sichert die App den eigenen Datenstand als
 `Sicherungen/spesenkit_speicherkandidat_<Datum>_<Zeit>_<UUID>.json`. Vor dem Ersetzen wird auch der gelesene
 Vorgänger als `spesenkit_vor_speichern_….json` gesichert. Jede Kopie wird geschlossen und vollständig
 zurückgelesen, bevor die Hauptdatei ersetzt werden darf. Diese Kopien sind normale JSON-Sicherungen mit
-Reisen, Belegen und eingefrorenen Abrechnungen; sie werden nie automatisch gelöscht.
+Reisen, Belegen und eingefrorenen Abrechnungen. Seit 1.8.3 löscht die App die beiden Kopien eines Speicherns beim
+nächsten eigenen Speichern, aber nur wenn die ersetzte Datei noch genau den eigenen Stand enthielt (Fingerabdruck
+gleich). Hat eine andere Sitzung dazwischen gespeichert, bleiben sie. Liegengebliebene Kopien (Sitzungsende, Konflikt)
+werden bei der Tagessicherung nach 7 Tagen entfernt.
 
 Revision und erwarteter Inhaltsfingerabdruck werden geprüft. Vor dem Ersetzen wird die Datei erneut mit
 dem gelesenen Ausgangstext verglichen. Ein erkannter Konflikt verlangt die vorhandene Entscheidung
@@ -166,7 +169,7 @@ keine Bestätigung eines erfolgreichen Schreibens und wird nicht automatisch mit
 Alte Sicherungsnamen ohne UUID bzw. mit Zähler bleiben lesbar.
 
 **Garantie und Grenze:** Mit dieser Speicherlogik bleiben beide konkurrierenden Speicherkandidaten
-erhalten, sobald ihre Kopien erfolgreich geschrieben und zurückgelesen wurden. Schlägt eine notwendige
+mindestens 7 Tage erhalten, sobald ihre Kopien erfolgreich geschrieben und zurückgelesen wurden. Schlägt eine notwendige
 Sicherung oder Prüfung fehl, wird der eigene Schreibvorgang nicht als erfolgreich bestätigt. Die File System
 Access API bietet keine atomare serverübergreifende Operation „nur ersetzen, falls unverändert“.
 `navigator.locks` ordnet lediglich Tabs innerhalb desselben Browserprofils. Deshalb können im letzten

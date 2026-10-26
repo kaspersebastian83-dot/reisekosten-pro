@@ -1,6 +1,6 @@
 # SpesenKit – Anleitung
 
-Stand: Version 1.8.2. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
+Stand: Version 1.8.3. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
 Büro-Terminal (RDP, eigenes Windows-Profil) in **Edge oder Chrome** genutzt.
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ – oder in der
@@ -32,7 +32,8 @@ Alles passiert in der **Monatsübersicht**.
      Abwesenheitsdauer und Verpflegungsvorschau.
    - **Hotelrechnung** und **Sonstige Kosten** – Datum (Rechnungsdatum),
      Betrag, Zahlungsart, Beleg als Datei; rechts Projekt und Reisezuordnung.
-   - **Beleg fotografieren** – Beleg ablegen und später zuordnen.
+   - **Beleg fotografieren** – Beleg ablegen und später zuordnen. Fotos werden dabei verkleinert
+     (längste Seite 2000 Pixel), damit das Handy nicht volläuft; PDFs bleiben unverändert.
    - **Fahrtenbuch importieren** – Vimcar-CSV oder andere CSV/XLSX.
 3. **Viele Einträge am Stück:** **Speichern & nächste** (oder Strg+Enter) hält
    das Fenster offen und belegt den nächsten Eintrag vor (Reise: Folgetag,
@@ -70,8 +71,8 @@ und zahlt nichts aus.
 - Vor jedem Schreibversuch bleiben zusätzlich geprüfte **Speicherkandidaten** und
   Vorgängerstände erhalten. Unter **Datensicherung → Sicherungen → Speicherkandidaten
   und Vorgänger anzeigen** lassen sich auch konkurrierende oder fehlgeschlagene
-  Versuche nach Prüfung wiederherstellen. Diese Kopien werden nicht automatisch
-  gelöscht und enthalten ebenfalls sämtliche Belege.
+  Versuche nach Prüfung wiederherstellen. Diese Kopien enthalten sämtliche Belege;
+  sie werden beim nächsten Speichern gelöscht, wenn nichts dazwischenkam, sonst nach 7 Tagen.
 - Bei abweichenden Datenständen ausdrücklich entscheiden, welcher Stand gilt.
   Alle offenen Sitzungen sollten dieselbe aktuelle App-Version verwenden; eine
   serverübergreifende Sperre gibt es nicht. Deshalb möglichst nur eine Sitzung
