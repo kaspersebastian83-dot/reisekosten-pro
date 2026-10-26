@@ -10,7 +10,9 @@ import type { AppState } from "./types";
  *   spesenkit_manuell_<…>.json                    „Jetzt sichern“
  *   spesenkit_vor_wiederherstellung_<…>.json      Stand vor einer Wiederherstellung
  *   spesenkit_browserstand_/ordnerstand_/ungueltig_  aus Konflikten bzw. unlesbarer Datei (3.3a)
- * Automatisch gelöscht werden ausschließlich Tagessicherungen mit genau diesem Namensmuster.
+ *   spesenkit_speicherkandidat_/vor_speichern_    je Speichervorgang; beim nächsten eigenen Speichern gelöscht, wenn die
+ *                                                Datei noch genau diesen Stand hat, sonst nach 7 Tagen (copiesToPrune)
+ * Automatisch gelöscht werden nur Tagessicherungen mit genau diesem Namensmuster und die Kopien je Speichervorgang.
  */
 export type BackupKind = "auto" | "abschluss" | "manuell" | "vor_wiederherstellung" | "browserstand" | "ordnerstand" | "speicherkandidat" | "vor_speichern" | "ungueltig" | "sonstige";
 export const backupKindLabels: Record<BackupKind, string> = {
@@ -66,12 +68,32 @@ export function backupsToPrune(entries: BackupEntry[], now: Date, policy: Retent
   return autos.filter((entry) => !keep.has(entry.name)).map((entry) => entry.name);
 }
 
+/** Kopien je Speichervorgang („speicherkandidat“, „vor_speichern“), die nach dem Speichern liegen bleiben – etwa die
+ *  letzten einer Sitzung oder aus einem Konflikt: nach `days` Tagen entbehrlich, denn Konflikte zeigt SpesenKit sofort,
+ *  und ältere Stände decken die Tages- und Monatssicherungen ab. Andere Arten werden hier nie vorgeschlagen. */
+export const COPY_RETENTION_DAYS = 7;
+export function copiesToPrune(entries: BackupEntry[], now: Date, days = COPY_RETENTION_DAYS): string[] {
+  const limit = localDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - days));
+  return entries.filter((entry) => (entry.kind === "speicherkandidat" || entry.kind === "vor_speichern") && entry.date < limit).map((entry) => entry.name);
+}
+
+/**
+ * Merker des Aufrufers: Für welchen Ordner (stabiler Schlüssel, z. B. Anzeigename der Verknüpfung) ist die
+ * Tagessicherung heute schon vorhanden? Erspart das Auflisten bei jedem Speichern. Der Ordner-Handle selbst taugt
+ * nicht als Schlüssel: Aus IndexedDB kommt bei jedem Lesen ein neues Objekt.
+ */
+export interface DailyBackupMemo { key?: string; day?: string }
+
 /** Tagessicherung des bisherigen Stands (falls heute noch keine), danach aufräumen. Ergebnis für die Anzeige. */
-export async function dailyBackup(root: DirHandleLike, previous: AppState, now = new Date(), policy = defaultRetention) {
+export async function dailyBackup(root: DirHandleLike, previous: AppState, now = new Date(), policy = defaultRetention, memo?: DailyBackupMemo & { forKey: string }) {
+  const today = localDate(now), done = () => { if (memo) { memo.key = memo.forKey; memo.day = today; } };
+  if (memo && memo.key === memo.forKey && memo.day === today) return { written: null as string | null, pruned: [] as string[] };
   const entries = await listBackups(root);
-  if (!autoBackupDue(entries, now)) return { written: null as string | null, pruned: [] as string[] };
+  if (!autoBackupDue(entries, now)) { done(); return { written: null as string | null, pruned: [] as string[] }; }
   const written = await writeSafetyCopy(root, "auto", previous, now);
-  const pruned = backupsToPrune(await listBackups(root), now, policy);
+  done();
+  const after = await listBackups(root);
+  const pruned = [...backupsToPrune(after, now, policy), ...copiesToPrune(after, now)];
   for (const name of pruned) await removeFile(root, [COPY_DIR], name);
   return { written, pruned };
 }

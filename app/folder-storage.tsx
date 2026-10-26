@@ -61,11 +61,21 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   const [backupNote, setBackupNote] = useState("");
   const [backupRun, setBackupRun] = useState(0);
   /** Datendatei schreiben; beim ersten Speichern des Tages vorher den bisherigen Stand sichern (best effort). */
-  const writeFile = (link: FolderLink, state: AppState, expected: number, options: { replaceInvalid?: boolean } = {}) =>
-    writeDataFile(link.handle, state, expected, appRelease, new Date(), { expectedHash: link.hash || undefined, ...options, beforeReplace: async (current) => {
-      try { const result = await dailyBackup(link.handle, current.state); if (result.written) setBackupRun((n) => n + 1); setBackupNote(""); }
-      catch (error) { setBackupNote(`Tagessicherung konnte nicht angelegt werden: ${message(error)}`); }
-    } });
+  /** Kopien des letzten eigenen Speicherns; beim nächsten bestätigten Speichern entbehrlich (siehe staleCopies). */
+  const lastCopies = useRef<{ hash: string; names: string[] } | null>(null);
+  /** Tagessicherung heute schon vorhanden? Schlüssel: Ordnername der Verknüpfung (der Handle ist jedes Mal ein neues Objekt). */
+  const dailyMemo = useRef<{ key?: string; day?: string }>({});
+  const writeFile = async (link: FolderLink, state: AppState, expected: number, options: { replaceInvalid?: boolean } = {}) => {
+    let copies: string[] = [];
+    const result = await writeDataFile(link.handle, state, expected, appRelease, new Date(), { expectedHash: link.hash || undefined, ...options,
+      staleCopies: lastCopies.current || undefined, onCopies: (names) => { copies = names; },
+      beforeReplace: async (current) => {
+        try { const result = await dailyBackup(link.handle, current.state, new Date(), undefined, Object.assign(dailyMemo.current, { forKey: linkName(link) })); if (result.written) setBackupRun((n) => n + 1); setBackupNote(""); }
+        catch (error) { setBackupNote(`Tagessicherung konnte nicht angelegt werden: ${message(error)}`); }
+      } });
+    lastCopies.current = { hash: result.hash, names: copies };
+    return result;
+  };
   /** Lokale Änderungen, die noch nicht im Ordner sind, weil er gerade nicht beschreibbar ist. */
   const unsynced = useRef(false);
 
@@ -561,7 +571,7 @@ function FolderBackups({ folder }: { folder: FolderStorage }) {
   return <div className="folder-backups">
     <div className="folder-backups-head"><h4>Sicherungen in <code>{`${FOLDER_NAME}\\${COPY_DIR}`}</code></h4>
       <button className="ghost" disabled={working || folder.busy} onClick={async () => { setWorking(true); setNote(""); try { await folder.backupNow(); setNote("Sicherung angelegt."); } catch (error) { setNote(message(error)); } finally { setWorking(false); } }}>Jetzt sichern</button></div>
-    <p className="muted">Automatisch: einmal täglich der Stand vor der ersten Änderung (die letzten 14 Tage, dazu je Monat einer für 12 Monate) und nach jedem Monatsabschluss. Vor jedem Schreibversuch werden zusätzlich der Speicherkandidat und der gelesene Vorgänger gesichert; diese Kopien bleiben dauerhaft.</p>
+    <p className="muted">Automatisch: einmal täglich der Stand vor der ersten Änderung (die letzten 14 Tage, dazu je Monat einer für 12 Monate) und nach jedem Monatsabschluss. Vor jedem Schreibversuch werden zusätzlich der Speicherkandidat und der gelesene Vorgänger gesichert. Sie werden beim nächsten Speichern gelöscht, wenn die Datei noch genau diesen Stand hat; liegengebliebene Kopien (z. B. nach einem Konflikt) nach 7 Tagen.</p>
     <p className="muted">Ein Speicherkandidat ist kein bestätigter Abschluss des Speichervorgangs: Er kann aus einem abgebrochenen oder konkurrierenden Versuch stammen. Vor dem Wiederherstellen den Inhalt prüfen; die Auswahl ersetzt den aktuellen Datenstand und führt ihn nicht automatisch zusammen.</p>
     {folder.backupNote && <p className="error-text" role="status">{folder.backupNote}</p>}
     <label className="check"><input type="checkbox" checked={saveAttempts} onChange={(event) => setSaveAttempts(event.target.checked)} />Speicherkandidaten und Vorgänger anzeigen</label>
