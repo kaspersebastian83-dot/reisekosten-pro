@@ -1,5 +1,17 @@
 # Release Notes
 
+## 1.8.1 – 26. Oktober 2026
+
+- Speichern im selben Tab: „Bisher: …“ im Feld „Verwendetes Fahrzeug“ (Dienstreise → Weitere Angaben) ließ das
+  Fahrzeug der Fahrt leer. Danach meldete schon ein einzelner Tab „Die Daten wurden in einem anderen Tab geändert“,
+  und nichts wurde mehr gespeichert. Jetzt lässt „Bisher: …“ das Fahrzeug unverändert, und der Vergleich mit dem
+  gespeicherten Stand prüft beide Seiten gleich aufbereitet. Echte Änderungen aus einem anderen Tab werden weiterhin
+  erkannt. Speicherformat unverändert.
+- Link „Handbuch“ (Buch-Symbol) in der Seitenleiste unter „Projektzentrale“: öffnet AidKit „SpesenKit Schritt für Schritt“
+  (`../aidkit/#app-spesenkit`) im eigenen Fenster.
+- Tests: Regression für den Vergleich (Vitest), Prüfung der festen Handbuch-Adresse im Build und
+  `tests/fahrzeug-speichern-browser-check.mjs` (zwei Fahrten nacheinander, einmal mit „Bisher: …“).
+
 ## Noch nicht veröffentlicht – Buchhaltungs-PDF
 
 - Corporate Identity der Spektron-Suite: blaue App-Palette, mitgeliefertes Firmenlogo als dezentes

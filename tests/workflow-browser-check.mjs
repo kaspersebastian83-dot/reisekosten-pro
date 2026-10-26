@@ -46,8 +46,11 @@ try {
       assert.equal(await page.title(),'SpesenKit');
       assert.equal(await page.locator('.brand b').innerText(),'SpesenKit');
       assert.equal(await page.locator('.brand-mark img').evaluate(img=>img.complete&&img.naturalWidth>0),true,'brand icon loads');
-      assert.equal(await page.locator('a.suite-link').getAttribute('href'),'../Projektzentrale/','link back to the Projektzentrale');
-      assert.match(await page.locator('a.suite-link').innerText(),/Projektzentrale/);
+      assert.equal(await page.locator('a.suite-link').first().getAttribute('href'),'../Projektzentrale/','link back to the Projektzentrale');
+      assert.match(await page.locator('a.suite-link').first().innerText(),/Projektzentrale/);
+      const handbuch=page.locator('a.suite-link').nth(1);
+      assert.equal(await handbuch.getAttribute('href'),'../aidkit/#app-spesenkit','Handbuch link to the fixed AidKit chapter');
+      assert.equal(await handbuch.getAttribute('target'),'aidkit');assert.match(await handbuch.innerText(),/Handbuch/);
       assert.equal(await page.locator('.brand-mark').evaluate(el=>el.offsetWidth===el.offsetHeight),true,'brand symbol keeps its square proportions');
       assert.equal(await page.locator('.brand small').innerText(),'Dienstreisen · Spesen · Abrechnungen');
       await check(`${engine} ${viewport.width}: navigation, import access and empty dashboard actions`,async()=>{

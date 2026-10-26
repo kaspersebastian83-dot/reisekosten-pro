@@ -157,12 +157,19 @@ export function normalizeState(value?: Partial<AppState>): AppState {
   };
 }
 
+/** Gleicher Stand wie zuletzt gespeichert? Beide Seiten normalisiert verglichen: Beim Lesen ergänzt
+ *  normalizeState z. B. das Fahrzeug einer Fahrt; ohne diesen Schritt meldete schon ein einzelner Tab
+ *  „in einem anderen Tab geändert“ und nichts wurde mehr gespeichert. */
+export function sameStoredState(current: AppState, expected: AppState) {
+  return JSON.stringify(current) === JSON.stringify(normalizeState(structuredClone(expected)));
+}
+
 export async function saveState(state: AppState, expected: AppState) {
   const transaction = (await db()).transaction(STORE, "readwrite");
   try {
     const current = normalizeState(await transaction.store.get("main"));
     // An older tab must never overwrite a newer import, receipt or snapshot.
-    if (JSON.stringify(current) !== JSON.stringify(expected)) {
+    if (!sameStoredState(current, expected)) {
       throw new Error("Die Daten wurden in einem anderen Tab geändert. Sichern Sie Ihre eigenen Änderungen als JSON und laden Sie die App anschließend neu. Der neuere Speicherstand wurde nicht überschrieben.");
     }
     await transaction.store.put(state, "main");
