@@ -3,7 +3,7 @@ import { AlertTriangle, Car, ReceiptText } from 'lucide-react';
 import type { AppState, StatementData } from '../lib/types';
 import { filterTimeline, monthTimeline, timelineFilterLabels, type TimelineEntry, type TimelineFilter } from '../lib/month-timeline';
 import { DayDetails } from './calculation-details';
-import { paymentLabel } from '../lib/receipt-linking';
+import { paymentLabel, withoutTripNeeded } from '../lib/receipt-linking';
 
 const euro = (value: number) => value.toLocaleString('de-DE', {style: 'currency', currency: 'EUR'});
 const dayLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('de-DE', {weekday: 'short', day: '2-digit', month: '2-digit'});
@@ -38,16 +38,16 @@ export function MonthTimeline({state, month, statement, edit, startTrip, filter 
     const warnings = [...new Set(e.warnings)].filter(w => w !== 'Beleg fehlt');
     return <button type="button" className="timeline-entry expense" onClick={() => edit({kind: 'expense', id: e.id})} aria-label={`${e.category} ${e.description} bearbeiten`}>
       <ReceiptText size={16} aria-hidden="true" />
-      <span className="timeline-main"><b>{e.category}{e.description ? ` · ${e.description}` : ''}</b><small>{[paymentLabel(e.paymentType), trip ? `Reise ${trip.destination || short(trip.date)}` : 'keiner Reise zugeordnet'].join(' · ')}</small></span>
+      <span className="timeline-main"><b>{e.category}{e.description ? ` · ${e.description}` : ''}</b><small>{[paymentLabel(e.paymentType), trip ? `Reise ${trip.destination || short(trip.date)}` : withoutTripNeeded(e, state.settings) ? (state.settings.staffRole === 'innendienst' ? '' : 'ohne Reise') : 'keiner Reise zugeordnet'].filter(Boolean).join(' · ')}</small></span>
       {!e.receipt && <span className="timeline-flag">Beleg fehlt</span>}
       {warnings.length > 0 && <span className="timeline-flag" title={warnings.join(' · ')}><AlertTriangle size={14} aria-hidden="true" />{warnings.length === 1 ? 'Hinweis' : `${warnings.length} Hinweise`}</span>}
       <span className="timeline-amount">{euro(e.gross)}</span>
     </button>;
   };
   return <section className="month-timeline" aria-label="Monat im Überblick">
-    <h3>Monat im Überblick <small>{counts.trips} {counts.trips === 1 ? 'Dienstreise' : 'Dienstreisen'} · {counts.expenses} {counts.expenses === 1 ? 'Kostenposition' : 'Kostenpositionen'}</small></h3>
+    <h3>Monat im Überblick <small>{state.settings.staffRole === 'innendienst' && !counts.trips ? '' : `${counts.trips} ${counts.trips === 1 ? 'Dienstreise' : 'Dienstreisen'} · `}{counts.expenses} {counts.expenses === 1 ? 'Kostenposition' : 'Kostenpositionen'}</small></h3>
     {filter && <p className="timeline-filter" role="status">Gefiltert: <b>{timelineFilterLabels[filter]}</b> · {days.flatMap(d => d.entries).length} Einträge <button type="button" className="link" onClick={() => setFilter?.(null)}>Alle anzeigen</button></p>}
-    {filter && days.length === 0 ? <p className="muted">Keine passenden Einträge in diesem Monat.</p> : days.length === 0 ? <div className="timeline-empty"><p>Für diesen Monat ist noch nichts erfasst.</p>{startTrip && <button className="ghost" onClick={startTrip}>Erste Dienstreise erfassen</button>}</div> :
+    {filter && days.length === 0 ? <p className="muted">Keine passenden Einträge in diesem Monat.</p> : days.length === 0 ? <div className="timeline-empty"><p>Für diesen Monat ist noch nichts erfasst.</p>{startTrip && state.settings.staffRole !== 'innendienst' && <button className="ghost" onClick={startTrip}>Erste Dienstreise erfassen</button>}</div> :
       <ol className="timeline-days">{days.map(d => <li key={d.date} className="timeline-day">
         <div className="timeline-date"><b>{dayLabel(d.date)}</b>{d.allowance !== null && <small title={d.allowanceReason}>{d.allowance > 0 ? `Verpflegung ${euro(d.allowance)}` : 'keine Pauschale'}</small>}</div>
         <ul>{d.entries.map(entry => <li key={entry.kind === 'trip' ? `t-${entry.trip.id}` : `e-${entry.expense.id}`}>{row(entry)}</li>)}</ul>

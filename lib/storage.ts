@@ -50,7 +50,7 @@ function validateState(value: Partial<AppState>) {
     if (trip.dailyMeals && (!record(trip.dailyMeals) || !Object.values(trip.dailyMeals).every(meals))) fail();
   }
   const receipt = (v: unknown) => record(v) && texts(v, ["id", "name", "type", "hash", "dataUrl"]) && numbers(v, ["size"]);
-  const context = (v: Partial<Record<"projectNumber" | "stayStart" | "stayEnd" | "breakfastIncluded", unknown>>) => (["projectNumber", "stayStart", "stayEnd"] as const).every(key => v[key] === undefined || typeof v[key] === "string") && (v.breakfastIncluded === undefined || (typeof v.breakfastIncluded === "string" && ["yes", "no", "unknown"].includes(v.breakfastIncluded)));
+  const context = (v: Partial<Record<"projectNumber" | "stayStart" | "stayEnd" | "breakfastIncluded" | "noTrip", unknown>>) => (["projectNumber", "stayStart", "stayEnd"] as const).every(key => v[key] === undefined || typeof v[key] === "string") && (v.breakfastIncluded === undefined || (typeof v.breakfastIncluded === "string" && ["yes", "no", "unknown"].includes(v.breakfastIncluded))) && (v.noTrip === undefined || typeof v.noTrip === "boolean");
   for (const expense of value.expenses || []) {
     if (!record(expense) || !texts(expense, ["id", "date", "category", "description", "currency", "reimbursementStatus", "status"]) || !numbers(expense, ["gross", "net", "vatRate", "vat", "exchangeRate", "businessShare"]) || !warnings(expense.warnings) || (expense.receipt && !receipt(expense.receipt))) fail();
     if ((expense.tripId !== undefined && typeof expense.tripId !== "string") || !context(expense) || (expense.paymentType !== undefined && typeof expense.paymentType !== "string")) fail();

@@ -1,5 +1,19 @@
 # Release Notes
 
+## 1.8.5 – 26. Oktober 2026
+
+Rückmeldungen aus dem Einsatz:
+- **„Gehört zu keiner Reise und keinem Projekt (z. B. Büromaterial)“** – neuer Haken bei Kosten (Kostenfenster und
+  Beleg-Eingang). Angehakt: keine Reiseauswahl, kein Projektfeld, und weder Erfassung noch Abschlussprüfung melden
+  eine fehlende Reise oder ein fehlendes Projekt. Ohne Haken bleibt der Hinweis, damit vergessene Zuordnungen
+  auffallen. Wird doch eine Reise gesetzt, wird sie wie bisher geprüft. Gespeichert als `noTrip` an der Kostenposition.
+- **Tätigkeit: Außendienst / Innendienst** (Einstellungen). Innendienst: nur Kosten und Belege – kein „Dienstreise
+  erfassen“, kein Fahrtenbuch-Import, keine Verpflegungsvorschau; Kosten ohne Reise- und Projektzuordnung und ohne
+  Hinweise darauf, Projekt freiwillig. Vorhandene Reisen bleiben erhalten und sichtbar. Standard: Außendienst.
+- Monatsübersicht: Kosten mit Haken zeigen „ohne Reise“ statt „keiner Reise zugeordnet“.
+- Tests: `innendienst.test.ts` (Abschlussprüfung, Übernahme aus dem Eingang, Standard, Speicherprüfung) und
+  `tests/innendienst-browser-check.mjs` (beide Abläufe, Desktop und Handy).
+
 ## 1.8.4 – 26. Oktober 2026
 
 Rückmeldungen aus dem Einsatz zur Belegerkennung („Beleg fotografieren / OCR“):

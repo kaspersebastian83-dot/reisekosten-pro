@@ -15,10 +15,12 @@ export function PaymentSelect({ value, onChange }: { value: PaymentType; onChang
   </select></label>;
 }
 
-export function ReceiptLinkFields({ value, onChange, trips, travelLabel = 'Passende Reise', compact = false }: {
+export function ReceiptLinkFields({ value, onChange, trips, travelLabel = 'Passende Reise', compact = false, innendienst = false }: {
   value: LinkingInput; onChange: (patch: Partial<LinkingInput>) => void; trips: Trip[]; travelLabel?: string;
   /** Kostenfenster: feste Erläuterungen aufklappbar, Hotelangaben in einer Zeile. Warnungen bleiben sichtbar. */
   compact?: boolean;
+  /** Innendienst: keine Reisezuordnung, Projekt freiwillig. */
+  innendienst?: boolean;
 }) {
   const id = useId();
   const projects = [...new Map(trips.filter(t => projectNumber(t.order)).map(t => [projectNumber(t.order), t.order])).values()];
@@ -29,11 +31,17 @@ export function ReceiptLinkFields({ value, onChange, trips, travelLabel = 'Passe
   const hotelInfo = 'Rechnungsdatum und Übernachtungszeitraum sind getrennt. Für Hotelvorschläge wird das Rechnungsdatum nicht als Reisezeitraum verwendet.';
   const hotelReview = 'Hotelrechnung und Verpflegung werden getrennt erfasst. Keine automatische Übernachtungspauschale; vor Abrechnung eine mögliche anderweitige Erstattung prüfen.';
   const manualHint = 'Eine manuelle Auswahl bestätigt die konkrete Reise. Ohne Bestätigung wird keine Reisezuordnung gespeichert.';
+  // Ohne Reise: Innendienst oder ausdrücklich „gehört zu keiner Reise / keinem Projekt“ (nur ohne bestätigte Reise).
+  const noTrip = !value.tripId && (innendienst || !!value.noTrip);
   return <section className={`wide receipt-linking${compact ? ' compact' : ''}`} aria-label="Projekt und Reisezuordnung">
     <div className="form-grid">
-      <label className="wide">Projekt<input aria-label="Projekt" list={id} placeholder="26.0123 Musterstadt (optional)" value={value.projectNumber || ''} onChange={e => onChange({projectNumber:e.target.value})} />
+      {!innendienst && !value.tripId && <label className="check wide no-trip">
+        <input type="checkbox" checked={!!value.noTrip} onChange={e => onChange(e.target.checked ? {noTrip:true, tripId:undefined, projectNumber:undefined} : {noTrip:undefined})} />
+        Gehört zu keiner Reise und keinem Projekt (z. B. Büromaterial)
+      </label>}
+      {!(value.noTrip && !innendienst && !value.tripId) && <label className="wide">Projekt<input aria-label="Projekt" list={id} placeholder="26.0123 Musterstadt (optional)" value={value.projectNumber || ''} onChange={e => onChange({projectNumber:e.target.value})} />
         <datalist id={id}>{projects.map(p => <option key={p} value={p} />)}</datalist>
-      </label>
+      </label>}
       {hotel && <>
         <label>Übernachtungsbeginn<input type="date" value={value.stayStart || ''} onChange={e => onChange({stayStart:e.target.value})} /></label>
         <label>Übernachtungsende<input type="date" value={value.stayEnd || ''} onChange={e => onChange({stayEnd:e.target.value})} /></label>
@@ -43,6 +51,7 @@ export function ReceiptLinkFields({ value, onChange, trips, travelLabel = 'Passe
         {!compact && <p className="wide muted">{hotelInfo}</p>}
       </>}
       {linkingErrors(value).map(e => <p className="wide link-warning" role="alert" key={e}>{e}</p>)}
+      {noTrip ? <p className="wide muted">{innendienst ? 'Innendienst: Kosten ohne Reisezuordnung. Ein Projekt kann freiwillig angegeben werden.' : 'Ohne Reise und Projekt erfasst – dafür gibt es keine Hinweise auf eine fehlende Zuordnung.'}</p> : <>
       <div className="wide">
         {value.tripId ? <>
           <b>Bestätigte Zuordnung: {linked ? tripLabel(linked) : 'Reise nicht mehr vorhanden'}</b>
@@ -60,9 +69,10 @@ export function ReceiptLinkFields({ value, onChange, trips, travelLabel = 'Passe
         {trips.filter(t => t.tripType==='dienstlich' && t.status!=='storniert' || t.id===value.tripId).map(t => <option key={t.id} value={t.id}>{tripLabel(t)}</option>)}
         {value.tripId && !linked && <option value={value.tripId}>Bisherige Reise nicht mehr vorhanden</option>}
       </select>{!compact && <small>{manualHint}</small>}</label>
+      </>}
       {hotel && !compact && <p className="wide hotel-review">{hotelReview}</p>}
       {hotel && value.breakfastIncluded==='yes' && <p className="wide hotel-review">Prüfen, ob das Frühstück als gestellte Mahlzeit bei der Verpflegungspauschale berücksichtigt werden muss. Vorhandene Mahlzeitenangaben werden nicht verändert oder doppelt gekürzt.</p>}
-      {compact && <details className="wide link-info"><summary>Hinweise zur Zuordnung</summary><p>{manualHint}</p>{hotel && <><p>{hotelInfo}</p><p>{hotelReview}</p></>}</details>}
+      {compact && !noTrip && <details className="wide link-info"><summary>Hinweise zur Zuordnung</summary><p>{manualHint}</p>{hotel && <><p>{hotelInfo}</p><p>{hotelReview}</p></>}</details>}
     </div>
   </section>;
 }

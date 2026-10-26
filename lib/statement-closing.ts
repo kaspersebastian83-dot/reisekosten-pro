@@ -1,7 +1,7 @@
 import { buildStatement, duplicateKey, validateTrip } from './calculations';
 import { manualTripInterval } from './manual-trip';
 import { isMonth, latestStatement } from './month-navigation';
-import { duplicateExpense, linkingErrors, projectNumber, similarExpense, validDate } from './receipt-linking';
+import { duplicateExpense, linkingErrors, projectNumber, similarExpense, validDate, withoutTripNeeded } from './receipt-linking';
 import type { AppState, ChangeLog, ReviewStatus, StatementSnapshot } from './types';
 import { compareSnapshotWithCurrent, relatedTripsForSnapshot } from './statement-comparison';
 
@@ -83,10 +83,12 @@ export function checkStatementForClosing(state: AppState, month: string, snapsho
       issue(errors, 'expense-values', `${label}: Rechnungsdatum oder Beträge sind nicht valide.`, target);
     }
     const linked = state.trips.find(t => t.id === expense.tripId && t.status !== 'storniert');
-    if (!expense.tripId || !linked) issue(warnings, 'trip-link', `${label}: Keine eindeutige aktive Reise zugeordnet.`, target);
+    // Bewusst ohne Reise/Projekt (Haken an der Kostenposition) oder Innendienst: keine Zuordnungshinweise.
+    const free = withoutTripNeeded(expense, state.settings);
+    if (!free && (!expense.tripId || !linked)) issue(warnings, 'trip-link', `${label}: Keine eindeutige aktive Reise zugeordnet.`, target);
     const direct = projectNumber(expense.projectNumber);
     const indirect = projectNumber(linked?.order);
-    if ((!direct && !indirect) || (direct && indirect && direct !== indirect)) issue(warnings, 'project', `${label}: Projektzuordnung ist unklar oder widersprüchlich.`, target);
+    if (!free && ((!direct && !indirect) || (direct && indirect && direct !== indirect))) issue(warnings, 'project', `${label}: Projektzuordnung ist unklar oder widersprüchlich.`, target);
     if (!['privat vorgestreckt', 'Unternehmen', 'Firmenkarte', 'bereits erstattet'].includes(expense.paymentType)) issue(warnings, 'payment', `${label}: Zahlungsart unbekannt; zählt nicht zur offenen persönlichen Erstattung.`, target);
     if (expense.status === 'ungeprüft' || expense.status === 'importiert') issue(warnings, 'unreviewed', `${label}: Eintrag ist noch ungeprüft.`, target);
     for (const warning of new Set([

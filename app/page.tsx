@@ -1082,7 +1082,7 @@ function ReceiptCapture({
                   const {tripId:nextTrip, ...context} = patch;
                   if ("tripId" in patch) setTripId(nextTrip);
                   setSuggestion({...suggestion, ...context});
-                }} trips={state.trips} />
+                }} trips={state.trips} innendienst={state.settings.staffRole === "innendienst"} />
               </div>
             </div>
           </div>
@@ -2322,7 +2322,7 @@ function Expenses({
             </details>
           </div>
           <div className="expense-side">
-            <ReceiptLinkFields value={editing} onChange={patch=>setEditing({...editing,...patch})} trips={state.trips} travelLabel="Reisezuordnung" compact />
+            <ReceiptLinkFields value={editing} onChange={patch=>setEditing({...editing,...patch})} trips={state.trips} travelLabel="Reisezuordnung" compact innendienst={state.settings.staffRole === "innendienst"} />
             {mileageConflict && (
               <div className="error-box">
                 <AlertTriangle />
@@ -2920,6 +2920,18 @@ function SettingsPanel({
                 setLocal({ ...local, costCenter: e.target.value })
               }
             />
+          </label>
+          <label>
+            Tätigkeit
+            <select
+              aria-label="Tätigkeit"
+              value={local.staffRole}
+              onChange={(e) => setLocal({ ...local, staffRole: e.target.value as AppState["settings"]["staffRole"] })}
+            >
+              <option value="aussendienst">Außendienst – Dienstreisen, Fahrtenbuch, Verpflegung</option>
+              <option value="innendienst">Innendienst – nur Kosten und Belege</option>
+            </select>
+            <small>Innendienst: keine Dienstreisen und kein Fahrtenbuch-Import, Kosten ohne Reise- und Projektzuordnung. Vorhandene Einträge bleiben erhalten.</small>
           </label>
           <label>
             Zeitzone
