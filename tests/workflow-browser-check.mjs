@@ -51,6 +51,18 @@ try {
       const handbuch=page.locator('a.suite-link').nth(1);
       assert.equal(await handbuch.getAttribute('href'),'../aidkit/#app-spesenkit','Handbuch link to the fixed AidKit chapter');
       assert.equal(await handbuch.getAttribute('target'),'aidkit');assert.match(await handbuch.innerText(),/Handbuch/);
+      const rueck=page.locator('a.suite-link').nth(2);
+      assert.match(await rueck.getAttribute('href'),/^\.\.\/rueckmeldung\/\?app=spesenkit&version=\d+\.\d+\.\d+$/,'Rückmeldung link with program and version');
+      assert.equal(await rueck.getAttribute('target'),'rueckmeldung');assert.match(await rueck.innerText(),/Rückmeldung/);
+      if(viewport.width===390){   // Handy quer: Seitenleiste scrollt, „Rückmeldung“ bleibt erreichbar
+        await page.setViewportSize({width:740,height:360});
+        if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();
+        await page.waitForTimeout(300);
+        await rueck.scrollIntoViewIfNeeded();
+        const box=await rueck.boundingBox();assert.ok(box&&box.y>=0&&box.y+box.height<=360+1,'Rückmeldung in niedrigem Fenster erreichbar: '+JSON.stringify(box));
+        if(await page.locator('.scrim').isVisible())await page.locator('.scrim').click({position:{x:700,y:20}});
+        await page.setViewportSize(viewport);await page.waitForTimeout(250);
+      }
       assert.equal(await page.locator('.brand-mark').evaluate(el=>el.offsetWidth===el.offsetHeight),true,'brand symbol keeps its square proportions');
       assert.equal(await page.locator('.brand small').innerText(),'Dienstreisen · Spesen · Abrechnungen');
       await check(`${engine} ${viewport.width}: navigation, import access and empty dashboard actions`,async()=>{

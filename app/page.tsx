@@ -6,6 +6,7 @@ import {
   Archive,
   ArrowLeft,
   BookOpen,
+  MessageSquare,
   BarChart3,
   Camera,
   Car,
@@ -402,6 +403,10 @@ export default function Home() {
         <a className="suite-link" href="../aidkit/#app-spesenkit" target="aidkit" rel="noopener" title="Handbuch: SpesenKit Schritt für Schritt – öffnet AidKit in einem eigenen Fenster">
           <BookOpen size={16} aria-hidden="true" />
           <span><b>Handbuch</b><small>SpesenKit Schritt für Schritt</small></span>
+        </a>
+        <a className="suite-link" href={`../rueckmeldung/?app=spesenkit&version=${encodeURIComponent(appRelease.version)}`} target="rueckmeldung" rel="noopener" title="Fehler oder Wunsch melden – öffnet das Rückmeldeformular in einem eigenen Fenster, Programm und Version sind schon eingetragen">
+          <MessageSquare size={16} aria-hidden="true" />
+          <span><b>Rückmeldung</b><small>Fehler oder Wunsch melden</small></span>
         </a>
         <div className="privacy-note">
           <ShieldCheck size={18} />
