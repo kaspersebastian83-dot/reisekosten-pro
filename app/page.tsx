@@ -1055,12 +1055,16 @@ function ReceiptCapture({
                   />
                 </label>
                 <MerchantInput className="wide" label="Händler" value={suggestion.merchant || ""} known={merchants}
-                  onChange={(merchant, match) => setSuggestion({
-                    ...suggestion, merchant,
-                    // Bekannter Händler gewählt: Kategorie und Steuersatz aus seiner Regel, solange nicht selbst geändert.
-                    ...(match?.rule && !editedFields.current.has("category") ? { category: match.rule.category } : {}),
-                    ...(match?.rule && !editedFields.current.has("vatRate") ? { vatRate: match.rule.vatRate } : {}),
-                  })} />
+                  onChange={(merchant, match) => {
+                    // Nur der Händler gilt als selbst eingegeben. Kategorie und Steuersatz aus seiner Regel sind Vorgaben:
+                    // ein anderer Händler darf sie wieder ändern – selbst geänderte Felder bleiben.
+                    editedFields.current.add("merchant");
+                    setSuggestionState({
+                      ...suggestion, merchant,
+                      ...(match?.rule && !editedFields.current.has("category") ? { category: match.rule.category } : {}),
+                      ...(match?.rule && !editedFields.current.has("vatRate") ? { vatRate: match.rule.vatRate } : {}),
+                    });
+                  }} />
                 <label>
                   Kategorie
                   <select

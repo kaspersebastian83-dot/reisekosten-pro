@@ -23,6 +23,15 @@ export function significantWords(name: string) {
   const significant = all.filter((word) => word.length >= 3 && !STOP.has(word));
   return significant.length ? significant : all;
 }
+/**
+ * Wörter, die auf fast jedem Beleg stehen, aber auch Händler sein können („Netto“, „Total“, „Real“, „Star“). Ein Händler,
+ * der nur aus solchen Wörtern besteht, zählt nur in einer Kopfzeile ohne Betrag – nicht in „Netto 12,34“ oder „Total“.
+ */
+const RECEIPT_WORDS = new Set(["netto", "brutto", "total", "summe", "gesamt", "betrag", "bar", "real", "star", "kasse", "bon", "karte",
+  "zahlung", "rabatt", "pfand", "steuer", "mwst", "ust", "eur", "euro", "visa", "ec", "girocard", "datum", "beleg", "rechnung"]);
+const AMOUNT = /\d+[.,]\d{2}\b/;
+
+const HEADER = 8;
 /** Höchstens ein Zeichen anders (ersetzt, fehlt oder zu viel). */
 function nearlyEqual(a: string, b: string) {
   if (a === b) return true;
@@ -88,12 +97,19 @@ export const knownMerchantNamed = (name: string, known: KnownMerchant[]) => {
  */
 export function findKnownMerchant(text: string | undefined, known: KnownMerchant[], lines?: number) {
   if (!text) return undefined;
-  const scope = lines ? text.split(/\r?\n/).slice(0, lines).join("\n") : text;
-  const textWords = words(scope);
+  const allLines = text.split(/\r?\n/);
+  const textWords = words(lines ? allLines.slice(0, lines).join("\n") : text);
+  // Kopfzeilen ohne Betrag – nur dort zählen Händler, deren Name zugleich ein übliches Belegwort ist.
+  const headerLines = allLines.slice(0, Math.min(lines ?? HEADER, HEADER)).filter((line) => !AMOUNT.test(line)).map(words);
   let best: { merchant: KnownMerchant; score: number } | undefined;
   for (const merchant of known) {
     const significant = significantWords(merchant.name);
-    if (!significant.length || !significant.every((word) => wordIn(word, textWords))) continue;
+    if (!significant.length) continue;
+    const ambiguous = significant.every((word) => RECEIPT_WORDS.has(word));
+    const found = ambiguous
+      ? headerLines.some((line) => significant.every((word) => line.includes(word)))
+      : significant.every((word) => wordIn(word, textWords));
+    if (!found) continue;
     const score = significant.length * 1000 + merchant.uses;
     if (!best || score > best.score) best = { merchant, score };
   }

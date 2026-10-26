@@ -48,6 +48,13 @@ describe("Händler im Belegtext wiederfinden", () => {
     expect(findKnownMerchant("STAR Tankstelle\nDiesel 60,00", known)?.name).toBe("Star");
     expect(findKnownMerchant("Hotel Lindenhof\nÜbernachtung 89,00", known)).toBeUndefined();
   });
+  it("Händler, deren Name ein übliches Belegwort ist („Netto“, „Total“), nur in einer Kopfzeile ohne Betrag", () => {
+    const words = knownMerchants(state([expense("n", "Netto"), expense("t", "Total")]));
+    expect(findKnownMerchant("Kaufhaus Beispiel\nArtikel 10,00\nNetto 8,40\nMwSt 1,60\nTotal 10,00", words)).toBeUndefined();
+    expect(findKnownMerchant("Rewe Markt\nSumme netto 12,10", words)).toBeUndefined();
+    expect(findKnownMerchant("NETTO Marken-Discount\nFiliale 1234\nBananen 1,99\nNetto 1,86", words)?.name).toBe("Netto");
+    expect(findKnownMerchant("TOTAL Tankstelle\nDiesel 55,00", words)?.name).toBe("Total");
+  });
   it("nur Kopfzeilen, wenn verlangt", () => {
     const text = ["Hotel Ibis", ...Array.from({ length: 10 }, (_, i) => `Position ${i} 1,00`), "Tankquittung Aral"].join("\n");
     expect(findKnownMerchant(text, known, 8)).toBeUndefined();

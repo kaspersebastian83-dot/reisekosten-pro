@@ -10,7 +10,10 @@ Rückmeldung aus dem Einsatz: Belegfotos sollen wiederkehrende Händler und Tank
   („SHEL1“ → Shell, „Muller“ → Müller) und unabhängig von Rechtsform oder Zusätzen („ARAL AG Tankstelle 4711“ → Aral).
   Der Händler erhält dann seinen gewohnten Namen, die Regel greift. Ein Name aus einem Wort gilt für die ganze Marke
   („Aral“ = jede Aral-Station), „Shell Würselen“ nur für diese Station. Ist schon ein Händler erkannt, zählen einzelne
-  Markennamen nur in den Kopfzeilen (z. B. nicht „Parkhaus Aral Center“ auf einer Hotelrechnung).
+  Markennamen nur in den Kopfzeilen (z. B. nicht „Parkhaus Aral Center“ auf einer Hotelrechnung). Händler, deren Name
+  zugleich ein übliches Belegwort ist („Netto“, „Total“), zählen nur in einer Kopfzeile ohne Betrag (Codex-Review).
+- Vorgaben eines gewählten Händlers gelten nicht als eigene Eingabe: ein anderer Händler darf sie wieder ändern
+  (Codex-Review).
 - **Lernen bei jeder gespeicherten Kostenposition** mit Händler (bisher nur im Beleg-Eingang): Kategorie, Steuersatz und
   Zahlungsart werden zum Händler gemerkt.
 - Tests: `merchants.test.ts` (Auswahlliste, Lesefehler, genau vor allgemein, keine Zufallstreffer, Kopfzeilen, Lernen),

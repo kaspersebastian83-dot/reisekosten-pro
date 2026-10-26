@@ -94,7 +94,28 @@ try {
       assert.ok(options.includes('Shell Würselen'));
       await editor.getByRole('button', { name: 'Abbrechen', exact: true }).click(); await editor.waitFor({ state: 'detached' });
     });
-    assert.deepEqual(errors, []);
+
+    await check(`${viewport.width}: Belegfoto-Eingang: Liste auch dort; zweiter gewählter Händler ersetzt die Vorgaben des ersten`, async () => {
+      await context.route(/https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());   // Texterkennung offline: Eingabe von Hand
+      await nav('Monatsübersicht');
+      await page.locator('.month-entry-workspace').getByRole('button', { name: 'Beleg fotografieren / OCR', exact: true }).click();
+      const png = Buffer.from(await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 20; c.height = 40; const g = c.getContext('2d'); g.fillStyle = 'white'; g.fillRect(0, 0, 20, 40); return c.toDataURL('image/png').split(',')[1]; }), 'base64');
+      const capture = page.locator('.receipt-capture');
+      await capture.locator('input[type=file]').first().setInputFiles({ name: 'synthetisch.png', mimeType: 'image/png', buffer: png });
+      await page.getByText('Die automatische Erkennung war nicht möglich.', { exact: false }).waitFor({ timeout: 30000 });
+      const field = capture.getByLabel('Händler', { exact: true });
+      assert.ok((await page.locator(`datalist[id="${await field.getAttribute('list')}"] option`).evaluateAll((all) => all.map((o) => o.value))).includes('Aral'));
+      await field.fill('Bäckerei Müller');
+      assert.equal(await capture.getByLabel('Kategorie', { exact: true }).inputValue(), 'sonstige Nebenkosten');
+      await field.fill('Aral');
+      assert.equal(await capture.getByLabel('Kategorie', { exact: true }).inputValue(), 'Tanken', 'Vorgabe des ersten Händlers gilt nicht als eigene Eingabe');
+      await capture.getByLabel('Kategorie', { exact: true }).selectOption('Parken');
+      await field.fill('Bäckerei Müller');
+      assert.equal(await capture.getByLabel('Kategorie', { exact: true }).inputValue(), 'Parken', 'selbst gewählte Kategorie bleibt');
+      await context.unroute(/https?:\/\/(?!127\.0\.0\.1)/);
+    });
+    // Die absichtlich blockierte Texterkennung (offline) meldet sich als Seitenfehler – nur diesen ausnehmen.
+    assert.deepEqual(errors.filter((e) => !/importScripts.*tesseract/.test(e)), []);
     await context.close();
   }
 } finally { await browser.close(); server.close(); }
