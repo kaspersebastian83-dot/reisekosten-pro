@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import type { PaymentType, Receipt, Trip } from '../lib/types';
+import { knownMerchantNamed, type KnownMerchant } from '../lib/merchants';
 import { isHotel, linkingErrors, matchingTrips, paymentLabel, projectNumber, type LinkingInput } from '../lib/receipt-linking';
 
 const dateDe = (date: string) => date.split('-').reverse().join('.');
@@ -83,4 +84,24 @@ export function ReceiptAttachment({receipt}: {receipt?: Receipt}) {
     {/^image\/(png|jpe?g|webp)$/i.test(receipt.type) && <img src={receipt.dataUrl} alt="Gespeicherter Beleg" />}
     <a href={receipt.dataUrl} download={receipt.name}>Beleg öffnen / herunterladen</a>
   </details>;
+}
+
+/**
+ * Feld „Händler“ mit Auswahlliste der bisher verwendeten Händler (häufigste zuerst). Freie Eingabe bleibt möglich.
+ * onChange meldet mit, ob der Name einem bekannten Händler entspricht – dann können Kategorie und Steuersatz
+ * aus dessen gelernter Regel übernommen werden.
+ */
+export function MerchantInput({ label, value, known, onChange, className }: {
+  label: string; value: string; known: KnownMerchant[]; className?: string;
+  onChange: (value: string, match?: KnownMerchant) => void;
+}) {
+  const id = useId();
+  // Die Liste steht neben dem Feld (nicht im Label), sonst würden ihre Einträge Teil des Feldnamens.
+  return <>
+    <label className={className}>{label}
+      <input value={value} list={known.length ? id : undefined} autoComplete="off"
+        onChange={(event) => onChange(event.target.value, knownMerchantNamed(event.target.value, known))} />
+    </label>
+    {known.length > 0 && <datalist id={id}>{known.slice(0, 80).map((merchant) => <option key={merchant.name} value={merchant.name}>{merchant.uses > 1 ? `${merchant.uses}×` : undefined}</option>)}</datalist>}
+  </>;
 }

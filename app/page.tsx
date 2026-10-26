@@ -70,7 +70,8 @@ import { manualTripErrors, manualTripInterval, manualTripReviewNotes, projectPla
 import { cleanContext, duplicateMessage, linkingErrors, paymentLabel, paymentPayer, similarExpense, syncExpenseLink, validDate } from "../lib/receipt-linking";
 import { buildAnnualAnalysis } from "../lib/annual-reports";
 import { jpegName, readReceiptFile, rotateReceiptImage } from "../lib/receipt-file";
-import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
+import { MerchantInput, PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
+import { knownMerchants, learnMerchant, type KnownMerchant } from "../lib/merchants";
 import { MonthWorkspace } from "./month-workspace";
 import { StatementClosing } from "./statement-closing";
 import { StatementChanges } from "./statement-changes";
@@ -663,6 +664,7 @@ function ReceiptCapture({
 }) {
   const now = new Date().toISOString().slice(0, 10);
   const [receipt, setReceipt] = useState(initial?.receipt);
+  const merchants = useMemo(() => knownMerchants(state), [state.expenses, state.merchantRules]); // eslint-disable-line react-hooks/exhaustive-deps
   const [suggestion, setSuggestionState] = useState<import("../lib/types").ReceiptSuggestion>(
     initial?.suggestion || {
       date: now.startsWith(month) ? now : `${month}-01`,
@@ -723,7 +725,7 @@ function ReceiptCapture({
         },
       );
       const { rotation, ocrConfidence: _ocrConfidence, ...read } = recognized;
-      const learned = applyMerchantRule(read, state.merchantRules);
+      const learned = applyMerchantRule(read, state.merchantRules, merchants);
       if (revision !== scanRevision.current) return;
       setSuggestionState(current => ({...current, ...Object.fromEntries(Object.entries(learned.suggestion).filter(([key]) => !editedFields.current.has(key)))}));
       // Quer oder kopfüber gelesen: gespeichertes Foto aufrecht drehen (Fingerabdruck bleibt der der Originaldatei).
@@ -1052,18 +1054,13 @@ function ReceiptCapture({
                     }
                   />
                 </label>
-                <label className="wide">
-                  Händler
-                  <input
-                    value={suggestion.merchant || ""}
-                    onChange={(event) =>
-                      setSuggestion({
-                        ...suggestion,
-                        merchant: event.target.value,
-                      })
-                    }
-                  />
-                </label>
+                <MerchantInput className="wide" label="Händler" value={suggestion.merchant || ""} known={merchants}
+                  onChange={(merchant, match) => setSuggestion({
+                    ...suggestion, merchant,
+                    // Bekannter Händler gewählt: Kategorie und Steuersatz aus seiner Regel, solange nicht selbst geändert.
+                    ...(match?.rule && !editedFields.current.has("category") ? { category: match.rule.category } : {}),
+                    ...(match?.rule && !editedFields.current.has("vatRate") ? { vatRate: match.rule.vatRate } : {}),
+                  })} />
                 <label>
                   Kategorie
                   <select
@@ -1980,6 +1977,18 @@ function Expenses({
   onSaved?: () => void;
 }) {
   const [editing, setEditing] = useState<Expense | null>(null);
+  const merchants = useMemo(() => knownMerchants(state), [state.expenses, state.merchantRules]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Im Formular selbst geänderte Felder: ein gewählter Händler überschreibt sie nicht. */
+  const touched = useRef(new Set<string>());
+  useEffect(() => { touched.current.clear(); }, [editing?.id]);
+  const withMerchant = (expense: Expense, merchant: string, match?: KnownMerchant): Expense => {
+    const rule = match?.rule;
+    if (!rule) return { ...expense, merchant };
+    const next = { ...expense, merchant, ...(touched.current.has("category") ? {} : { category: rule.category }) };
+    if (touched.current.has("vatRate") || rule.vatRate === expense.vatRate) return next;
+    const net = round2(expense.gross / (1 + rule.vatRate / 100));
+    return { ...next, vatRate: rule.vatRate, net, vat: round2(expense.gross - net) };
+  };
   // Als Formular über der Monatsübersicht: nach Speichern oder Abbrechen wieder schließen.
   const wasEditing = useRef(false);
   useEffect(() => {
@@ -2068,6 +2077,8 @@ function Expenses({
         s.expenses[i] = e;
       } else s.expenses.push(e);
       syncExpenseLink(s, e);
+      // Händler merken: beim nächsten Beleg wiedererkennen, Kategorie und Steuersatz vorschlagen.
+      learnMerchant(s, e, uid);
       return s;
     });
     const message = workspaceMonth && !e.date.startsWith(workspaceMonth)
@@ -2125,9 +2136,10 @@ function Expenses({
               <select
                 aria-label="Kategorie"
                 value={editing.category}
-                onChange={(e) =>
-                  setEditing({ ...editing, category: e.target.value })
-                }
+                onChange={(e) => {
+                  touched.current.add("category");
+                  setEditing({ ...editing, category: e.target.value });
+                }}
               >
                 {expenseCategories.map((c) => (
                   <option key={c} value={c}>{c === "Hotel" ? "Hotel / Übernachtung" : c}</option>
@@ -2242,15 +2254,8 @@ function Expenses({
             <details className="wide expense-more" open={!!(editing.merchant || editing.invoiceNumber || editing.businessShare !== 100 || editing.reimbursementStatus !== "offen")}>
               <summary>Weitere Angaben · Händler, Rechnungsnummer, Steuer, Erstattungsstatus, Anteil</summary>
               <div className="form-grid">
-              <label>
-                Händler / Anbieter
-                <input
-                  value={editing.merchant || ""}
-                  onChange={(e) =>
-                    setEditing({ ...editing, merchant: e.target.value })
-                  }
-                />
-              </label>
+              <MerchantInput label="Händler / Anbieter" value={editing.merchant || ""} known={merchants}
+                onChange={(merchant, match) => setEditing(withMerchant(editing, merchant, match))} />
               <label>
                 Rechnungsnummer
                 <input
@@ -2275,9 +2280,10 @@ function Expenses({
                 USt.-Satz
                 <select
                   value={editing.vatRate}
-                  onChange={(e) =>
-                    setEditing({ ...editing, vatRate: Number(e.target.value) })
-                  }
+                  onChange={(e) => {
+                    touched.current.add("vatRate");
+                    setEditing({ ...editing, vatRate: Number(e.target.value) });
+                  }}
                 >
                   <option value="0">0 %</option>
                   <option value="7">7 %</option>

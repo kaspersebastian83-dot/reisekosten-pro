@@ -1,4 +1,8 @@
 import type { MerchantRule, ReceiptSuggestion } from "./types";
+import { findKnownMerchant, knownMerchants, merchantPattern, significantWords, type KnownMerchant } from "./merchants";
+
+/** Kopfzeilen eines Belegs: dort steht der Händler. */
+const HEADER_LINES = 8;
 
 const parseGermanNumber = (value: string) => {
   const normalized = value
@@ -136,18 +140,29 @@ function learnedMerchant(rawText: string | undefined, rules: MerchantRule[]) {
   return undefined;
 }
 
+/**
+ * Bekannte Händler wiedererkennen und ihre gelernte Regel anwenden. known: bisher verwendete Händler (knownMerchants);
+ * ohne Angabe nur die gelernten Regeln. Ein bekannter Händler im Text ersetzt die rohe Kopfzeile durch seinen
+ * gewohnten Namen („ARAL AG Station 4711“ → „Aral“). Ist schon ein Händler erkannt, zählen dafür nur die Kopfzeilen.
+ */
 export function applyMerchantRule(
   suggestion: ReceiptSuggestion,
   rules: MerchantRule[],
+  known: KnownMerchant[] = knownMerchants({ expenses: [], merchantRules: rules }),
 ) {
-  const known = suggestion.merchant && rules.some((item) => suggestion.merchant!.toLowerCase().includes(item.merchantPattern.toLowerCase()));
-  if (!known) {
-    const found = learnedMerchant(suggestion.rawText, rules);
-    if (found) suggestion = { ...suggestion, merchant: found };
+  // Ohne erkannten Händler: ganzer Text. Mit erkanntem Händler: Kopfzeilen – mehrteilige Namen („Cafe Lindenhof“) auch
+  // weiter unten („… dankt“), einzelne Markennamen nicht (z. B. „Parkhaus Aral Center“ auf einer Hotelrechnung).
+  const found = suggestion.merchant
+    ? findKnownMerchant(suggestion.rawText, known, HEADER_LINES) ?? findKnownMerchant(suggestion.rawText, known.filter((merchant) => significantWords(merchant.name).length >= 2))
+    : findKnownMerchant(suggestion.rawText, known);
+  if (found) {
+    // Nur als Regel bekannt (klein geschrieben): Schreibweise aus dem Beleg übernehmen.
+    const name = found.fromRuleOnly && found.rule ? learnedMerchant(suggestion.rawText, [found.rule]) || found.name : found.name;
+    suggestion = { ...suggestion, merchant: name };
   }
   if (!suggestion.merchant) return { suggestion, rule: undefined };
-  const merchant = suggestion.merchant.toLowerCase();
-  const rule = rules
+  const merchant = suggestion.merchant.toLowerCase(), exact = merchantPattern(suggestion.merchant);
+  const rule = rules.find((item) => item.merchantPattern === exact) || rules
     .filter((item) => merchant.includes(item.merchantPattern.toLowerCase()))
     .sort((a, b) => b.uses - a.uses)[0];
   if (!rule) return { suggestion, rule: undefined };
