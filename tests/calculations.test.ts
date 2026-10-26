@@ -301,6 +301,26 @@ describe("über Mitternacht ohne Übernachtung (§ 9 Abs. 4a Satz 3 Nr. 3 EStG)"
     expect(day.allowanceBefore).toBe(teil("2026-07-14"));
     expect(calculateDay("2026-07-15", [nacht], s).allowanceBefore).toBe(0);
   });
+  it("mit manueller Abwesenheitskorrektur: Berechnung wie bisher (An-/Abreisetag)", () => {
+    const [a, b] = tage(base("22:00", "01:00", { endDate: "2026-07-15", manualAbsenceMinutes: 0 }));
+    expect(a.allowanceBefore).toBe(anreise("2026-07-14"));
+    expect(b.allowanceBefore).toBe(tariffFor(s, "2026-07-15", "departure")!.amount);
+  });
+  it("24 Stunden und mehr über Mitternacht ohne Übernachtung: nur die Teilpauschale", () => {
+    for (const [start, end] of [["08:00", "08:00"], ["01:00", "23:00"]]) {
+      const [a, b] = tage(base(start, end, { endDate: "2026-07-15" }));
+      expect(a.allowanceBefore + b.allowanceBefore).toBe(teil("2026-07-14"));
+      expect([a, b].some((d) => d.allowanceBefore === tariffFor(s, d.date, "full")!.amount && d.allowanceBefore !== teil(d.date))).toBe(false);
+    }
+  });
+  it("am nicht angesetzten Tag echte Zeiten statt 00:00–23:59", () => {
+    const [a, b] = tage(base("22:00", "01:00", { endDate: "2026-07-15" }));
+    expect([a.firstStart, a.lastEnd]).toEqual(["22:00", "01:00"]);
+    expect([b.firstStart, b.lastEnd]).toEqual(["00:00", "01:00"]);
+    const [c, d] = tage(base("20:00", "07:00", { endDate: "2026-07-15" }));
+    expect([c.firstStart, c.lastEnd]).toEqual(["20:00", "23:59"]);
+    expect([d.firstStart, d.lastEnd]).toEqual(["20:00", "07:00"]);
+  });
   it("Monatswechsel: Nacht 31.07.–01.08. zählt einmal", () => {
     const nacht = { ...base("15:00", "03:00", { endDate: "2026-08-01" }), date: "2026-07-31" };
     expect(calculateDay("2026-07-31", [nacht], s).allowanceBefore).toBe(teil("2026-07-31"));

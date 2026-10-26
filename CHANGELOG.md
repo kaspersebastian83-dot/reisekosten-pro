@@ -8,12 +8,15 @@
   Kalendertag mit dem überwiegenden Teil; bei gleichen Teilen am Abfahrtstag mit Hinweis. Vorher bekam jede
   Fahrt über Mitternacht An- und Abreisetag, auch eine Nachtfahrt 22:00–01:00.
   Mit bestätigter Übernachtung, bei mehr als einem Datumswechsel oder mit manueller Abwesenheitskorrektur wie bisher.
+  Auch bei 24 Stunden und mehr bleibt es bei der Teilpauschale. Am nicht angesetzten Tag stehen die echten Zeiten
+  (Abfahrt bis Tagesende bzw. Tagesbeginn bis Rückkehr), nicht 00:00–23:59.
   Andere Fahrten am selben Tag zählen dazu. Beträge kommen weiter aus den hinterlegten Tarifen.
 - Begründung je Tag nennt die Regel; Hinweis in der Vorschau beim Erfassen. Haken bei genau einer Nacht:
   „Auswärtige Übernachtung zwischen Abfahrt und Rückkehr tatsächlich erfolgt“.
 - Bereits abgeschlossene Monatsabrechnungen bleiben eingefroren; bei einer Korrektur zeigt der Vergleich die Änderung.
-- Tests: acht Fälle in `calculations.test.ts` (Nachtfahrt unter der Schwelle, überwiegend vor/nach Mitternacht,
-  Gleichstand, mit Übernachtung, zwei Datumswechsel, mit Tagesfahrt am selben Tag, Monatswechsel).
+- Tests: elf Fälle in `calculations.test.ts` (Nachtfahrt unter der Schwelle, überwiegend vor/nach Mitternacht,
+  Gleichstand, mit Übernachtung, zwei Datumswechsel, manuelle Korrektur, 24 Stunden und mehr, Zeiten am anderen Tag,
+  mit Tagesfahrt am selben Tag, Monatswechsel).
 
 ## 1.8.1 – 26. Oktober 2026
 
