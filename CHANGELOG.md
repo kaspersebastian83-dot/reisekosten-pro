@@ -11,6 +11,8 @@ Rückmeldungen aus dem Einsatz zur Belegerkennung („Beleg fotografieren / OCR�
   Adresse, Telefon, Internetadresse, Kasse und Bon-Nummer zählen nicht; Rechtsform (GmbH, KG …) und bekannte Marken
   (Tankstellen, Bahn, Märkte, Hotels, Parkhausbetreiber …) sprechen für den Händler. Einmal bestätigte Händler
   (gelernte Regeln) werden auch dann gefunden, wenn die Kopfzeile unleserlich ist.
+- **Speichern wartet auf die Texterkennung** („Nur im Eingang speichern“ ist währenddessen gesperrt), damit erkannte
+  Felder und das aufrecht gedrehte Foto nicht verloren gehen. Hängt die Erkennung, lässt sie sich abbrechen.
 - **Datum und Uhrzeit sind keine Beträge mehr** („Ausfahrt 26.10.2026“ ergab bisher 26,10 €, wenn die Summenzeile
   schlecht lesbar war).
 - Tests: `receipt-ocr.test.ts` (Händler, Datum vs. Betrag, gelernter Händler). Mit echter Texterkennung geprüft
