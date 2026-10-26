@@ -88,3 +88,31 @@ export async function readReceiptFile(file: File): Promise<Omit<Receipt, 'id'>> 
   if (small) return { name: jpegName(file.name), type: 'image/jpeg', size: small.size, hash, dataUrl: await asDataUrl(small) };
   return { name: file.name, type: file.type, size: file.size, hash, dataUrl: await asDataUrl(file) };
 }
+
+/**
+ * Beleg aufrecht drehen (Grad im Uhrzeigersinn, 90/180/270), z. B. nachdem die Texterkennung ihn quer gelesen hat.
+ * Ergebnis als JPEG; null, wenn das Bild nicht gelesen werden kann (dann bleibt es wie es ist).
+ */
+export async function rotateReceiptImage(dataUrl: string, degrees: number): Promise<{ dataUrl: string; size: number } | null> {
+  const turn = ((Math.round(degrees / 90) * 90) % 360 + 360) % 360;
+  if (!turn || typeof document === 'undefined') return null;
+  const match = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(dataUrl);
+  if (!match) return null;
+  const bytes = match[2] ? Uint8Array.from(atob(match[3]), (c) => c.charCodeAt(0)) : new TextEncoder().encode(decodeURIComponent(match[3]));
+  const blob = new Blob([bytes], { type: match[1] || 'image/jpeg' });
+  const image = await decode(blob);
+  if (!image) return null;
+  try {
+    const sideways = turn % 180 !== 0;
+    const canvas = document.createElement('canvas');
+    canvas.width = sideways ? image.height : image.width; canvas.height = sideways ? image.width : image.height;
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+    context.translate(canvas.width / 2, canvas.height / 2); context.rotate((turn * Math.PI) / 180);
+    context.drawImage(image.source, -image.width / 2, -image.height / 2);
+    const out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    return out ? { dataUrl: await asDataUrl(out), size: out.size } : null;
+  } catch { return null; }
+  finally { image.close(); }
+}

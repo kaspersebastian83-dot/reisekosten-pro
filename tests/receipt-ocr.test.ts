@@ -49,3 +49,26 @@ describe("lokale Belegerkennung", () => {
     expect(result.suggestion.vatRate).toBe(7);
   });
 });
+
+describe("Händler und Beträge robuster (Rückmeldung aus dem Einsatz)", () => {
+  const rule = (merchantPattern: string): MerchantRule => ({ id: "r", merchantPattern, category: "sonstige Nebenkosten", paymentType: "privat vorgestreckt", vatRate: 7, uses: 1, updatedAt: "2026-10-26T00:00:00Z" });
+  it("überspringt Logo-Zeichensalat, Adresse, Telefon, Kasse", () => {
+    expect(parseReceiptText("~~ HH ~~\nBäckerei Schmitz GmbH\nKaiserstr. 4, 52062 Aachen\nKasse 2 Bon 4711\nGesamt EUR 4,50").merchant).toBe("Bäckerei Schmitz GmbH");
+    expect(parseReceiptText("|| ii ||\nTel. 02405 123456\nwww.beispiel.de\nCafé Lindenhof\nSumme 9,80").merchant).toBe("Café Lindenhof");
+    expect(parseReceiptText("Musterstraße 12\n52146 Würselen\nARAL Tankstelle\nSUMME 78,50").merchant).toBe("ARAL Tankstelle");
+  });
+  it("Rechtsform zählt auch weiter unten, Marken werden erkannt", () => {
+    expect(parseReceiptText("Willkommen\nFiliale 12\n\n\n\n\n\n\n\n\n\nHolzbau Meier GmbH & Co. KG\nSumme 12,00").merchant).toBe("Holzbau Meier GmbH & Co. KG");
+    expect(parseReceiptText("Quittung\nStarbucks Aachen\nSumme 4,20").merchant).toBe("Starbucks Aachen");
+  });
+  it("Datum und Uhrzeit sind keine Beträge", () => {
+    expect(parseReceiptText("Parkhaus\nAusfahrt 26.10.2026 11:30\nBetrag 6,00").gross).toBe(6);
+    expect(parseReceiptText("Einfahrt 26.10.26 09:00\n6,00 EUR").gross).toBe(6);
+  });
+  it("findet einen gelernten Händler im Text, wenn die Kopfzeile unleserlich war", () => {
+    const parsed = parseReceiptText("~~ ## ~~\nI1 ;\nKaffee 2,90\nCafe Lindenhof dankt\nSumme 2,90");
+    const result = applyMerchantRule({ ...parsed, merchant: undefined }, [rule("cafe lindenhof")]);
+    expect(result.suggestion.merchant).toBe("Cafe Lindenhof");
+    expect(result.rule?.id).toBe("r");
+  });
+});

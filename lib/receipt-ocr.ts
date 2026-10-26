@@ -24,7 +24,11 @@ function findGross(lines: string[]) {
     /(gesamt|summe|total|zu zahlen|zahlbetrag|endbetrag|brutto)/i;
   const candidates: Array<{ amount: number; priority: boolean }> = [];
   for (const line of lines) {
-    const matches = line.match(/\b\d{1,5}(?:[.,]\d{2})\b/g) || [];
+    // Datum und Uhrzeit sind keine Beträge („26.10.2026“ ergäbe sonst 26,10).
+    const withoutDates = line
+      .replace(/\b\d{1,2}[.\/-]\d{1,2}[.\/-](?:20)?\d{2}\b/g, " ")
+      .replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, " ");
+    const matches = withoutDates.match(/\b\d{1,5}(?:[.,]\d{2})\b/g) || [];
     for (const value of matches) {
       const amount = parseGermanNumber(value);
       if (amount && amount > 0 && amount < 100000)
@@ -58,20 +62,30 @@ function inferVat(text: string, category: string) {
   return ["Hotel", "Bahn", "Taxi"].includes(category) ? 7 : 19;
 }
 
+/* Händler: Kopfzeilen bewerten statt die erste Zeile mit Buchstaben zu nehmen. Logos werden oft als Zeichensalat
+ * („~~ HH ~~“) gelesen; Adresse, Telefon, Kasse und Bon-Nummer sind kein Händler. Rechtsform und bekannte Marken
+ * sind starke Hinweise. */
+const KNOWN_MERCHANTS = /\b(aral|shell|esso|total(?:energies)?|jet|star|agip|eni|hem|avia|westfalen|raiffeisen|orlen|omv|deutsche bahn|db fernverkehr|db vertrieb|rewe|edeka|lidl|aldi|netto|penny|kaufland|globus|real|dm|rossmann|müller|obi|bauhaus|hornbach|toom|hagebau|würth|conrad|media ?markt|saturn|ikea|mcdonald'?s|burger king|starbucks|tchibo|backwerk|ditsch|apcoa|contipark|q-park|apag|ibis|motel one|b&b hotels?|holiday inn|novotel|mercure|nh hotels?|best western|hilton|marriott|maritim|steigenberger|accor|sixt|europcar|avis|hertz|uber|free ?now|flixbus|toll collect)\b/i;
+const LEGAL_FORM = /\b(gmbh|ag|kg|ohg|gbr|ug|e\.\s?k\.?|e\.\s?v\.|mbh|ltd|se|inc)\b/i;
+const NOT_MERCHANT = /(rechnung|kassenbon|quittung|beleg|datum|uhrzeit|\buhr\b|steuer|\bust\b|mwst|\beur\b|gesamt|summe|zu zahlen|\bkasse\b|\bbon\b|\btel\b|telefon|\bfax\b|www\.|@|https?:|filiale|str\.|straße|strasse|\bplatz\b|\ballee\b|\bweg\b|\b\d{5}\b|bar\s|ec-karte|kartenzahlung|girocard|vielen dank|willkommen|kunden|ust-?id|steuer-?nr|bediener|tisch)/i;
+const letters = (text: string) => (text.match(/[A-Za-zÄÖÜäöüß]/g) || []).length;
+
 function merchantFromLines(lines: string[]) {
-  return lines
-    .find((line) => {
-      const clean = line.trim();
-      return (
-        clean.length >= 3 &&
-        clean.length <= 60 &&
-        /[A-Za-zÄÖÜäöü]/.test(clean) &&
-        !/(rechnung|kassenbon|beleg|datum|steuer|ust|mwst|eur|gesamt|summe)/i.test(
-          clean,
-        )
-      );
-    })
-    ?.trim();
+  let best: { line: string; score: number } | undefined;
+  lines.forEach((raw, index) => {
+    const line = raw.trim();
+    const legal = LEGAL_FORM.test(line), known = KNOWN_MERCHANTS.test(line);
+    if (index > 9 && !legal && !known) return;                       // Händler steht oben – außer Rechtsform/Marke
+    if (line.length < 3 || line.length > 60) return;
+    if (!/[A-Za-zÄÖÜäöüß]{3,}/.test(line)) return;                      // mindestens ein echtes Wort
+    if (letters(line) / line.replace(/\s/g, "").length < 0.6) return;  // Zeichensalat, Zahlenzeilen
+    if (NOT_MERCHANT.test(line) && !known) return;
+    const words = line.split(" ").filter((word) => letters(word) >= 2).length;
+    const upper = letters(line.replace(/[a-zäöüß]/g, "")) / letters(line);
+    const score = 10 - index + (legal ? 15 : 0) + (known ? 20 : 0) + (upper > 0.7 ? 3 : 0) + (words >= 2 ? 2 : 0);
+    if (!best || score > best.score) best = { line, score };
+  });
+  return best?.line;
 }
 
 export function parseReceiptText(rawText: string): ReceiptSuggestion {
@@ -107,10 +121,30 @@ export function parseReceiptText(rawText: string): ReceiptSuggestion {
   };
 }
 
+/** Einmal bestätigter Händler (gelernte Regel) im erkannten Text wiederfinden – auch wenn die Kopfzeile unleserlich war. */
+function learnedMerchant(rawText: string | undefined, rules: MerchantRule[]) {
+  if (!rawText) return undefined;
+  const lines = rawText.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim());
+  for (const rule of [...rules].sort((a, b) => b.uses - a.uses)) {
+    const pattern = rule.merchantPattern.trim().toLowerCase();
+    if (pattern.length < 4) continue;
+    for (const line of lines) {
+      const at = line.toLowerCase().indexOf(pattern);
+      if (at >= 0) return line.slice(at, at + pattern.length);
+    }
+  }
+  return undefined;
+}
+
 export function applyMerchantRule(
   suggestion: ReceiptSuggestion,
   rules: MerchantRule[],
 ) {
+  const known = suggestion.merchant && rules.some((item) => suggestion.merchant!.toLowerCase().includes(item.merchantPattern.toLowerCase()));
+  if (!known) {
+    const found = learnedMerchant(suggestion.rawText, rules);
+    if (found) suggestion = { ...suggestion, merchant: found };
+  }
   if (!suggestion.merchant) return { suggestion, rule: undefined };
   const merchant = suggestion.merchant.toLowerCase();
   const rule = rules
@@ -127,21 +161,50 @@ export function applyMerchantRule(
   };
 }
 
+/** Gilt als sicher erkannt: hohe Texterkennungs-Sicherheit und ein Betrag. Dann wird nicht weiter gedreht. */
+const confident = (confidence: number, suggestion: ReceiptSuggestion) => confidence >= 75 && !!suggestion.gross;
+const resultScore = (confidence: number, suggestion: ReceiptSuggestion) =>
+  confidence + (suggestion.gross ? 15 : 0) + (suggestion.date ? 10 : 0) + (suggestion.merchant ? 5 : 0);
+/** Reihenfolge: aufrecht, quer (beide Richtungen), auf dem Kopf. */
+export const RECEIPT_ROTATIONS = [0, 90, 270, 180] as const;
+
+type OcrWorker = Pick<import("tesseract.js").Worker, "recognize">;
+type OcrImage = import("tesseract.js").ImageLike;
+
+/**
+ * Liest den Beleg; liegt er quer oder auf dem Kopf, liefert der erste Durchgang Zeichensalat mit niedriger Sicherheit.
+ * Dann wird gedreht erneut gelesen und das beste Ergebnis genommen. `rotation` (Grad) sagt, um wie viel gedreht
+ * gelesen wurde.
+ */
+export async function readReceiptRotated(worker: OcrWorker, image: OcrImage, onPhase?: (text: string) => void) {
+  let best: { suggestion: ReceiptSuggestion; score: number; rotation: number; confidence: number } | undefined;
+  for (const rotation of RECEIPT_ROTATIONS) {
+    onPhase?.(rotation ? `Beleg liegt quer oder auf dem Kopf – lese gedreht (${rotation}°)` : "");
+    const result = await worker.recognize(image, rotation ? { rotateRadians: (rotation * Math.PI) / 180 } : {});
+    const suggestion = parseReceiptText(result.data.text);
+    const score = resultScore(result.data.confidence, suggestion);
+    if (!best || score > best.score) best = { suggestion, score, rotation, confidence: result.data.confidence };
+    if (confident(result.data.confidence, suggestion)) break;
+  }
+  return { ...best!.suggestion, rotation: best!.rotation, ocrConfidence: Math.round(best!.confidence) };
+}
+
+/** Texterkennung im Browser (tesseract.js, Sprachdaten Deutsch und Englisch). */
 export async function recognizeReceiptLocally(
   image: string,
   onProgress?: (progress: number, status: string) => void,
 ) {
   const { createWorker } = await import("tesseract.js");
+  let phase = "";
   const worker = await createWorker(["deu", "eng"], 1, {
     logger: (message) =>
       onProgress?.(
         Math.round((message.progress || 0) * 100),
-        message.status || "Texterkennung",
+        phase || message.status || "Texterkennung",
       ),
   });
   try {
-    const result = await worker.recognize(image);
-    return parseReceiptText(result.data.text);
+    return await readReceiptRotated(worker, image, (text) => { phase = text; });
   } finally {
     await worker.terminate();
   }
