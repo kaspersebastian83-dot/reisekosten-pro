@@ -1,5 +1,6 @@
 import { buildStatement, round2, tariffFor } from './calculations';
 import { emptyState } from './config';
+import { receiptIdentity } from './receipt-images';
 import type { AppState, Expense, StatementData, StatementSnapshot, Tariff, Trip } from './types';
 
 export interface StatementChange {
@@ -107,7 +108,7 @@ export function compareSnapshotWithCurrent(state: AppState, month: string, snaps
       if (type === 'trip') {
         const oldMeals = mealDays(old as Trip, month); const newMeals = mealDays(current as Trip, month);
         if (stableValue(oldMeals) !== stableValue(newMeals)) add('data', label, [{ field: 'Gestellte Mahlzeiten im Monat', before: showMeals(oldMeals), after: showMeals(newMeals) }]);
-      } else if (!knownOnly && stableValue((old as Expense).receipt) !== stableValue((current as Expense).receipt)) {
+      } else if (!knownOnly && stableValue(receiptIdentity((old as Expense).receipt)) !== stableValue(receiptIdentity((current as Expense).receipt))) {
         add('document', label, [{ field: 'Belegdatei / Dateiinhalt', before: receiptLabel(old as Expense), after: `${receiptLabel(current as Expense)}${receiptLabel(old as Expense) === receiptLabel(current as Expense) ? ' · Dateiinhalt oder gespeicherte Belegmetadaten geändert' : ''}` }]);
       }
     }

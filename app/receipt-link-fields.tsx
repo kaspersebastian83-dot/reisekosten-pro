@@ -1,4 +1,5 @@
-import { useId } from 'react';
+import { useEffect, useId, useState } from 'react';
+import { receiptDataUrl } from '../lib/receipt-images';
 import type { PaymentType, Receipt, Trip } from '../lib/types';
 import { knownMerchantNamed, type KnownMerchant } from '../lib/merchants';
 import { isHotel, linkingErrors, matchingTrips, paymentLabel, projectNumber, type LinkingInput } from '../lib/receipt-linking';
@@ -78,11 +79,29 @@ export function ReceiptLinkFields({ value, onChange, trips, travelLabel = 'Passe
   </section>;
 }
 
+/** Bild eines Belegs (eingebettet oder unter fileId gespeichert); undefined, solange es geladen wird, "" wenn es fehlt. */
+export function useReceiptDataUrl(receipt?: Receipt) {
+  const [loaded, setLoaded] = useState<{ key: string; url: string } | null>(null);
+  const key = receipt ? receipt.dataUrl ? `inline:${receipt.id}:${receipt.dataUrl.length}` : `file:${receipt.fileId || ""}` : "";
+  useEffect(() => {
+    if (!receipt || receipt.dataUrl) return;
+    let active = true;
+    void receiptDataUrl(receipt).then((url) => { if (active) setLoaded({ key, url }); });
+    return () => { active = false; };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!receipt) return "";
+  if (receipt.dataUrl) return receipt.dataUrl;
+  return loaded?.key === key ? loaded.url : undefined;
+}
+
 export function ReceiptAttachment({receipt}: {receipt?: Receipt}) {
+  const url = useReceiptDataUrl(receipt);
   if (!receipt) return <span className="receipt-missing">Beleg fehlt</span>;
   return <details className="receipt-attachment"><summary>Beleg ansehen · {receipt.name}</summary>
-    {/^image\/(png|jpe?g|webp)$/i.test(receipt.type) && <img src={receipt.dataUrl} alt="Gespeicherter Beleg" />}
-    <a href={receipt.dataUrl} download={receipt.name}>Beleg öffnen / herunterladen</a>
+    {url === undefined ? <p className="muted">Beleg wird geladen …</p>
+      : !url ? <p className="receipt-missing">Das Belegbild ist auf diesem Gerät nicht verfügbar. Bitte den SpesenKit-Ordner verbinden.</p>
+      : <>{/^image\/(png|jpe?g|webp)$/i.test(receipt.type) && <img src={url} alt="Gespeicherter Beleg" />}
+        <a href={url} download={receipt.name}>Beleg öffnen / herunterladen</a></>}
   </details>;
 }
 

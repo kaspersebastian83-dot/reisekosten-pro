@@ -8,6 +8,7 @@ import { readFile, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
+import { handleShim } from './helpers/folder-harness.mjs';
 const require = createRequire(import.meta.url);
 const engines = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve('dist');
@@ -26,6 +27,8 @@ const url = `http://127.0.0.1:${server.address().port}/reisekosten-pro/`;
 const browser = await engines.chromium.launch({ headless: true, ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {}) });
 const output = await mkdtemp(path.join(tmpdir(), 'spesenkit-ordner-'));
 const check = async (name, fn) => { await fn(); console.log('PASS', name); };
+
+const prepare = async (context) => { await context.addInitScript(harness); if (process.env.SANDBOX_HANDLE_SHIM) await context.addInitScript(handleShim); };
 
 // Simulierte Ordnerauswahl und Berechtigungen; Steuerung über localStorage (überlebt Neuladen).
 const harness = () => {
@@ -99,7 +102,7 @@ const tripIds = (state) => state.trips.map((t) => t.id);
 
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: 'Europe/Berlin' });
-  await context.addInitScript(harness);
+  await prepare(context);
   const page = await context.newPage(); page.setDefaultTimeout(15000);
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   const banner = page.locator('.folder-banner');
@@ -376,7 +379,7 @@ try {
   await context.close();
 
   await check('konkurrierender Terminalserver: Entscheidung statt Erfolg; beide Kandidaten nach Neustart wiederherstellbar', async () => {
-    const ctx = await browser.newContext({ timezoneId: 'Europe/Berlin' }); await ctx.addInitScript(harness);
+    const ctx = await browser.newContext({ timezoneId: 'Europe/Berlin' }); await prepare(ctx);
     const p = await ctx.newPage(); await p.goto(url); await ready(p);
     await p.locator('.folder-banner').getByRole('button', { name: 'Ordner einrichten' }).click();
     await until(async () => (await folderStatus(p)) === 'ok', 'Ordner verbunden');
@@ -404,7 +407,7 @@ try {
   });
 
   await check('fehlgeschlagene Kandidatensicherung: Fehlerstatus, Hauptdatei unverändert, Wiederholung möglich', async () => {
-    const ctx = await browser.newContext(); await ctx.addInitScript(harness);
+    const ctx = await browser.newContext(); await prepare(ctx);
     const p = await ctx.newPage(); await p.goto(url); await ready(p);
     await p.locator('.folder-banner').getByRole('button', { name: 'Ordner einrichten' }).click();
     await until(async () => (await folderStatus(p)) === 'ok', 'Ordner verbunden');
@@ -437,7 +440,7 @@ try {
   for (const viewport of [{ width: 390, height: 844 }, { width: 820, height: 1180 }, { width: 1440, height: 1000 }]) {
     await check(`Layout ${viewport.width}px: Hinweis, Ordnerkarte und Konfliktdialog ohne Überlauf`, async () => {
       const ctx = await browser.newContext({ viewport, timezoneId: 'Europe/Berlin' });
-      await ctx.addInitScript(harness);
+      await prepare(ctx);
       const p = await ctx.newPage(); await p.goto(url); await ready(p);
       await fits(p); await p.screenshot({ path: path.join(output, `hinweis-${viewport.width}.png`) });
       await p.locator('.folder-banner').getByRole('button', { name: 'Ordner einrichten' }).click();

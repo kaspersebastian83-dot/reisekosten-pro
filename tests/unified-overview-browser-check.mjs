@@ -7,6 +7,7 @@ import { readFile, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
+import { databases, storedState } from './helpers/browser-state.mjs';
 const require = createRequire(import.meta.url);
 const engines = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const engine = process.env.BROWSER_ENGINE || 'chromium';
@@ -29,7 +30,7 @@ const results=[];
 const check=async(name,fn)=>{await fn();results.push(name);console.log('PASS',name);};
 const open=async(options={})=>{const context=await browser.newContext(options);const page=await context.newPage();return {context,page};};
 const nav=async(page,name)=>{if(name==='Fahrten importieren'){await nav(page,'Monatsübersicht');await page.locator('.month-entry-workspace').getByRole('button',{name:'Fahrtenbuch importieren',exact:true}).click();return;}if(await page.getByRole('button',{name:'Menü öffnen',exact:true}).isVisible())await page.getByRole('button',{name:'Menü öffnen',exact:true}).click();await page.locator('.sidebar nav').getByRole('button',{name:new RegExp('^'+name)}).click();await page.waitForTimeout(250);};
-const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
+const state=page=>storedState(page);   // Belegbilder aus der Bilddatenbank wieder eingesetzt (seit 1.9 getrennt gespeichert)
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 const download=async(page,name)=>{const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();const d=await pending;const target=path.join(output,d.suggestedFilename());await d.saveAs(target);return {file:target,bytes:await readFile(target)};};
 // Purely synthetic dates, trips and reports; never uses a real browser profile.
@@ -106,7 +107,8 @@ try {
       await check(`${engine} ${viewport.width}: unified offline startup retains all existing records, snapshots and storage identity`,async()=>{
         const before=await state(page);await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await context.setOffline(true);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
         assert.equal(await picker.inputValue(),'2026-11');assert.deepEqual(await state(page),before);await picker.fill('2026-06');assert.deepEqual(await state(page),before);assert.equal(await page.evaluate(()=>localStorage.length),0);
-        assert.deepEqual(await page.evaluate(async()=>{const list=await indexedDB.databases();return list.map(({name,version})=>({name,version}));}),[{name:'reisekosten-pro',version:1}]);assert.deepEqual(errors,[]);await fits();await context.setOffline(false);
+        // Bestand unverändert in „reisekosten-pro“ v1; seit 1.9 höchstens zusätzlich die Bilddatenbank „spesenkit-belege“.
+        assert.deepEqual((await databases(page)).filter(db=>db.name!=='spesenkit-belege'),[{name:'reisekosten-pro',version:1}]);assert.ok((await databases(page)).every(db=>db.name==='reisekosten-pro'||(db.name==='spesenkit-belege'&&db.version===1)));assert.deepEqual(errors,[]);await fits();await context.setOffline(false);
       });
     } catch(error){await page.screenshot({path:path.join(output,`${engine}-${viewport.width}-failure.png`),fullPage:true});throw error;}
     finally{await context.close();}
