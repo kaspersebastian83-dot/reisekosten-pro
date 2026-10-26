@@ -1,4 +1,4 @@
-import { buildStatement } from './calculations';
+import { buildStatement, expenseGrossEur } from './calculations';
 import { projectNumber } from './receipt-linking';
 import { latestStatement } from './month-navigation';
 import { isClosedStatement } from './statement-comparison';
@@ -138,10 +138,10 @@ export function buildAnnualAnalysis(state: AppState, year: number): AnnualAnalys
         const expense = expenseById.get(expenseDetail.id);
         if (!expense) continue;
         entryMonths.add(month);
-        if (expense.paymentType === 'unbekannt') totals.unknownPayment = add(totals.unknownPayment, expense.gross);
+        if (expense.paymentType === 'unbekannt') totals.unknownPayment = add(totals.unknownPayment, expenseGrossEur(expense));
         const key = resolveExpenseProject(expense, tripById);
         rememberProjectLabel(key, expense.projectNumber || '');
-        if (!expenseDetail.excluded) projectCost(key, expense.gross);
+        if (!expenseDetail.excluded) projectCost(key, expenseGrossEur(expense));   // in Euro wie die Monats- und Jahressummen
       }
     }
   }

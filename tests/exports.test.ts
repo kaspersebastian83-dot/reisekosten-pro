@@ -90,3 +90,37 @@ describe('Versionssichere und zahlungsneutrale Exporte', () => {
     expect(state).toEqual(before);
   });
 });
+
+describe('Restpunkte der Durchsicht (1.8.6)', () => {
+  it('Summen nach Kostenart in Euro – Fremdwährung mit dem gespeicherten Kurs', () => {
+    const { state } = fixture();
+    state.expenses = [{ ...state.expenses[0], id: 'chf-hotel', date: '2026-06-10', category: 'Hotel', gross: 100, net: 100, currency: 'CHF', exchangeRate: 0.95, receipt: undefined },
+      { ...state.expenses[0], id: 'chf-park', date: '2026-06-10', category: 'Parken', gross: 20, net: 20, currency: 'CHF', exchangeRate: 0.95, paymentType: 'Firmenkarte', reimbursementStatus: 'nicht erstattungsfähig', receipt: undefined }];
+    const data = buildStatement(state, month);
+    expect(data.totals.accommodation).toBe(95);
+    expect(data.totals.other).toBe(19);
+    expect(data.totals.companyPaid).toBe(19);
+    expect(data.totals.grandTotal).toBe(Math.round((data.totals.allowance + data.totals.mileage + 95 + 19) * 100) / 100);
+  });
+  it('DATEV ohne 0,00-Zeilen; Buchungstext ohne leere Teile', async () => {
+    const files = downloads(); const { state } = fixture();
+    state.trips = [];
+    state.expenses = [{ ...state.expenses[0], id: 'park', date: '2026-06-10', category: 'Parken', gross: 6, net: 6, paymentType: 'privat vorgestreckt', reimbursementStatus: 'offen', receipt: undefined },
+      { ...state.expenses[0], id: 'firma', date: '2026-06-11', category: 'Bahn', gross: 50, net: 50, paymentType: 'Firmenkarte', reimbursementStatus: 'nicht erstattungsfähig', receipt: undefined }];
+    exportCsv(buildStatement(state, month), state, true);
+    const csv = Papa.parse<Record<string, string>>((await files[0].blob.text()).replace(/^﻿/, ''), { header: true, delimiter: ';', skipEmptyLines: true });
+    expect(csv.data.map(row => [row.Belegdatum, row.Buchungstext, row.Betrag])).toEqual([['20260610', 'Auslagen Parken', '6,00']]);
+  });
+  it('Excel: Summen im Übersichtsblatt, Beträge mit Euro-Format', async () => {
+    const files = downloads(); const { state, first } = fixture();
+    await exportExcel(first.data, stateForStatementVersion(state, first), context(1));
+    const workbook = new ExcelJS.Workbook(); await workbook.xlsx.load(Buffer.from(await files[0].blob.arrayBuffer()) as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    const overview: (string | number)[][] = []; workbook.getWorksheet('Übersicht')!.eachRow(row => overview.push((row.values as (string | number)[]).slice(1)));
+    expect(overview).toContainEqual(['Persönliche Erstattung (offener Betrag)', first.data.totals.openAmount]);
+    expect(overview).toContainEqual(['Übernachtung', first.data.totals.accommodation]);
+    const sheet = workbook.getWorksheet('Reisekosten')!;
+    const col = (sheet.getRow(1).values as string[]).indexOf('OffenerBetrag');
+    expect(sheet.getColumn(col).numFmt).toBe('#,##0.00 "€"');
+    expect(sheet.rowCount).toBe(first.data.rows.length + 1);
+  });
+});
