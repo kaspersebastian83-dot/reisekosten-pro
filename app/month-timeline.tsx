@@ -41,7 +41,7 @@ export function MonthTimeline({state, month, statement, edit, startTrip, filter 
       <span className="timeline-main"><b>{e.category}{e.description ? ` · ${e.description}` : ''}</b><small>{[paymentLabel(e.paymentType), trip ? `Reise ${trip.destination || short(trip.date)}` : withoutTripNeeded(e, state.settings) ? (state.settings.staffRole === 'innendienst' ? '' : 'ohne Reise') : 'keiner Reise zugeordnet'].filter(Boolean).join(' · ')}</small></span>
       {!e.receipt && <span className="timeline-flag">Beleg fehlt</span>}
       {warnings.length > 0 && <span className="timeline-flag" title={warnings.join(' · ')}><AlertTriangle size={14} aria-hidden="true" />{warnings.length === 1 ? 'Hinweis' : `${warnings.length} Hinweise`}</span>}
-      <span className="timeline-amount">{euro(e.gross)}</span>
+      <span className="timeline-amount">{e.currency && e.currency !== 'EUR' ? `${e.gross.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${e.currency}` : euro(e.gross)}</span>
     </button>;
   };
   return <section className="month-timeline" aria-label="Monat im Überblick">

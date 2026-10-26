@@ -5,7 +5,8 @@
 Restpunkte aus der Durchsicht vor dem Einsatz:
 - **Fremdwährung:** Summen nach Kostenart (Tanken, Übernachtung, Sonstige, Gesamtkosten, vom Unternehmen bezahlt,
   erstattet, privat vorgestreckt) rechnen mit dem gespeicherten Kurs in Euro – auf dem Bildschirm, in Excel, CSV und
-  den Auswertungen, wie schon im PDF und beim Erstattungsbetrag. Bei EUR (Kurs 1) ändert sich nichts. Hinweis: In der
+  den Auswertungen (auch „Reisekosten nach Projekt“ in der Jahresauswertung), wie schon im PDF und beim
+  Erstattungsbetrag. Einzelbeträge in der Monatsübersicht stehen mit ihrer Währung statt immer mit €. Bei EUR (Kurs 1) ändert sich nichts. Hinweis: In der
   App lässt sich derzeit keine Fremdwährung erfassen; betroffen wären nur eingespielte ältere Daten.
 - **DATEV-CSV:** keine 0,00-Zeilen mehr; Buchungstext ohne leere Teile („Auslagen Parken“ an Tagen ohne Reise).
 - **Excel:** Beträge mit Euro-Format, Kilometer mit einer Nachkommastelle; Summen im Blatt „Übersicht“ (das Blatt

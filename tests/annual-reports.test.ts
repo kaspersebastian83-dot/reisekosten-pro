@@ -198,3 +198,14 @@ describe('Jahresauswertungen aus Monatsberechnungen', () => {
     expect(state.statements).toEqual(before);
   });
 });
+
+describe('Jahresauswertung in Euro (1.8.6)', () => {
+  it('Fremdwährung: Projektaufteilung passt zur Jahressumme', () => {
+    const state = fresh(); state.trips = [trip()];
+    state.expenses = [expense({ currency: 'CHF', gross: 100, net: 100, exchangeRate: 0.95 })];
+    const result = buildAnnualAnalysis(state, 2026);
+    expect(result.totals.accommodation).toBe(95);
+    const project = result.projects.find(item => item.label.includes('26.0123'));
+    expect(project?.amount).toBe(Math.round((95 + (result.totals.allowance || 0) + (result.totals.mileage || 0)) * 100) / 100);
+  });
+});
