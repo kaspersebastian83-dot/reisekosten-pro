@@ -36,8 +36,15 @@ export function cleanContext(value: ExpenseContext): ExpenseContext {
     stayStart: value.stayStart || undefined,
     stayEnd: value.stayEnd || undefined,
     breakfastIncluded: value.breakfastIncluded || undefined,
+    noTrip: value.noTrip || undefined,
   };
 }
+/**
+ * Braucht diese Kostenposition keine Reise und kein Projekt? Ja, wenn sie ausdrücklich so erfasst wurde
+ * („Gehört zu keiner Reise …“) oder im Innendienst. Eine trotzdem gesetzte Reise wird weiter geprüft.
+ */
+export const withoutTripNeeded = (value: { noTrip?: boolean; tripId?: string }, settings?: { staffRole?: string }) =>
+  !value.tripId && (!!value.noTrip || settings?.staffRole === "innendienst");
 const normalized = (value = '') => value.trim().toLocaleLowerCase('de-DE').replace(/\s+/g, ' ');
 export function duplicateExpense(expenses: Expense[], draft: Partial<Expense>) {
   return expenses.find(e => e.id !== draft.id && (

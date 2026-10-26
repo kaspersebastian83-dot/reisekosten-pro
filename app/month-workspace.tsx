@@ -26,11 +26,13 @@ export function MonthWorkspace({state, month, statement, startEntry, openCapture
   const preview = useMemo(() => closingPreview(state, month), [state, month]);
   const closed = !!existing && isClosedStatement(existing) && !comparison?.draft && !comparison?.hasChanges;
   const captured = trips + expenses > 0;
+  // Innendienst: nur Kosten und Belege – keine Reisen, kein Fahrtenbuch, keine Verpflegung (vorhandene Reisen bleiben sichtbar).
+  const innendienst = state.settings.staffRole === 'innendienst';
   const step = !captured ? 1 : closed ? 4 : preview.errors.length ? 2 : 3;
   const stepsAndAction = <section className="workspace-statement-action" aria-label="Monatsabrechnung">
     <h3>Abschluss</h3>
     <ol className="workspace-steps" aria-label="Weg zum Abschluss">
-      <li className={step > 1 ? 'done' : 'current'}><b>Erfassen</b><small>{captured ? `${trips} ${trips === 1 ? 'Reise' : 'Reisen'}, ${expenses} ${expenses === 1 ? 'Kostenposition' : 'Kostenpositionen'}` : 'Noch nichts erfasst'}</small></li>
+      <li className={step > 1 ? 'done' : 'current'}><b>Erfassen</b><small>{captured ? `${innendienst && !trips ? '' : `${trips} ${trips === 1 ? 'Reise' : 'Reisen'}, `}${expenses} ${expenses === 1 ? 'Kostenposition' : 'Kostenpositionen'}` : 'Noch nichts erfasst'}</small></li>
       <li className={closed ? 'done' : step === 2 ? 'current blocked' : step === 3 ? 'done' : ''}><b>Prüfen</b><small>{!captured ? '–' : closed ? 'Geprüft' : preview.errors.length ? `${preview.errors.length} Fehler vor dem Abschluss beheben` : preview.warnings.length ? `${preview.warnings.length} Hinweise in ${groupClosingIssues(preview.warnings).length} Gruppen – blockieren nicht` : 'Keine bekannten Probleme'}</small></li>
       <li className={closed ? 'done' : step === 3 ? 'current' : ''}><b>Abschließen</b><small>{closed ? `Abgeschlossen · Version ${existing!.version}` : existing && !existing.locked ? `Entwurf Version ${existing.version} – Abschlussprüfung öffnen` : 'Entwurf erstellen, prüfen und verbindlich abschließen'}</small></li>
     </ol>
@@ -42,12 +44,13 @@ export function MonthWorkspace({state, month, statement, startEntry, openCapture
     <header className="workspace-head">
       <div className="workspace-title"><p className="eyebrow">Monatsarbeitsbereich</p><h2>{monthLabel(month)}</h2><span className={`status-pill month-${overview.status}`}>{overview.label}</span></div>
       <section className="workspace-toolbar" aria-label="Spesen erfassen">
-        <button className="primary workspace-trip-entry" onClick={() => startEntry('trip')}><Plus size={18}/> Dienstreise erfassen</button>
+        {!innendienst && <button className="primary workspace-trip-entry" onClick={() => startEntry('trip')}><Plus size={18}/> Dienstreise erfassen</button>}
         {/* Sichtbar kurz, vorgelesen vollständig (der sichtbare Text ist Teil des Namens). */}
+        {innendienst && <button className="primary" onClick={() => startEntry('Parken')} aria-label="Kosten erfassen"><Plus size={18}/> Kosten erfassen</button>}
         <button className="ghost" onClick={() => startEntry('Hotel')} aria-label="Hotelrechnung erfassen"><Plus size={17}/> Hotelrechnung</button>
-        <button className="ghost" onClick={() => startEntry('Parken')} aria-label="Sonstige Kosten erfassen"><Plus size={17}/> Sonstige Kosten</button>
+        {!innendienst && <button className="ghost" onClick={() => startEntry('Parken')} aria-label="Sonstige Kosten erfassen"><Plus size={17}/> Sonstige Kosten</button>}
         <button className="ghost" onClick={openCapture} aria-label="Beleg fotografieren / OCR" title="Beleg fotografieren oder Datei wählen; Text wird lokal erkannt"><Camera size={17}/> Beleg fotografieren</button>
-        {openImport && <button className="ghost" onClick={openImport} title="Fahrten aus einer CSV-Datei (z. B. Vimcar) übernehmen"><Import size={17}/> Fahrtenbuch importieren</button>}
+        {openImport && !innendienst && <button className="ghost" onClick={openImport} title="Fahrten aus einer CSV-Datei (z. B. Vimcar) übernehmen"><Import size={17}/> Fahrtenbuch importieren</button>}
       </section>
     </header>
     {inboxCount > 0 && startInbox && <section className="workspace-inbox" aria-label="Beleg-Eingang">
@@ -67,8 +70,10 @@ export function MonthWorkspace({state, month, statement, startEntry, openCapture
             <b>{comparison?.baseline ? 'Persönlicher Erstattungsbetrag laut aktuellem Rechenstand' : 'Voraussichtliche persönliche Erstattung'}</b><strong>{euro(totals.openAmount)}</strong>
           </div>
           <dl className="workspace-figures">
+            {!(innendienst && !trips) && <>
             <div><dt>Dienstreisen</dt><dd>{trips}</dd></div>
             <div><dt>Verpflegungspauschalen · Vorschau</dt><dd>{euro(totals.allowance)}</dd></div>
+            </>}
             <div><dt>Hotelkosten · erfasst</dt><dd>{euro(totals.accommodation)}</dd></div>
             <div><dt>Weitere Kosten inkl. Tanken · erfasst</dt><dd>{euro(round2(totals.other + totals.fuel))}</dd></div>
           </dl>

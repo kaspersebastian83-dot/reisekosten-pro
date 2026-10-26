@@ -101,6 +101,8 @@ export interface Receipt {
 // Optional receipt context; old backups need no migration or inferred defaults.
 export interface ExpenseContext {
   projectNumber?: string;
+  /** Bewusst ohne Reise und ohne Projekt erfasst (z. B. Büromaterial): keine Hinweise auf fehlende Zuordnung. */
+  noTrip?: boolean;
   stayStart?: string;
   stayEnd?: string;
   breakfastIncluded?: "yes" | "no" | "unknown";
@@ -212,6 +214,8 @@ export interface Settings {
   regularSites: string;
   timezone: string;
   rounding: "keine" | "5 Minuten" | "15 Minuten";
+  /** Außendienst: Dienstreisen, Fahrtenbuch, Verpflegung. Innendienst: nur Kosten und Belege, ohne Reise-/Projektzuordnung. */
+  staffRole: "aussendienst" | "innendienst";
   ruleMode: "legal" | "internal";
   internalMinutes: number;
   internalComparator: "greater" | "atLeast";

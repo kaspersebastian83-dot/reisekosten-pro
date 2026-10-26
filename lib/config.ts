@@ -123,6 +123,7 @@ export const defaultSettings: Settings = {
   regularSites: "",
   timezone: "Europe/Berlin",
   rounding: "keine",
+  staffRole: "aussendienst",
   ruleMode: "legal",
   internalMinutes: 510,
   internalComparator: "greater",
