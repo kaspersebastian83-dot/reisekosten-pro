@@ -3,7 +3,7 @@
 Dienstreisen · Spesen · Abrechnungen
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
-1.8.7 (Release-Version aus [package.json](package.json), Änderungen in
+1.9.0 (Release-Version aus [package.json](package.json), Änderungen in
 [CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
 
 Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
@@ -20,7 +20,7 @@ Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV-, DATEV-CSV- und ZIP-Exporte.
 
-## Aktueller Stand in Kürze (1.8.7)
+## Aktueller Stand in Kürze (1.9.0)
 
 - **Navigation:** Monatsübersicht, Auswertungen, Einstellungen, Datensicherung.
   In der Seitenleiste darunter: Projektzentrale, Handbuch (AidKit) und Rückmeldung
@@ -32,6 +32,15 @@ Kosten und Belege und erzeugt PDF-, Excel-, CSV-, DATEV-CSV- und ZIP-Exporte.
   `main`) und – nach „Ordner einrichten“ – die maßgebliche Datei
   `SpesenKit/Daten/spesenkit.json` im persönlichen Ordner, dazu Ablage
   `SpesenKit/Spesen/<Jahr>/<Monat>/` und Sicherungen `SpesenKit/Sicherungen/`.
+- **Belegbilder (ab 1.9):** jedes Bild genau einmal, benannt nach dem
+  Fingerabdruck seines Inhalts (SHA-256 + Endung): im Browser in der IndexedDB
+  `spesenkit-belege` (Store `belege`), im Ordner als echte Datei
+  `SpesenKit/Belege/<Fingerabdruck>.jpg` (wird nie automatisch gelöscht).
+  Bestand, `spesenkit.json` (Format 2) und Sicherungen enthalten nur den
+  Verweis (`receipt.fileId`, `dataUrl` leer) – bei einigen Monaten mit Belegen
+  rund 0,2 MB statt 90 MB. Ältere Stände werden beim ersten Öffnen umgestellt;
+  ältere SpesenKit-Versionen lehnen Format 2 ab, statt zu überschreiben. Die
+  JSON-Sicherung zum Herunterladen enthält weiterhin alle Bilder.
 - **Formulare:** Reise- und Kostenfenster zweispaltig ohne Scrollen ab etwa
   1366 × 660 px, Stapelerfassung mit „Speichern & nächste“ (Strg+Enter).
 - Die Abschnitte ab „Entwicklungsverlauf“ beschreiben die einzelnen Schritte
@@ -183,7 +192,8 @@ erkannt, nicht durch eine permanente Überwachung anderer Server.
 Alle beteiligten Sitzungen müssen die aktualisierte Speicherlogik verwenden. Unbeobachtete Änderungen alter
 App-Versionen oder externer Programme im letzten Rennfenster können nicht vollständig abgesichert werden.
 Ebenso ersetzt Rücklesen keine Sicherung gegen Hardwareausfall oder spätere Löschung. Jede Kopie enthält
-den vollständigen Datenbestand einschließlich Base64-Belegen: der Platzbedarf wächst mit den Schreibversuchen.
+den vollständigen Datenbestand; Belegbilder seit 1.9 nur als Verweis auf `SpesenKit/Belege/` (vorher als Base64 in
+jeder Kopie).
 Bei Platzmangel bleibt eine Fehlermeldung statt eines bestätigten Speichervorgangs. Eine automatische
 Bereinigung dieser Wiederherstellungskopien ist bewusst nicht eingerichtet.
 

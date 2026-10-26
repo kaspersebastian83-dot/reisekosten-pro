@@ -1,5 +1,33 @@
 # Release Notes
 
+## 1.9.0 – 26. Oktober 2026
+
+Rückmeldung aus dem Einsatz: Nach dem Monatsabschluss hing die App 10–15 Sekunden.
+- **Ursache:** Jedes Belegbild stand als Text im Datenbestand, meist dreifach (Kosten, Beleg-Eingang, eingefrorene
+  Abrechnungsversion). Gemessen mit 3 Monaten × 25 Belegen: rund 90 MB, die beim Speichern mehrfach geschrieben,
+  zurückgelesen und geprüft wurden – beim Abschluss zusätzlich Sicherungskopie und PDF/ZIP.
+- **Neu: Belegbilder als eigene Dateien.** Jedes Bild wird genau einmal gespeichert, benannt nach dem Fingerabdruck
+  seines Inhalts: im Browser in einer eigenen Bilddatenbank, im SpesenKit-Ordner unter `SpesenKit/Belege/` (echte
+  Bilddateien, nie automatisch gelöscht). Datenbestand, `spesenkit.json` und Sicherungen enthalten nur den Verweis.
+  Gemessen: Bestand 89 MB → 0,2 MB; Speichern im Ordner 8 s → 0,06 s; Sicherung nach dem Abschluss 1,4 s → 0,01 s.
+  Im Browser mit verbundenem Ordner (25 Belege im Monat): App beim Monatsabschluss gesperrt 21 s → 1,5 s.
+- **Umstellung automatisch:** Beim ersten Öffnen werden vorhandene Daten im Browser und die Datei im Ordner ins neue
+  Format übernommen (Format 2). Der erste Abgleich nach dem Update übersetzt den gespeicherten Fingerabdruck, damit
+  kein Scheinkonflikt erscheint. Ältere Sicherungen und JSON-Sicherungen bleiben wiederherstellbar.
+- **Ältere Versionen:** Eine noch nicht aktualisierte SpesenKit-Version lehnt die neue Datei ab („bitte SpesenKit
+  aktualisieren“) und überschreibt nichts.
+- **Andere Rechner:** Bilder, die nur im Ordner liegen, werden beim Abgleich im Hintergrund in den Browser übernommen
+  und sonst beim Anzeigen direkt aus dem Ordner gelesen.
+- „JSON-Sicherung herunterladen“ enthält weiterhin alle Bilder (für sich allein vollständig).
+- Ablage nach dem Abschluss: die PDF wird nur noch einmal erzeugt (das ZIP verwendet dieselbe).
+- Nicht mehr verwendete Bilder im Browser werden nach 7 Tagen entfernt; im Ordner bleiben sie.
+- Tests: `receipt-images.test.ts` (Fingerabdruck, einmal speichern, Ordnerdateien, anderer Rechner, ZIP, JSON-Sicherung,
+  Größe, Übergang von 1.8 ohne Scheinkonflikt); angepasst: Format 2 in `folder-store`/`folder-concurrency`.
+  Neuer Browsercheck `belege-dateien-browser-check.mjs` (1.8-Bestand umstellen, Anzeige, JSON-Sicherung, Ordner Format 2,
+  Format-1-Datei ohne Konflikt, Bilder vom Ordner holen). Browserchecks lesen den Bestand über
+  `tests/helpers/browser-state.mjs` (Bilder wieder eingesetzt). Für Sandbox-Chromium, das beim Zurücklesen eines
+  OPFS-Ordners aus IndexedDB abstürzt: `SANDBOX_HANDLE_SHIM=1` (`tests/helpers/folder-harness.mjs`).
+
 ## 1.8.7 – 26. Oktober 2026
 
 - **Rückmeldung:** neuer Link „Rückmeldung – Fehler oder Wunsch melden“ in der Seitenleiste unter „Handbuch“. Öffnet das

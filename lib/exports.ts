@@ -3,6 +3,7 @@ import Papa from "papaparse";
 import type { AppState, StatementData } from "./types";
 import { buildStatementPdf, statementPdfBytes } from "./pdf-statement";
 import { receiptIndex } from "./receipt-index";
+import { withAllReceiptImages, withReceiptImages } from "./receipt-images";
 import { correctionExportNotice, statementAmountLabel, type StatementExportContext } from "./export-context";
 export { correctionExportNotice, statementAmountLabel, type StatementExportContext } from "./export-context";
 
@@ -247,7 +248,9 @@ export function exportCsv(data: StatementData, state: AppState, datev = false, c
   );
 }
 
-export function exportBackup(state: AppState) {
+/** JSON-Sicherung: alle Belegbilder eingebettet – die Datei ist für sich allein vollständig. */
+export async function exportBackup(state: AppState) {
+  state = await withAllReceiptImages(state);
   download(
     new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
     `Reisekosten_Backup_${new Date().toISOString().slice(0, 10)}.json`,
@@ -270,9 +273,12 @@ export async function zipFile(
   state: AppState,
   number: string,
   context?: StatementExportContext,
+  /** Bereits erzeugte PDF derselben Version (Ablage): nicht ein zweites Mal aufbauen. */
+  existingPdf?: Promise<{ name: string; blob: Blob }>,
 ) {
   const zip = new JSZip();
-  const pdf = await pdfFile(data, state, number, context);
+  state = await withReceiptImages(state, data.month);
+  const pdf = await (existingPdf ?? pdfFile(data, state, number, context));
   zip.file(
     statementExportFilename(data.month, 'pdf', context),
     await pdf.blob.arrayBuffer(),

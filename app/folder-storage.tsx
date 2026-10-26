@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FolderOpen, HardDrive, Printer, RefreshCw } from "lucide-react";
 import {
-  COPY_DIR, DATA_DIR, DATA_FILE, FOLDER_NAME, FolderError, decideReconcile, isEmptyState, readDataFile, resolveAppFolder,
-  stateHash, stateSummary, writeDataFile, writeSafetyCopy, type FolderFile, type FolderLink,
+  COPY_DIR, DATA_DIR, DATA_FILE, FILE_FORMAT_VERSION, FOLDER_NAME, FolderError, cacheFolderReceipts, decideReconcile, isEmptyState, readDataFile,
+  readReceiptImage, resolveAppFolder, stateHash, stateSummary, translateLegacyLink, writeDataFile, writeSafetyCopy, type FolderFile, type FolderLink,
 } from "../lib/folder-store";
+import { setReceiptFolderSource } from "../lib/receipt-images";
 import { folderSupported, pickFolder, suiteLinks, withFolderLock } from "../lib/suite-link";
 import { defaultFilingFormats, filedStatus, fileStatement, filingFormatLabels, type FilingFormat, type FilingFormats, type FilingReport } from "../lib/statement-filing";
 import { printPdf } from "../lib/exports";
@@ -82,7 +83,8 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   const linkName = (link?: FolderLink | null) => link?.label || link?.handle.name || FOLDER_NAME;
   const okStatus = (link: FolderLink, pending = false): FolderStatus => ({ kind: "ok", name: linkName(link), revision: link.revision, savedAt: link.savedAt, pending });
 
-  const reconcile = useCallback(async (link: FolderLink) => {
+  const reconcile = useCallback(async (given: FolderLink) => {
+    let link = given;
     setBusy(true);
     setStatus({ kind: "checking", name: linkName(link) });
     try {
@@ -97,16 +99,21 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
           if (error instanceof FolderError && error.code === "permission") { setStatus({ kind: "permission", name: linkName(link) }); return; }
           throw error;
         }
+        // Erster Abgleich nach dem Update auf 1.9: alten Fingerabdruck einmal übersetzen (kein Scheinkonflikt).
+        const translated = await translateLegacyLink(link, local, file);
+        if (translated !== link) { link = translated; await suiteLinks.set(link); }
         const decision = decideReconcile(link, await stateHash(local), isEmptyState(local), file);
         if (decision.kind === "in-sync") {
-          const next = { ...link, revision: decision.file.content.revision, hash: decision.file.hash, savedAt: decision.file.content.savedAt };
+          let next: FolderLink = { ...link, revision: decision.file.content.revision, hash: decision.file.hash, savedAt: decision.file.content.savedAt, hashFormat: 2 };
+          // Gleicher Inhalt, aber noch im alten Format (Bilder eingebettet): einmal im neuen Format schreiben.
+          if (decision.file.content.formatVersion < FILE_FORMAT_VERSION) next = { ...next, ...await writeFile(next, local, decision.file.content.revision) };
           await suiteLinks.set(next); setStatus(okStatus(next));
         } else if (decision.kind === "write-local") {
           const result = await writeFile(link, local, decision.expectedRevision);
           const next = { ...link, ...result }; await suiteLinks.set(next); setStatus(okStatus(next));
         } else if (decision.kind === "load-file") {
           await adoptState(decision.file.state);
-          const next = { ...link, revision: decision.file.content.revision, hash: decision.file.hash, savedAt: decision.file.content.savedAt };
+          const next: FolderLink = { ...link, revision: decision.file.content.revision, hash: decision.file.hash, savedAt: decision.file.content.savedAt, hashFormat: 2 };
           await suiteLinks.set(next); setStatus(okStatus(next));
           notify(`Datenstand aus dem SpesenKit-Ordner geladen (gespeichert ${time(decision.file.content.savedAt)}).`);
         } else if (decision.kind === "missing") {
@@ -116,6 +123,9 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
         }
       });
       lastError.current = null;
+      // Belegbilder, die nur im Ordner liegen (anderer Rechner), im Hintergrund in den Browser übernehmen.
+      const current = committed();
+      if (statusRef.current.kind === "ok" && current) void cacheFolderReceipts(link.handle, current).catch(() => undefined);
     } catch (error) {
       lastError.current = error instanceof Error ? error : new Error(message(error));
       if (error instanceof FolderError && error.code === "conflict") {
@@ -147,6 +157,13 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     if (permission !== "granted") { setStatus({ kind: "permission", name: linkName(link) }); return; }
     await reconcile(link);
   }, [reconcile, setStatus]);
+
+  // Solange der Ordner erreichbar ist, können fehlende Belegbilder von dort gelesen werden.
+  useEffect(() => {
+    if (status.kind !== "ok") { setReceiptFolderSource(null); return; }
+    setReceiptFolderSource(async (fileId, type) => { const link = await suiteLinks.get(); return link ? readReceiptImage(link.handle, fileId, type) : null; });
+    return () => setReceiptFolderSource(null);
+  }, [status.kind]);
 
   const started = useRef(false);
   useEffect(() => { if (ready && !started.current) { started.current = true; void start(); } }, [ready, start]);
@@ -211,7 +228,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
     }
     try {
       const root = await resolveAppFolder(chosen);
-      const next: FolderLink = { handle: root, revision: 0, hash: "", label: root === chosen ? root.name : `${chosen.name}\\${root.name}` };
+      const next: FolderLink = { handle: root, revision: 0, hash: "", hashFormat: 2, label: root === chosen ? root.name : `${chosen.name}\\${root.name}` };
       await suiteLinks.set(next);
       knownHandle.current = root;
       await reconcile(next);
@@ -243,7 +260,7 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
         if (keep === "folder") {
           const copy = await writeSafetyCopy(link.handle, "browserstand", local);
           await adoptState(file.state);
-          const next = { ...link, revision: file.content.revision, hash: file.hash, savedAt: file.content.savedAt };
+          const next: FolderLink = { ...link, revision: file.content.revision, hash: file.hash, savedAt: file.content.savedAt, hashFormat: 2 };
           await suiteLinks.set(next); setStatus(okStatus(next));
           return `Ordnerstand übernommen. Der bisherige Browserstand liegt als Kopie in ${copy}.`;
         }

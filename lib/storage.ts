@@ -2,6 +2,7 @@ import { openDB, type IDBPDatabase } from "idb";
 import { duplicateKey } from "./calculations";
 import type { AppState, Trip, ImportProfile } from "./types";
 import { emptyState } from "./config";
+import { FILE_ID, detachReceipts, hasEmbeddedImages, persistReceiptImages } from "./receipt-images";
 
 const DB = "reisekosten-pro";
 const STORE = "state";
@@ -49,7 +50,7 @@ function validateState(value: Partial<AppState>) {
     if (!record(trip) || !texts(trip, ["id", "date", "startTime", "endTime", "startPlace", "destination", "purpose", "customer", "order", "costCenter", "plate", "vehicle", "vehicleType", "tripType", "notes", "status"]) || !numbers(trip, ["businessKm", "privateKm"]) || !warnings(trip.warnings) || !meals(trip.meals)) fail();
     if (trip.dailyMeals && (!record(trip.dailyMeals) || !Object.values(trip.dailyMeals).every(meals))) fail();
   }
-  const receipt = (v: unknown) => record(v) && texts(v, ["id", "name", "type", "hash", "dataUrl"]) && numbers(v, ["size"]);
+  const receipt = (v: unknown) => record(v) && texts(v, ["id", "name", "type", "hash", "dataUrl"]) && numbers(v, ["size"]) && (v.fileId === undefined || (typeof v.fileId === "string" && FILE_ID.test(v.fileId)));
   const context = (v: Partial<Record<"projectNumber" | "stayStart" | "stayEnd" | "breakfastIncluded" | "noTrip", unknown>>) => (["projectNumber", "stayStart", "stayEnd"] as const).every(key => v[key] === undefined || typeof v[key] === "string") && (v.breakfastIncluded === undefined || (typeof v.breakfastIncluded === "string" && ["yes", "no", "unknown"].includes(v.breakfastIncluded))) && (v.noTrip === undefined || typeof v.noTrip === "boolean");
   for (const expense of value.expenses || []) {
     if (!record(expense) || !texts(expense, ["id", "date", "category", "description", "currency", "reimbursementStatus", "status"]) || !numbers(expense, ["gross", "net", "vatRate", "vat", "exchangeRate", "businessShare"]) || !warnings(expense.warnings) || (expense.receipt && !receipt(expense.receipt))) fail();
@@ -93,11 +94,15 @@ function validateState(value: Partial<AppState>) {
 }
 
 export async function loadState(): Promise<AppState> {
+  return (await loadStateForApp()).state;
+}
+/** Wie loadState; meldet zusätzlich, ob im Browser noch eingebettete Belegbilder liegen (dann einmal neu speichern). */
+export async function loadStateForApp(): Promise<{ state: AppState; embeddedImages: boolean }> {
   const value = await (await db()).get(STORE, "main");
-  return normalizeState(value);
+  return { state: normalizeState(value), embeddedImages: !!value && hasEmbeddedImages(value) };
 }
 
-export function normalizeState(value?: Partial<AppState>): AppState {
+export function normalizeState(value?: Partial<AppState>, options: { detach?: boolean } = {}): AppState {
   if (value === undefined) return structuredClone(emptyState);
   validateState(value);
   const settings = {
@@ -143,7 +148,8 @@ export function normalizeState(value?: Partial<AppState>): AppState {
     );
     return vehicle ? { ...expense, vehicleId: vehicle.id } : expense;
   });
-  return {
+  // Eingebettete Belegbilder (ältere Stände) werden herausgelöst: im Bestand bleibt nur der Verweis (lib/receipt-images.ts).
+  const normalized: AppState = {
     ...structuredClone(emptyState),
     ...value,
     trips,
@@ -155,6 +161,7 @@ export function normalizeState(value?: Partial<AppState>): AppState {
     changes: value.changes || [],
     settings,
   };
+  return options.detach === false ? normalized : detachReceipts(normalized);
 }
 
 /** Gleicher Stand wie zuletzt gespeichert? Beide Seiten normalisiert verglichen: Beim Lesen ergänzt
@@ -165,6 +172,9 @@ export function sameStoredState(current: AppState, expected: AppState) {
 }
 
 export async function saveState(state: AppState, expected: AppState) {
+  const stored = detachReceipts(state);
+  // Zuerst die Bilder: Ein gespeicherter Verweis zeigt nie auf ein fehlendes Bild.
+  await persistReceiptImages(stored);
   const transaction = (await db()).transaction(STORE, "readwrite");
   try {
     const current = normalizeState(await transaction.store.get("main"));
@@ -172,7 +182,7 @@ export async function saveState(state: AppState, expected: AppState) {
     if (!sameStoredState(current, expected)) {
       throw new Error("Die Daten wurden in einem anderen Tab geändert. Sichern Sie Ihre eigenen Änderungen als JSON und laden Sie die App anschließend neu. Der neuere Speicherstand wurde nicht überschrieben.");
     }
-    await transaction.store.put(state, "main");
+    await transaction.store.put(stored, "main");
     await transaction.done;
   } catch (error) {
     try { transaction.abort(); } catch { /* Already aborted. */ }

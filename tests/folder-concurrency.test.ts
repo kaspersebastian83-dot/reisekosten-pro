@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { demoState } from "../lib/demo";
 import { buildStatement } from "../lib/calculations";
-import { COPY_DIR, DATA_DIR, DATA_FILE, FOLDER_NAME, PREVIOUS_FILE, decideReconcile, readDataFile, stateHash, writeDataFile, writeSafetyCopy } from "../lib/folder-store";
+import { COPY_DIR, DATA_DIR, DATA_FILE, FOLDER_NAME, PREVIOUS_FILE, RECEIPT_DIR, decideReconcile, readDataFile, stateHash, writeDataFile, writeSafetyCopy } from "../lib/folder-store";
+import { withAllReceiptImages } from "../lib/receipt-images";
 import { backupsToPrune, listBackups, readBackup } from "../lib/folder-backups";
 import { FakeDir } from "./helpers/fake-dir";
+import type { AppState } from "../lib/types";
 
 const barrier = () => {
   let release!: () => void;
@@ -147,8 +149,15 @@ describe("Gleichzeitige Ordnerspeicherung ohne gemeinsame Browsersperre", () => 
       expensesSnapshot: structuredClone(state.expenses), relatedTripsSnapshot: structuredClone(state.trips) });
     await writeDataFile(root, state, 0);
     const [restored] = await candidates(root);
-    expect(restored.expenses[0].receipt).toEqual(state.expenses[0].receipt);
-    expect(restored.statements).toEqual(state.statements);
+    // Ab Format 2: im Kandidaten nur der Verweis, das Bild genau einmal unter Belege/ – zusammen wieder exakt der Beleg.
+    const fileId = restored.expenses[0].receipt!.fileId!;
+    expect(restored.expenses[0].receipt).toEqual({ ...state.expenses[0].receipt, dataUrl: "", fileId });
+    expect(await (root.file(RECEIPT_DIR, fileId) as Blob).text()).toBe("Hallo");
+    expect(restored.statements[0].expensesSnapshot![0].receipt!.fileId).toBe(fileId);
+    const hydrated = await withAllReceiptImages(restored);
+    const plain = (s: AppState) => JSON.parse(JSON.stringify(s, (key, value) => key === "fileId" ? undefined : value));
+    expect(plain(hydrated).expenses[0].receipt).toEqual(state.expenses[0].receipt);
+    expect(plain(hydrated).statements).toEqual(state.statements);
   });
 
   it("verwendet einen bereits vorhandenen Kopienamen auch bei einer UUID-Kollision nicht erneut", async () => {
