@@ -1,5 +1,23 @@
 # Release Notes
 
+## 1.8.4 – 26. Oktober 2026
+
+Rückmeldungen aus dem Einsatz zur Belegerkennung („Beleg fotografieren / OCR“):
+- **Quer oder auf dem Kopf liegende Belege werden erkannt.** Liefert der erste Durchgang keinen sicheren Text mit
+  Betrag, liest SpesenKit den Beleg um 90°, 270° und 180° gedreht und nimmt das beste Ergebnis. Aufrechte Belege
+  kosten keine Zeit extra; quer liegende brauchen ein paar Sekunden länger („Beleg liegt quer … lese gedreht“).
+  Das gespeicherte Foto wird dabei aufrecht gedreht.
+- **Händler zuverlässiger:** Statt der ersten Zeile mit Buchstaben werden die Kopfzeilen bewertet. Logo-Zeichensalat,
+  Adresse, Telefon, Internetadresse, Kasse und Bon-Nummer zählen nicht; Rechtsform (GmbH, KG …) und bekannte Marken
+  (Tankstellen, Bahn, Märkte, Hotels, Parkhausbetreiber …) sprechen für den Händler. Einmal bestätigte Händler
+  (gelernte Regeln) werden auch dann gefunden, wenn die Kopfzeile unleserlich ist.
+- **Speichern wartet auf die Texterkennung** („Nur im Eingang speichern“ ist währenddessen gesperrt), damit erkannte
+  Felder und das aufrecht gedrehte Foto nicht verloren gehen. Hängt die Erkennung, lässt sie sich abbrechen.
+- **Datum und Uhrzeit sind keine Beträge mehr** („Ausfahrt 26.10.2026“ ergab bisher 26,10 €, wenn die Summenzeile
+  schlecht lesbar war).
+- Tests: `receipt-ocr.test.ts` (Händler, Datum vs. Betrag, gelernter Händler). Mit echter Texterkennung geprüft
+  (tesseract.js 7, deu+eng): drei Testbelege je aufrecht, 90°, 180°, 270° – alle zwölf mit Händler, Datum und Betrag.
+
 ## 1.8.3 – 26. Oktober 2026
 
 Weniger Kopien – auf dem Handy füllte SpesenKit den Speicher schnell.

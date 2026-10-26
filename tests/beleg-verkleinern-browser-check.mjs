@@ -66,4 +66,20 @@ try {
   assert.equal(Buffer.from(p.dataUrl.split(',')[1],'base64').toString(),pdf.toString());
   console.log('PASS PDF bleibt unverändert');
   assert.deepEqual(errors.filter(e=>!/importScripts|tesseract/i.test(e)),[],'keine Fehler außer der bewusst blockierten Texterkennung');
+  // 1.8.4: Speichern wartet auf die Texterkennung; hängt sie, lässt sie sich abbrechen.
+  {
+    const ctx2=await browser.newContext({viewport:{width:390,height:844}});
+    await ctx2.route(/https?:\/\/(?!127\.0\.0\.1)/,()=>{});            // Texterkennung lädt nie fertig
+    const p2=await ctx2.newPage();await p2.goto(url);await p2.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+    await p2.locator('.month-entry-workspace').getByRole('button',{name:'Beleg fotografieren / OCR',exact:true}).click();
+    await p2.locator('.receipt-capture input[type=file]').first().setInputFiles({name:'IMG_1.JPG',mimeType:'image/jpeg',buffer:foto});
+    const save=p2.getByRole('button',{name:'Nur im Eingang speichern',exact:true});
+    await p2.getByRole('button',{name:'Erkennung abbrechen',exact:true}).waitFor({timeout:30000});
+    assert.equal(await save.isDisabled(),true,'Speichern wartet auf die Erkennung');
+    await p2.getByRole('button',{name:'Erkennung abbrechen',exact:true}).click();
+    await p2.getByText('Erkennung abgebrochen',{exact:false}).waitFor();
+    assert.equal(await save.isDisabled(),false,'nach dem Abbrechen speicherbar');
+    await ctx2.close();
+    console.log('PASS Speichern wartet auf die Texterkennung, Abbrechen möglich');
+  }
 } finally { await browser.close(); server.close(); }

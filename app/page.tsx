@@ -68,7 +68,7 @@ import {
 import { manualTripErrors, manualTripInterval, manualTripReviewNotes, projectPlace, projectSuggestions } from "../lib/manual-trip";
 import { cleanContext, duplicateMessage, linkingErrors, paymentLabel, paymentPayer, similarExpense, syncExpenseLink, validDate } from "../lib/receipt-linking";
 import { buildAnnualAnalysis } from "../lib/annual-reports";
-import { readReceiptFile } from "../lib/receipt-file";
+import { jpegName, readReceiptFile, rotateReceiptImage } from "../lib/receipt-file";
 import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
 import { MonthWorkspace } from "./month-workspace";
 import { StatementClosing } from "./statement-closing";
@@ -717,9 +717,17 @@ function ReceiptCapture({
           setScanStatus(status);
         },
       );
-      const learned = applyMerchantRule(recognized, state.merchantRules);
+      const { rotation, ocrConfidence: _ocrConfidence, ...read } = recognized;
+      const learned = applyMerchantRule(read, state.merchantRules);
       if (revision !== scanRevision.current) return;
       setSuggestionState(current => ({...current, ...Object.fromEntries(Object.entries(learned.suggestion).filter(([key]) => !editedFields.current.has(key)))}));
+      // Quer oder kopfüber gelesen: gespeichertes Foto aufrecht drehen (Fingerabdruck bleibt der der Originaldatei).
+      if (rotation) {
+        const upright = await rotateReceiptImage(nextReceipt.dataUrl, rotation);
+        if (upright && revision === scanRevision.current)
+          setReceipt(current => current && current.id === nextReceipt.id && current.dataUrl === nextReceipt.dataUrl
+            ? { ...current, dataUrl: upright.dataUrl, size: upright.size, type: "image/jpeg", name: jpegName(current.name) } : current);
+      }
 
     } catch {
       if (revision !== scanRevision.current) return;
@@ -978,6 +986,9 @@ function ReceiptCapture({
                     <i>
                       <em style={{ width: `${progress}%` }} />
                     </i>
+                    {/* Speichern wartet auf die Erkennung (sonst gingen erkannte Felder und das aufrecht gedrehte Foto verloren).
+                        Hängt sie, lässt sie sich abbrechen und der Beleg von Hand erfassen. */}
+                    <button type="button" className="link" onClick={() => { scanRevision.current++; setScanning(false); setScanError("Erkennung abgebrochen. Den Beleg bitte von Hand ergänzen."); }}>Erkennung abbrechen</button>
                   </div>
                 </div>
               )}
@@ -1078,7 +1089,7 @@ function ReceiptCapture({
         )}
         {receipt && (
           <footer>
-            <button className="ghost" onClick={saveInbox} disabled={readingReceipt}>
+            <button className="ghost" onClick={saveInbox} disabled={scanning || readingReceipt} title={scanning ? "Erst nach der Texterkennung – oder „Erkennung abbrechen“" : undefined}>
               <Inbox size={17} />
               Nur im Eingang speichern
             </button>
