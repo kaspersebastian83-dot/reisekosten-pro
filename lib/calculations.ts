@@ -110,25 +110,55 @@ export function groupTripsByDay(trips: Trip[]) {
   return map;
 }
 
+const dayAfter = (date: string) =>
+  new Date(new Date(`${date}T12:00:00Z`).getTime() + 86_400_000).toISOString().slice(0, 10);
+const dateDe = (date: string) => date.split("-").reverse().join(".");
+const hhmm = (minutes: number) => `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
+
+/**
+ * Über Mitternacht ohne Übernachtung (§ 9 Abs. 4a Satz 3 Nr. 3 EStG): Beginnt die Reise an einem Tag und endet
+ * am Folgetag ohne Übernachtung, zählt die gesamte Abwesenheit als ein Tag – für den Kalendertag mit dem
+ * überwiegenden Teil. Gilt nur ohne bestätigte Übernachtung und ohne manuelle Abwesenheitskorrektur, mit genau einem
+ * Datumswechsel und vollständigen Zeiten; sonst null und die bisherige An-/Abreiseberechnung bleibt.
+ */
+export function midnightWithoutOvernight(trip: Trip) {
+  if (trip.overnight || trip.manualAbsenceMinutes != null || !trip.endDate || trip.endDate !== dayAfter(trip.date) || !trip.startTime || !trip.endTime) return null;
+  const before = minutesBetween(trip.date, trip.startTime, "24:00");
+  const after = minutesBetween(trip.endDate, "00:00", trip.endTime);
+  return { before, after, total: before + after, day: after > before ? trip.endDate : trip.date, tie: after === before };
+}
+
 export function calculateDay(
   date: string,
   trips: Trip[],
   settings: Settings,
 ): DayCalculation {
   const warnings = [...new Set(trips.flatMap((t) => t.warnings))];
-  const starts = trips
+  const night = trips
+    .map((trip) => ({ trip, split: midnightWithoutOvernight(trip) }))
+    .filter((item): item is { trip: Trip; split: NonNullable<ReturnType<typeof midnightWithoutOvernight>> } => !!item.split);
+  const nightTrips = new Set(night.map((item) => item.trip));
+  const regular = trips.filter((t) => !nightTrips.has(t));
+  const nightHere = night.filter((item) => item.split.day === date);
+  const nightMinutes = nightHere.reduce((sum, item) => sum + item.split.total, 0);
+  if (nightHere.some((item) => item.split.tie))
+    warnings.push("Über Mitternacht ohne Übernachtung: vor und nach Mitternacht gleich lange abwesend – angesetzt am Abfahrtstag, bitte prüfen.");
+  const starts = regular
     .filter((t) => t.date === date)
     .map((t) => t.startTime)
     .filter(Boolean)
     .sort();
-  const ends = trips
+  const ends = regular
     .filter((t) => (t.endDate || t.date) === date)
     .map((t) => t.endTime)
     .filter(Boolean)
     .sort();
-  const firstStart = starts[0] || "00:00";
-  const lastEnd = ends.at(-1) || "23:59";
-  const multi = trips.find((t) => (t.endDate || t.date) > t.date);
+  // Zeiten der Nachtfahrt: am angesetzten Tag Abfahrt und Rückkehr, am anderen Tag die echte Grenze (Abfahrt bzw. Rückkehr).
+  const nightStart = night.filter((item) => item.split.day === date || item.trip.date === date).map((item) => item.trip.startTime).sort()[0];
+  const nightEnd = night.filter((item) => item.split.day === date || item.trip.endDate === date).map((item) => item.trip.endTime).sort().at(-1);
+  const firstStart = starts[0] || nightStart || "00:00";
+  const lastEnd = ends.at(-1) || nightEnd || "23:59";
+  const multi = regular.find((t) => (t.endDate || t.date) > t.date);
   const isArrival = !!multi && date === multi.date;
   const isDeparture = !!multi && date === multi.endDate;
   const isFull =
@@ -143,13 +173,17 @@ export function calculateDay(
     absenceMinutes = minutesBetween(date, firstStart, "24:00");
   else if (isDeparture) absenceMinutes = minutesBetween(date, "00:00", lastEnd);
   else if (starts.length && ends.length)
-    absenceMinutes = minutesBetween(date, firstStart, lastEnd);
-  else warnings.push("Abwesenheitsdauer muss bestätigt werden.");
+    absenceMinutes = minutesBetween(date, starts[0], ends.at(-1)!) + nightMinutes;
+  else if (regular.length) warnings.push("Abwesenheitsdauer muss bestätigt werden.");
+  else absenceMinutes = nightMinutes;
 
   if (trips.some((t) => !t.absenceConfirmed))
     warnings.push("Abwesenheitsdauer muss bestätigt werden.");
-  const kind: Tariff["kind"] | null =
-    isFull || absenceMinutes >= 1440
+  // Über Mitternacht ohne Übernachtung gibt es höchstens die Teilpauschale, auch bei 24 Stunden und mehr.
+  const nightOnly = nightHere.length > 0 && !multi && manual == null;
+  const kind: Tariff["kind"] | null = nightOnly
+    ? thresholdEligible(absenceMinutes, settings) ? "partial" : null
+    : isFull || absenceMinutes >= 1440
       ? "full"
       : isArrival
         ? "arrival"
@@ -199,9 +233,13 @@ export function calculateDay(
         ? "Anreisetag einer mehrtägigen Reise"
         : kind === "departure"
           ? "Abreisetag einer mehrtägigen Reise"
-          : kind === "partial"
-            ? `${Math.floor(absenceMinutes / 60)}:${String(absenceMinutes % 60).padStart(2, "0")} Std. Abwesenheit – Schwelle erfüllt`
-            : "Schwelle für eintägige Auswärtstätigkeit nicht überschritten";
+          : night.length && !multi && manual == null
+            ? nightHere.length
+              ? `Über Mitternacht ohne Übernachtung: ${hhmm(absenceMinutes)} Std. Abwesenheit, überwiegend an diesem Tag – ${kind ? "Schwelle erfüllt" : "Schwelle nicht überschritten"} (eine Pauschale für die ganze Reise; falls übernachtet wurde, in der Dienstreise bestätigen)`
+              : `Über Mitternacht ohne Übernachtung: angesetzt am ${night.map((item) => dateDe(item.split.day)).join(", ")} (überwiegender Teil der Abwesenheit)${kind ? ` – zusätzlich ${hhmm(absenceMinutes)} Std. an diesem Tag, Schwelle erfüllt` : ""}`
+            : kind === "partial"
+              ? `${hhmm(absenceMinutes)} Std. Abwesenheit – Schwelle erfüllt`
+              : "Schwelle für eintägige Auswärtstätigkeit nicht überschritten";
   return {
     date,
     trips,

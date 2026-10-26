@@ -252,3 +252,78 @@ describe("Fahrzeugbezogene Kilometererstattung", () => {
     expect(normalized.trips[0].vehicleId).toBe("vehicle-private-default");
   });
 });
+
+describe("über Mitternacht ohne Übernachtung (§ 9 Abs. 4a Satz 3 Nr. 3 EStG)", () => {
+  const s = defaultSettings as Settings;
+  const tage = (trip: Trip) => [trip.date, trip.endDate!].map((date) => calculateDay(date, [trip], s));
+  const teil = (date: string) => tariffFor(s, date, "partial")!.amount;
+  const anreise = (date: string) => tariffFor(s, date, "arrival")!.amount;
+
+  it("Nachtfahrt 22:00–01:00 (3 Std.): keine Pauschale, nicht zwei An-/Abreisetage", () => {
+    const [a, b] = tage(base("22:00", "01:00", { endDate: "2026-07-15" }));
+    expect(a.allowanceBefore + b.allowanceBefore).toBe(0);
+    expect(a.absenceMinutes).toBe(180);
+    expect(a.reason).toMatch(/Über Mitternacht ohne Übernachtung.*Schwelle nicht überschritten/);
+    expect(b.reason).toMatch(/angesetzt am 14\.07\.2026/);
+  });
+  it("14:00–02:00 (12 Std., überwiegend am Abfahrtstag): eine Teilpauschale am Abfahrtstag", () => {
+    const [a, b] = tage(base("14:00", "02:00", { endDate: "2026-07-15" }));
+    expect(a.allowanceBefore).toBe(teil("2026-07-14"));
+    expect(a.absenceMinutes).toBe(720);
+    expect(b.allowanceBefore).toBe(0);
+  });
+  it("20:00–07:00 (11 Std., überwiegend am Folgetag): eine Teilpauschale am Rückkehrtag", () => {
+    const [a, b] = tage(base("20:00", "07:00", { endDate: "2026-07-15" }));
+    expect(a.allowanceBefore).toBe(0);
+    expect(b.allowanceBefore).toBe(teil("2026-07-15"));
+    expect(b.absenceMinutes).toBe(660);
+  });
+  it("gleich lang vor und nach Mitternacht: Abfahrtstag, mit Hinweis", () => {
+    const [a, b] = tage(base("19:00", "05:00", { endDate: "2026-07-15" }));
+    expect(a.allowanceBefore).toBe(teil("2026-07-14"));
+    expect(b.allowanceBefore).toBe(0);
+    expect(a.warnings.join(" ")).toMatch(/gleich lange abwesend/);
+  });
+  it("mit bestätigter Übernachtung: An- und Abreisetag wie bisher", () => {
+    const [a, b] = tage(base("22:00", "01:00", { endDate: "2026-07-15", overnight: true }));
+    expect(a.allowanceBefore).toBe(anreise("2026-07-14"));
+    expect(b.allowanceBefore).toBe(tariffFor(s, "2026-07-15", "departure")!.amount);
+  });
+  it("mehr als ein Datumswechsel ohne Bestätigung: Berechnung wie bisher", () => {
+    const [a] = tage(base("08:00", "17:00", { endDate: "2026-07-16" }));
+    expect(a.allowanceBefore).toBe(anreise("2026-07-14"));
+  });
+  it("Nachtfahrt und Tagesfahrt am selben Tag: Zeiten zählen zusammen", () => {
+    const tag = base("08:00", "12:00");
+    const nacht = base("20:00", "02:00", { endDate: "2026-07-15" });
+    const day = calculateDay("2026-07-14", [tag, nacht], s);
+    expect(day.absenceMinutes).toBe(240 + 360);
+    expect(day.allowanceBefore).toBe(teil("2026-07-14"));
+    expect(calculateDay("2026-07-15", [nacht], s).allowanceBefore).toBe(0);
+  });
+  it("mit manueller Abwesenheitskorrektur: Berechnung wie bisher (An-/Abreisetag)", () => {
+    const [a, b] = tage(base("22:00", "01:00", { endDate: "2026-07-15", manualAbsenceMinutes: 0 }));
+    expect(a.allowanceBefore).toBe(anreise("2026-07-14"));
+    expect(b.allowanceBefore).toBe(tariffFor(s, "2026-07-15", "departure")!.amount);
+  });
+  it("24 Stunden und mehr über Mitternacht ohne Übernachtung: nur die Teilpauschale", () => {
+    for (const [start, end] of [["08:00", "08:00"], ["01:00", "23:00"]]) {
+      const [a, b] = tage(base(start, end, { endDate: "2026-07-15" }));
+      expect(a.allowanceBefore + b.allowanceBefore).toBe(teil("2026-07-14"));
+      expect([a, b].some((d) => d.allowanceBefore === tariffFor(s, d.date, "full")!.amount && d.allowanceBefore !== teil(d.date))).toBe(false);
+    }
+  });
+  it("am nicht angesetzten Tag echte Zeiten statt 00:00–23:59", () => {
+    const [a, b] = tage(base("22:00", "01:00", { endDate: "2026-07-15" }));
+    expect([a.firstStart, a.lastEnd]).toEqual(["22:00", "01:00"]);
+    expect([b.firstStart, b.lastEnd]).toEqual(["00:00", "01:00"]);
+    const [c, d] = tage(base("20:00", "07:00", { endDate: "2026-07-15" }));
+    expect([c.firstStart, c.lastEnd]).toEqual(["20:00", "23:59"]);
+    expect([d.firstStart, d.lastEnd]).toEqual(["20:00", "07:00"]);
+  });
+  it("Monatswechsel: Nacht 31.07.–01.08. zählt einmal", () => {
+    const nacht = { ...base("15:00", "03:00", { endDate: "2026-08-01" }), date: "2026-07-31" };
+    expect(calculateDay("2026-07-31", [nacht], s).allowanceBefore).toBe(teil("2026-07-31"));
+    expect(calculateDay("2026-08-01", [nacht], s).allowanceBefore).toBe(0);
+  });
+});
