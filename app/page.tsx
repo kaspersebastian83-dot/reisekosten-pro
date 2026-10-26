@@ -3473,6 +3473,10 @@ function Modal({
   /** Strg+Enter (macOS: ⌘+Enter) im Fenster. */
   onSubmitShortcut?: () => void;
 }) {
+  // Immer die aktuelle Fassung: Strg+Enter verlässt erst das Feld (z. B. „Händler“ übernimmt dabei die gelernte Regel)
+  // und speichert nach dem Neuzeichnen – sonst ginge der Stand von vor dem Verlassen des Felds ins Speichern.
+  const submitRef = useRef(onSubmitShortcut);
+  submitRef.current = onSubmitShortcut;
   return (
     <div
       className="modal-backdrop"
@@ -3483,7 +3487,12 @@ function Modal({
       <div
         className={wide ? "modal modal-wide" : "modal"}
         onKeyDown={onSubmitShortcut ? (e) => {
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); onSubmitShortcut(); }
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            const active = document.activeElement;
+            if (active instanceof HTMLElement && e.currentTarget.contains(active)) active.blur();
+            setTimeout(() => submitRef.current?.(), 0);
+          }
         } : undefined}
       >
         <header>

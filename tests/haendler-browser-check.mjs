@@ -110,6 +110,19 @@ try {
       await editor.getByRole('button', { name: 'Abbrechen', exact: true }).click(); await editor.waitFor({ state: 'detached' });
     });
 
+    await check(`${viewport.width}: Strg+Enter direkt aus dem Feld „Händler“ speichert mit der Regel des Händlers`, async () => {
+      const field = await openCost();
+      await editor.getByLabel('Datum', { exact: true }).fill('2026-10-07');
+      await editor.getByLabel('Beschreibung', { exact: true }).fill('Brötchen Strg Enter');
+      await editor.getByLabel('Brutto (€)', { exact: true }).fill('3.21');
+      await field.fill('Bäckerei Müller');
+      await page.keyboard.press('Control+Enter');
+      const s = await until(async () => { const v = await storedState(page); return v.expenses.some((e) => e.description === 'Brötchen Strg Enter') ? v : null; }, 'gespeichert');
+      const saved = s.expenses.find((e) => e.description === 'Brötchen Strg Enter');
+      assert.equal(saved.merchant, 'Bäckerei Müller'); assert.equal(saved.vatRate, 7, 'Regel vor dem Speichern übernommen'); assert.equal(saved.category, 'sonstige Nebenkosten');
+      if (await editor.count()) { await editor.getByRole('button', { name: 'Abbrechen', exact: true }).click(); await editor.waitFor({ state: 'detached' }); }
+    });
+
     await check(`${viewport.width}: Belegfoto-Eingang: Liste auch dort; zweiter gewählter Händler ersetzt die Vorgaben des ersten`, async () => {
       await context.route(/https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());   // Texterkennung offline: Eingabe von Hand
       await nav('Monatsübersicht');
