@@ -119,7 +119,8 @@ const withoutFileIds = (state: AppState): AppState => {
 };
 /** Fingerabdruck wie bis SpesenKit 1.8 (Bilder eingebettet). Für den Bestand im Browser werden die Bilder eingesetzt. */
 export async function legacyStateHash(state: AppState) {
-  const inline = withoutFileIds(await withAllReceiptImages(state));
+  // Nicht streng: fehlt ein Bild, passt der alte Fingerabdruck ohnehin nicht – dann entscheidet der Abgleich wie bisher.
+  const inline = withoutFileIds(await withAllReceiptImages(state, { strict: false }));
   return sha256(stableValue(normalizeState(JSON.parse(JSON.stringify(inline)) as AppState, { detach: false })));
 }
 /** Fingerabdruck einer Format-1-Datei wie bis SpesenKit 1.8 (aus dem unveränderten Dateiinhalt). */
@@ -297,8 +298,15 @@ export async function writeReceiptFiles(root: DirHandleLike, state: AppState) {
     const written = await (await dir.getFileHandle(id)).getFile();
     if (written.size !== undefined && written.size !== file.bytes.length) throw new FolderError("verify", `Das Belegbild „${id}“ wurde nicht vollständig gespeichert. Bitte erneut versuchen.`);
   }
+  // Kein Verweis ins Leere: Fehlt ein Bild hier UND im Ordner, wird keine Datei geschrieben, die darauf verweist.
+  if (unavailable.length) {
+    const names = unavailable.map((id) => receiptName(state, id));
+    throw new FolderError("write", `${names.length === 1 ? `Das Belegbild „${names[0]}“ fehlt` : `${names.length} Belegbilder (z. B. „${names[0]}“) fehlen`} in diesem Browser und im SpesenKit-Ordner. Es wurde nichts gespeichert, das darauf verweist. Bitte den Ordner verbinden, in dem die Belege liegen, und erneut speichern.`);
+  }
   return unavailable;
 }
+const receiptName = (state: AppState, fileId: string) => [...state.expenses, ...state.receiptInbox, ...state.statements.flatMap((s) => s.expensesSnapshot || [])]
+  .map((item) => item.receipt).find((receipt) => receipt?.fileId === fileId)?.name || fileId;
 
 /**
  * Bilder, die nur im Ordner liegen (z. B. auf einem anderen Rechner erfasst), in den Browser übernehmen –

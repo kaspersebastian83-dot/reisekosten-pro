@@ -19,6 +19,8 @@ Rückmeldung aus dem Einsatz: Nach dem Monatsabschluss hing die App 10–15 Seku
 - **Andere Rechner:** Bilder, die nur im Ordner liegen, werden beim Abgleich im Hintergrund in den Browser übernommen
   und sonst beim Anzeigen direkt aus dem Ordner gelesen.
 - „JSON-Sicherung herunterladen“ enthält weiterhin alle Bilder (für sich allein vollständig).
+- Fehlt ein Belegbild auf diesem Gerät und im Ordner, entstehen keine unvollständigen Dateien: PDF, ZIP und JSON-Sicherung
+  brechen mit klarer Meldung ab; in den Ordner wird nichts geschrieben, das auf ein fehlendes Bild verweist (Codex-Review).
 - Ablage nach dem Abschluss: die PDF wird nur noch einmal erzeugt (das ZIP verwendet dieselbe).
 - Nicht mehr verwendete Bilder im Browser werden nach 7 Tagen entfernt; im Ordner bleiben sie.
 - Tests: `receipt-images.test.ts` (Fingerabdruck, einmal speichern, Ordnerdateien, anderer Rechner, ZIP, JSON-Sicherung,

@@ -197,22 +197,42 @@ export async function receiptDataUrl(receipt?: Receipt): Promise<string> {
   return fromFolder;
 }
 
-const withImage = async <T extends { receipt?: Receipt }>(item: T): Promise<T> =>
-  item.receipt && !item.receipt.dataUrl && item.receipt.fileId ? { ...item, receipt: { ...item.receipt, dataUrl: await receiptDataUrl(item.receipt) } } : item;
+/** Ein verwiesenes Belegbild ist weder hier noch im Browser noch im (erreichbaren) SpesenKit-Ordner vorhanden. */
+export class MissingReceiptImageError extends Error {
+  constructor(public names: string[]) {
+    super(`${names.length === 1 ? `Das Belegbild „${names[0]}“ ist` : `${names.length} Belegbilder (z. B. „${names[0]}“) sind`} auf diesem Gerät nicht verfügbar. Bitte den SpesenKit-Ordner verbinden bzw. den Zugriff bestätigen und erneut versuchen – es wurde keine unvollständige Datei erzeugt.`);
+    this.name = "MissingReceiptImageError";
+  }
+}
+/** strict: fehlende Bilder sammeln und am Ende melden, statt eine unvollständige Datei zu erzeugen. */
+type Hydration = { strict: boolean; missing: string[] };
+const withImage = (run: Hydration) => async <T extends { receipt?: Receipt }>(item: T): Promise<T> => {
+  if (!item.receipt || item.receipt.dataUrl || !item.receipt.fileId) return item;
+  const dataUrl = await receiptDataUrl(item.receipt);
+  if (!dataUrl && run.strict) run.missing.push(item.receipt.name || item.receipt.fileId);
+  return { ...item, receipt: { ...item.receipt, dataUrl } };
+};
+const finish = <T>(run: Hydration, value: T) => {
+  if (run.missing.length) throw new MissingReceiptImageError([...new Set(run.missing)]);
+  return value;
+};
 
-/** Für PDF/ZIP: Bilder der Kosten eines Monats (oder aller Kosten) einsetzen. Fehlt ein Bild, bleibt es leer. */
-export async function withReceiptImages(state: AppState, month?: string): Promise<AppState> {
-  const expenses = await Promise.all(state.expenses.map((expense) => !month || expense.date.startsWith(month) ? withImage(expense) : expense));
-  return { ...state, expenses };
+/** Für PDF/ZIP: Bilder der Kosten eines Monats (oder aller Kosten) einsetzen. Fehlt eines, Fehler statt unvollständiger Datei. */
+export async function withReceiptImages(state: AppState, month?: string, options: { strict?: boolean } = {}): Promise<AppState> {
+  const run: Hydration = { strict: options.strict ?? true, missing: [] };
+  const expenses = await Promise.all(state.expenses.map((expense) => !month || expense.date.startsWith(month) ? withImage(run)(expense) : expense));
+  return finish(run, { ...state, expenses });
 }
 /** Für die JSON-Sicherung: alle Bilder eingebettet, damit die Datei für sich allein vollständig ist. */
-export async function withAllReceiptImages(state: AppState): Promise<AppState> {
+export async function withAllReceiptImages(state: AppState, options: { strict?: boolean } = {}): Promise<AppState> {
+  const run: Hydration = { strict: options.strict ?? true, missing: [] };
+  const fill = withImage(run);
   const [expenses, receiptInbox, statements] = await Promise.all([
-    Promise.all(state.expenses.map(withImage)),
-    Promise.all(state.receiptInbox.map(withImage)),
-    Promise.all(state.statements.map(async (snapshot) => snapshot.expensesSnapshot ? { ...snapshot, expensesSnapshot: await Promise.all(snapshot.expensesSnapshot.map(withImage)) } : snapshot)),
+    Promise.all(state.expenses.map(fill)),
+    Promise.all(state.receiptInbox.map(fill)),
+    Promise.all(state.statements.map(async (snapshot) => snapshot.expensesSnapshot ? { ...snapshot, expensesSnapshot: await Promise.all(snapshot.expensesSnapshot.map(fill)) } : snapshot)),
   ]);
-  return { ...state, expenses, receiptInbox, statements };
+  return finish(run, { ...state, expenses, receiptInbox, statements });
 }
 
 /**

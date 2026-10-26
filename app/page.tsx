@@ -72,7 +72,7 @@ import { cleanContext, duplicateMessage, linkingErrors, paymentLabel, paymentPay
 import { buildAnnualAnalysis } from "../lib/annual-reports";
 import { jpegName, readReceiptFile, rotateReceiptImage } from "../lib/receipt-file";
 import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel, useReceiptDataUrl } from "./receipt-link-fields";
-import { detachReceipts, pruneReceiptImages } from "../lib/receipt-images";
+import { MissingReceiptImageError, detachReceipts, pruneReceiptImages } from "../lib/receipt-images";
 import { MonthWorkspace } from "./month-workspace";
 import { StatementClosing } from "./statement-closing";
 import { StatementChanges } from "./statement-changes";
@@ -434,7 +434,7 @@ export default function Home() {
         <UpdateNotice canUpdate={canUpdate} prepare={setUpdatePreparing} />
         {saveError && <div className="error-box" role="alert">
           <p>{saveError}</p>
-          <button onClick={() => void exportBackup(state).catch(() => notify("JSON-Sicherung konnte nicht erstellt werden."))}>JSON-Sicherung herunterladen</button>
+          <button onClick={() => void exportBackup(state).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "JSON-Sicherung konnte nicht erstellt werden."))}>JSON-Sicherung herunterladen</button>
           <button onClick={() => setSaveRetry((n) => n + 1)}>Speichern erneut versuchen</button>
         </div>}
         <FolderBanner folder={folder} openBackup={() => navigate("Datensicherung")} />
@@ -2426,7 +2426,7 @@ function Statements({
     if (pdfBusy.current) return;
     pdfBusy.current = true; setPdfWorking(true);
     try { await (print ? printPdf : exportPdf)(statement, exportState, number, exportContext); }
-    catch { notify("Die PDF konnte nicht erstellt werden. Bitte erneut versuchen; die Abrechnung bleibt gespeichert."); }
+    catch (error) { notify(error instanceof MissingReceiptImageError ? error.message : "Die PDF konnte nicht erstellt werden. Bitte erneut versuchen; die Abrechnung bleibt gespeichert."); }
     finally { pdfBusy.current = false; setPdfWorking(false); }
   };
   const usedVehicles = [
@@ -2725,7 +2725,7 @@ function Statements({
             <FileSpreadsheet />
             DATEV-CSV
           </button>
-          <button onClick={() => exportZip(statement, exportState, number, exportContext)}>
+          <button onClick={() => void exportZip(statement, exportState, number, exportContext).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "Das ZIP konnte nicht erstellt werden. Bitte erneut versuchen."))}>
             <Archive />
             ZIP + Belege
           </button>
@@ -3330,7 +3330,7 @@ function Backup({
           Exportiert Fahrten, Kosten, Belege, Regeln, Importprofile und
           abgeschlossene Abrechnungen als JSON.
         </p>
-        <button className="primary" onClick={() => void exportBackup(state).catch(() => notify("JSON-Sicherung konnte nicht erstellt werden."))}>
+        <button className="primary" onClick={() => void exportBackup(state).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "JSON-Sicherung konnte nicht erstellt werden."))}>
           <Download size={18} />
           Sicherung herunterladen
         </button>

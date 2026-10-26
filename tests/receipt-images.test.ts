@@ -8,7 +8,7 @@ import {
   stateHash, translateLegacyLink, writeDataFile,
 } from "../lib/folder-store";
 import {
-  detachReceipts, forgetSessionReceiptImages, hasEmbeddedImages, receiptDataUrl, receiptFileId, receiptIdentity, referencedFileIds,
+  MissingReceiptImageError, detachReceipts, forgetSessionReceiptImages, hasEmbeddedImages, receiptDataUrl, receiptFileId, receiptIdentity, referencedFileIds,
   withAllReceiptImages, withReceiptImages,
 } from "../lib/receipt-images";
 import { normalizeState } from "../lib/storage";
@@ -123,6 +123,26 @@ describe("Belegbilder im SpesenKit-Ordner", () => {
     const archived = Object.keys(zip.files).filter((name) => name.startsWith("Belege/") && name.endsWith("beleg0_r0.jpg"));
     expect(archived).toHaveLength(1);
     expect(Buffer.from(await zip.file(archived[0])!.async("uint8array")).equals(bytesOf(image))).toBe(true);
+  });
+
+  it("fehlt ein Bild überall: PDF/ZIP und JSON-Sicherung brechen mit klarer Meldung ab, statt unvollständig zu sein", async () => {
+    const state = normalizeState(legacyState());
+    forgetSessionReceiptImages();                                  // Bild weder hier noch im Browser noch im Ordner
+    const data = buildStatement(state, "2026-07");
+    await expect(zipFile(data, state, "RK-1")).rejects.toBeInstanceOf(MissingReceiptImageError);
+    await expect(withReceiptImages(state, "2026-07")).rejects.toThrow(/r0\.jpg|Belegbilder/);
+    await expect(withAllReceiptImages(state)).rejects.toThrow("es wurde keine unvollständige Datei erzeugt");
+    const lenient = await withAllReceiptImages(state, { strict: false });   // nur für den Fingerabdruck-Übergang
+    expect(lenient.expenses.find((e) => e.id === "beleg0")!.receipt!.dataUrl).toBe("");
+  });
+
+  it("Ordner: fehlt ein Bild hier und im Ordner, wird keine Datei mit Verweis darauf geschrieben", async () => {
+    const root = new FakeDir(FOLDER_NAME);
+    const state = normalizeState(legacyState());
+    forgetSessionReceiptImages();
+    await expect(writeDataFile(root, state, 0)).rejects.toMatchObject({ code: "write", message: expect.stringContaining("r0.jpg") });
+    expect(root.file(DATA_DIR, DATA_FILE)).toBeUndefined();
+    expect([...(root.dirs.get("Sicherungen")?.files.keys() || [])]).toEqual([]);
   });
 
   it("JSON-Sicherung bleibt für sich vollständig: alle Bilder eingebettet", async () => {
