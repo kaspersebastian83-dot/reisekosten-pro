@@ -986,6 +986,9 @@ function ReceiptCapture({
                     <i>
                       <em style={{ width: `${progress}%` }} />
                     </i>
+                    {/* Speichern wartet auf die Erkennung (sonst gingen erkannte Felder und das aufrecht gedrehte Foto verloren).
+                        Hängt sie, lässt sie sich abbrechen und der Beleg von Hand erfassen. */}
+                    <button type="button" className="link" onClick={() => { scanRevision.current++; setScanning(false); setScanError("Erkennung abgebrochen. Den Beleg bitte von Hand ergänzen."); }}>Erkennung abbrechen</button>
                   </div>
                 </div>
               )}
@@ -1086,7 +1089,7 @@ function ReceiptCapture({
         )}
         {receipt && (
           <footer>
-            <button className="ghost" onClick={saveInbox} disabled={readingReceipt}>
+            <button className="ghost" onClick={saveInbox} disabled={scanning || readingReceipt} title={scanning ? "Erst nach der Texterkennung – oder „Erkennung abbrechen“" : undefined}>
               <Inbox size={17} />
               Nur im Eingang speichern
             </button>
