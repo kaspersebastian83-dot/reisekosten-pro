@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
+import { databases, storedState } from './helpers/browser-state.mjs';
 const require = createRequire(import.meta.url);
 const engines = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const engine = process.env.BROWSER_ENGINE || 'chromium';
@@ -22,7 +23,7 @@ const server = http.createServer(async (req,res) => {
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const url=`http://127.0.0.1:${server.address().port}/reisekosten-pro/`;
-const state=page=>page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('reisekosten-pro',1);request.onsuccess=()=>{const db=request.result;const tx=db.transaction('state');const r=tx.objectStore('state').get('main');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);tx.oncomplete=()=>db.close();};request.onerror=()=>reject(request.error);}));
+const state=page=>storedState(page);   // Belegbilder aus der Bilddatenbank wieder eingesetzt (seit 1.9 getrennt gespeichert)
 const waitState=async(page,fn)=>{for(let i=0;i<60;i++){const s=await state(page);if(s&&fn(s))return s;await page.waitForTimeout(100);}throw Error('Saved state condition timed out');};
 // SpesenKit 1.8.1: „Bisher: …“ im Feld „Verwendetes Fahrzeug“ ließ schon im einzelnen Tab jedes weitere Speichern
 // SpesenKit 1.8.3: Belegfotos werden beim Erfassen verkleinert (längste Seite ≤ 2000 px, JPEG); PDFs bleiben unverändert.

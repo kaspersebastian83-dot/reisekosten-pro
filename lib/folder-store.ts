@@ -1,7 +1,8 @@
 import { emptyState } from "./config";
 import { stableValue } from "./statement-comparison";
 import { normalizeState } from "./storage";
-import type { AppState } from "./types";
+import { FILE_ID, dataUrlFile, fileDataUrl, localReceiptImage, persistReceiptImages, referencedFileIds, rememberReceiptImage, withAllReceiptImages } from "./receipt-images";
+import type { AppState, Receipt } from "./types";
 
 /*
  * Persönlicher SpesenKit-Ordner (z. B. im Mitarbeiterordner auf dem Terminalserver).
@@ -9,6 +10,11 @@ import type { AppState } from "./types";
  *   <gewählter Ordner>/SpesenKit/Daten/spesenkit.json         aktueller, maßgeblicher Datenbestand
  *   <gewählter Ordner>/SpesenKit/Daten/spesenkit.vorher.json  Stand vor dem letzten Schreiben
  *   <gewählter Ordner>/SpesenKit/Sicherungen/*.json           Kopien bei Konflikten (Format der JSON-Sicherung)
+ *   <gewählter Ordner>/SpesenKit/Belege/<Fingerabdruck>.jpg   Belegbilder, je Inhalt einmal (ab Format 2, nie automatisch gelöscht)
+ *
+ * Ab Format 2 enthalten Datendatei und Sicherungen nur Verweise auf die Belegbilder (lib/receipt-images.ts). Die Bilder
+ * werden vor jeder Datei geschrieben, die auf sie verweist. Ältere SpesenKit-Versionen lehnen Format 2 ab
+ * („bitte SpesenKit aktualisieren“) und überschreiben die Datei nicht.
  *
  * Die IndexedDB „reisekosten-pro“ bleibt unverändert (Name, Version, Store, Schlüssel) und dient als
  * Arbeitsspeicher. Vor dem Ersetzen werden Speicherkandidat und gelesener Ausgangsstand unter eindeutigen
@@ -21,12 +27,15 @@ export const DATA_FILE = "spesenkit.json";
 export const PREVIOUS_FILE = "spesenkit.vorher.json";
 export const COPY_DIR = "Sicherungen";
 export const FILING_DIR = "Spesen";
+export const RECEIPT_DIR = "Belege";
 export const FILE_FORMAT = "spesenkit-daten";
-export const FILE_FORMAT_VERSION = 1;
+export const FILE_FORMAT_VERSION = 2;
+/** Lesbar: Format 1 (Bilder eingebettet) und Format 2 (Bilder unter Belege/). */
+const READABLE_FORMATS = [1, 2];
 
 type Permission = "granted" | "denied" | "prompt";
 export interface WritableLike { write(data: string | Blob): Promise<void>; close(): Promise<void>; abort?(): Promise<void> }
-export interface FileHandleLike { kind?: "file"; name?: string; getFile(): Promise<{ text(): Promise<string>; size?: number }>; createWritable(): Promise<WritableLike> }
+export interface FileHandleLike { kind?: "file"; name?: string; getFile(): Promise<{ text(): Promise<string>; size?: number; arrayBuffer?(): Promise<ArrayBuffer> }>; createWritable(): Promise<WritableLike> }
 export interface DirHandleLike {
   kind?: "directory";
   name: string;
@@ -48,8 +57,8 @@ export interface FolderFileContent {
 }
 export interface FolderFile { content: FolderFileContent; state: AppState; hash: string; text: string }
 /** Pro Browserprofil gespeichert (gemeinsame Datenbank „mosaik-suite“): welcher Ordner, welcher Dateistand zuletzt abgeglichen. */
-export interface FolderLink { handle: DirHandleLike; revision: number; hash: string; savedAt?: string; /** Anzeige, z. B. „Max Mustermann\SpesenKit“. */ label?: string; /** Formate für die automatische Ablage nach dem Abschluss. */ filing?: Partial<Record<"pdf" | "xlsx" | "zip", boolean>> }
-export interface WriteResult { revision: number; hash: string; savedAt: string }
+export interface FolderLink { handle: DirHandleLike; revision: number; hash: string; /** 2: Fingerabdruck mit Bildverweisen (ab SpesenKit 1.9). Fehlt: noch mit eingebetteten Bildern berechnet. */ hashFormat?: 2; savedAt?: string; /** Anzeige, z. B. „Max Mustermann\SpesenKit“. */ label?: string; /** Formate für die automatische Ablage nach dem Abschluss. */ filing?: Partial<Record<"pdf" | "xlsx" | "zip", boolean>> }
+export interface WriteResult { revision: number; hash: string; savedAt: string; hashFormat: 2 }
 
 export type FolderErrorCode = "invalid" | "conflict" | "permission" | "read" | "write" | "verify";
 export class FolderError extends Error {
@@ -99,6 +108,38 @@ async function sha256(text: string) {
 export async function stateHash(state: AppState) {
   return sha256(stableValue(normalizeState(JSON.parse(JSON.stringify(state)) as AppState)));
 }
+
+/* Übergang von Format 1: Ältere SpesenKit-Versionen haben den Fingerabdruck über den Bestand MIT eingebetteten Bildern
+ * berechnet. Damit der erste Abgleich nach dem Update keinen Scheinkonflikt meldet, wird der gespeicherte alte
+ * Fingerabdruck einmal mit dem gleichen Inhalt in neuer Form verglichen und übersetzt. */
+const withoutFileIds = (state: AppState): AppState => {
+  const strip = <T extends { receipt?: Receipt }>(item: T): T => item.receipt?.fileId ? { ...item, receipt: (({ fileId: _drop, ...rest }) => rest)(item.receipt) } : item;
+  return { ...state, expenses: state.expenses.map(strip), receiptInbox: state.receiptInbox.map(strip),
+    statements: state.statements.map((snapshot) => snapshot.expensesSnapshot ? { ...snapshot, expensesSnapshot: snapshot.expensesSnapshot.map(strip) } : snapshot) };
+};
+/** Fingerabdruck wie bis SpesenKit 1.8 (Bilder eingebettet). Für den Bestand im Browser werden die Bilder eingesetzt. */
+export async function legacyStateHash(state: AppState) {
+  // Nicht streng: fehlt ein Bild, passt der alte Fingerabdruck ohnehin nicht – dann entscheidet der Abgleich wie bisher.
+  const inline = withoutFileIds(await withAllReceiptImages(state, { strict: false }));
+  return sha256(stableValue(normalizeState(JSON.parse(JSON.stringify(inline)) as AppState, { detach: false })));
+}
+/** Fingerabdruck einer Format-1-Datei wie bis SpesenKit 1.8 (aus dem unveränderten Dateiinhalt). */
+export async function legacyFileHash(file: FolderFile) {
+  if (file.content.formatVersion !== 1) return null;
+  return sha256(stableValue(normalizeState(JSON.parse(JSON.stringify(file.content.state)) as AppState, { detach: false })));
+}
+/**
+ * Übersetzt einen alten Fingerabdruck der Verknüpfung (vor 1.9) einmal in die neue Form – nur, wenn eindeutig ist,
+ * welcher Inhalt gemeint war (unveränderter Browserstand oder unveränderte Format-1-Datei). Sonst bleibt er, und der
+ * Abgleich behandelt den Fall wie bisher (im Zweifel als Konflikt, den der Benutzer entscheidet).
+ */
+export async function translateLegacyLink<L extends Pick<FolderLink, "hash" | "hashFormat">>(link: L, local: AppState, file: FolderFile | null): Promise<L> {
+  if (!link.hash || link.hashFormat === 2) return link;
+  let hash = link.hash;
+  if (await legacyStateHash(local) === link.hash) hash = await stateHash(local);
+  else if (file && await legacyFileHash(file) === link.hash) hash = file.hash;
+  return { ...link, hash, hashFormat: 2 };
+}
 export function isEmptyState(state: AppState) {
   return (["trips", "expenses", "receiptInbox", "merchantRules", "profiles", "statements", "changes"] as const).every((key) => !state[key]?.length)
     && stableValue(state.settings) === stableValue(emptyState.settings);
@@ -124,7 +165,7 @@ async function parseDataFileText(text: string): Promise<FolderFile> {
   let parsed: Partial<FolderFileContent>;
   try { parsed = JSON.parse(text); } catch { throw invalid("keine lesbare JSON-Datei"); }
   if (!parsed || typeof parsed !== "object" || parsed.format !== FILE_FORMAT) throw invalid("keine SpesenKit-Datendatei");
-  if (parsed.formatVersion !== FILE_FORMAT_VERSION) throw invalid(`in einem unbekannten Format (Version ${String(parsed.formatVersion)}) gespeichert – bitte SpesenKit aktualisieren`);
+  if (!READABLE_FORMATS.includes(parsed.formatVersion as number)) throw invalid(`in einem unbekannten Format (Version ${String(parsed.formatVersion)}) gespeichert – bitte SpesenKit aktualisieren`);
   if (!Number.isInteger(parsed.revision) || parsed.revision! < 1 || typeof parsed.savedAt !== "string") throw invalid("unvollständig (Revision oder Speicherzeit fehlt)");
   if (!parsed.state || typeof parsed.state !== "object") throw invalid("ohne Datenbestand gespeichert");
   let state: AppState;
@@ -207,7 +248,7 @@ export async function writeDataFile(root: DirHandleLike, state: AppState, expect
   if (current && options.staleCopies && current.hash === options.staleCopies.hash) {
     for (const name of options.staleCopies.names) await removeFile(root, [COPY_DIR], name).catch(() => undefined);
   }
-  return { revision: content.revision, hash: await stateHash(snapshot), savedAt: content.savedAt };
+  return { revision: content.revision, hash: await stateHash(snapshot), savedAt: content.savedAt, hashFormat: 2 };
 }
 const copyName = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
@@ -228,7 +269,70 @@ async function writeVerifiedCopy(root: DirHandleLike, label: string, text: strin
 /** Geprüfte Kopie im bestehenden JSON-Sicherungsformat. Kandidaten und Vorgänger: siehe staleCopies und copiesToPrune. */
 export async function writeSafetyCopy(root: DirHandleLike, label: string, state: AppState, now = new Date()) {
   const snapshot = normalizeState(JSON.parse(JSON.stringify(state)) as AppState);
+  // Auch jede Sicherung verweist nur auf Bilder: diese zuerst ablegen (vorhandene werden übersprungen).
+  await writeReceiptFiles(root, snapshot);
   return writeVerifiedCopy(root, label, JSON.stringify(snapshot, null, 2), now);
+}
+
+/**
+ * Legt fehlende Belegbilder unter SpesenKit/Belege/<fileId> ab (Quelle: diese Sitzung oder der Browser).
+ * Vorhandene Dateien werden nie überschrieben; der Dateiname ist der Fingerabdruck des Inhalts.
+ * Ergebnis: Verweise, deren Bild weder im Ordner noch lokal vorhanden ist.
+ */
+export async function writeReceiptFiles(root: DirHandleLike, state: AppState) {
+  const ids = [...referencedFileIds(state)];
+  if (!ids.length) return [] as string[];
+  const dir = (await subDir(root, RECEIPT_DIR, true))!;
+  let present: Set<string> | null = null;
+  if (dir.values) {
+    present = new Set();
+    try { for await (const entry of dir.values()) if (entry.kind === "file") present.add(entry.name); }
+    catch (error) { throw accessError(error, `den Ordner „${RECEIPT_DIR}“`); }
+  }
+  const unavailable: string[] = [];
+  for (const id of ids) {
+    if (present ? present.has(id) : await fileExists(dir, id)) continue;   // Liste genügt: abgebrochene Schreibvorgänge hinterlassen keine Datei
+    const file = dataUrlFile(await localReceiptImage(id));
+    if (!file) { unavailable.push(id); continue; }
+    await writeText(dir, id, new Blob([file.bytes as BlobPart], { type: file.mime }));
+    const written = await (await dir.getFileHandle(id)).getFile();
+    if (written.size !== undefined && written.size !== file.bytes.length) throw new FolderError("verify", `Das Belegbild „${id}“ wurde nicht vollständig gespeichert. Bitte erneut versuchen.`);
+  }
+  // Kein Verweis ins Leere: Fehlt ein Bild hier UND im Ordner, wird keine Datei geschrieben, die darauf verweist.
+  if (unavailable.length) {
+    const names = unavailable.map((id) => receiptName(state, id));
+    throw new FolderError("write", `${names.length === 1 ? `Das Belegbild „${names[0]}“ fehlt` : `${names.length} Belegbilder (z. B. „${names[0]}“) fehlen`} in diesem Browser und im SpesenKit-Ordner. Es wurde nichts gespeichert, das darauf verweist. Bitte den Ordner verbinden, in dem die Belege liegen, und erneut speichern.`);
+  }
+  return unavailable;
+}
+const receiptName = (state: AppState, fileId: string) => [...state.expenses, ...state.receiptInbox, ...state.statements.flatMap((s) => s.expensesSnapshot || [])]
+  .map((item) => item.receipt).find((receipt) => receipt?.fileId === fileId)?.name || fileId;
+
+/**
+ * Bilder, die nur im Ordner liegen (z. B. auf einem anderen Rechner erfasst), in den Browser übernehmen –
+ * damit Belege auch ohne erreichbaren Ordner angezeigt und exportiert werden können. Ergebnis: Anzahl übernommen.
+ */
+export async function cacheFolderReceipts(root: DirHandleLike, state: AppState) {
+  let copied = 0;
+  for (const id of referencedFileIds(state)) {
+    if (await localReceiptImage(id)) continue;
+    const url = await readReceiptImage(root, id).catch(() => null);
+    if (url) { rememberReceiptImage(id, url); copied++; }
+  }
+  if (copied) await persistReceiptImages(state);
+  return copied;
+}
+
+/** Belegbild aus SpesenKit/Belege lesen; null, wenn es fehlt oder nicht zum Fingerabdruck passt. */
+export async function readReceiptImage(root: DirHandleLike, fileId: string, type?: string) {
+  if (!FILE_ID.test(fileId)) return null;
+  const dir = await subDir(root, RECEIPT_DIR, false);
+  if (!dir) return null;
+  try {
+    const file = await (await dir.getFileHandle(fileId)).getFile();
+    const buffer = file.arrayBuffer ? await file.arrayBuffer() : null;
+    return buffer ? fileDataUrl(fileId, new Uint8Array(buffer), type) : null;
+  } catch (error) { if (errorName(error) === "NotFoundError") return null; throw accessError(error, `„${fileId}“`); }
 }
 
 export type Reconcile =

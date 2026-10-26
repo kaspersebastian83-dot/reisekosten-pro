@@ -35,7 +35,7 @@ describe("SpesenKit-Ordner: Datei schreiben und lesen", () => {
     const written = await writeDataFile(root, state, 0, app, clock(1));
     expect(written.revision).toBe(1);
     const file = await readDataFile(root);
-    expect(file?.content).toMatchObject({ format: "spesenkit-daten", formatVersion: 1, revision: 1, app });
+    expect(file?.content).toMatchObject({ format: "spesenkit-daten", formatVersion: 2, revision: 1, app });
     expect(file?.hash).toBe(written.hash);
     expect(written.hash).toBe(await stateHash(state));
     expect(file?.state.trips.map((t) => t.id)).toEqual(state.trips.map((t) => t.id));

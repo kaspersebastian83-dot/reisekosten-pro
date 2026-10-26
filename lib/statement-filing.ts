@@ -21,6 +21,8 @@ export interface FilingInputs {
   state: AppState;
   number: string;
   context: StatementExportContext;
+  /** Einmal erzeugte PDF, die auch das ZIP enthält. */
+  sharedPdf?: () => Promise<{ name: string; blob: Blob }>;
 }
 export interface FilingReport { folder: string; written: string[]; existing: string[] }
 
@@ -51,18 +53,20 @@ export type FileBuilders = {
 export const exportBuilders: FileBuilders = {
   pdf: async (i) => pdfFile(i.data, i.state, i.number, i.context),
   xlsx: (i) => excelFile(i.data, i.state, i.context),
-  zip: (i) => zipFile(i.data, i.state, i.number, i.context),
+  zip: (i) => zipFile(i.data, i.state, i.number, i.context, i.sharedPdf?.()),
 };
 
 /** Legt die gewählten Formate einer abgeschlossenen Version ab. Erzeugt nur, was noch fehlt. */
 export async function fileStatement(root: DirHandleLike, state: AppState, snapshotId: string, formats: FilingFormats, builders: FileBuilders = exportBuilders): Promise<FilingReport> {
   const inputs = filingInputs(state, snapshotId);
+  let pdf: Promise<{ name: string; blob: Blob }> | undefined;
+  inputs.sharedPdf = () => (pdf ??= builders.pdf(inputs));
   const names = filingNames(inputs);
   const dir = await ensureDir(root, filingPath(inputs.data.month));
   const report: FilingReport = { folder: filingLabel(inputs.data.month), written: [], existing: [] };
   for (const format of order.filter((item) => formats[item])) {
     const result = await writeNewFile(dir, names[format], async () => {
-      const file = await builders[format](inputs);
+      const file = await (format === "pdf" ? inputs.sharedPdf!() : builders[format](inputs));
       if (file.name !== names[format]) throw new Error(`Unerwarteter Dateiname ${file.name}.`);
       return file.blob;
     });

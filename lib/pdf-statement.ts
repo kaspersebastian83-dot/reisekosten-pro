@@ -4,6 +4,7 @@ import autoTable, { type CellInput } from 'jspdf-autotable';
 import type { PDFDocument, PDFPage } from 'pdf-lib';
 import type { AppState, StatementData, Trip } from './types';
 import { receiptIndex, type ReceiptEntry } from './receipt-index';
+import { withReceiptImages } from './receipt-images';
 import { correctionExportNotice, statementAmountLabel, type StatementExportContext } from './export-context';
 
 const M = 17, W = 176, TOP = 34, BOTTOM = 274;
@@ -224,6 +225,8 @@ export function buildStatementPdf(data: StatementData, state: AppState, number: 
 /** Original-PDFs werden als Seiteninhalt eingebettet; Berechnung und Zustände werden nie verändert. */
 export async function statementPdfBytes(data: StatementData, state: AppState, number: string, context?: StatementExportContext, print = false): Promise<Uint8Array> {
   const { PDFDocument, degrees } = await import('pdf-lib');
+  // Belegbilder liegen getrennt vom Bestand: die des Monats für diese Datei einsetzen.
+  state = await withReceiptImages(state, data.month);
   const native = new Map<string, NativePdf>(), failed = new Set<string>();
   for (const entry of receiptIndex(data, state)) if (entry.expense.receipt && fileMime(entry) === 'application/pdf') {
     try {

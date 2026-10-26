@@ -116,7 +116,8 @@ describe('Monatsspezifischer Vergleich historischer Abschlüsse', () => {
   });
   it('bewahrt alte Backups und validiert das optionale Referenzreisefeld ohne Migration', () => {
     const state = fixture(); const old = structuredClone(state); delete old.statements[0].relatedTripsSnapshot;
-    expect(normalizeState(old).statements[0]).toEqual(old.statements[0]); expect(normalizeState(state).statements).toEqual(state.statements);
+    // Belegbilder werden beim Normalisieren herausgelöst (eigene Tests in receipt-images.test.ts); hier zählt die Struktur.
+    expect(normalizeState(old, { detach: false }).statements[0]).toEqual(old.statements[0]); expect(normalizeState(state, { detach: false }).statements).toEqual(state.statements);
     const invalid = structuredClone(state); invalid.statements[0].relatedTripsSnapshot = [ { id: 'malformed' } as Trip ]; expect(() => normalizeState(invalid)).toThrow('Ungültiges Datenformat');
   });
 });

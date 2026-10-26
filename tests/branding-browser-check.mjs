@@ -68,7 +68,8 @@ try {
     assert.deepEqual(await state(page),before);
     assert.equal(await page.evaluate(()=>localStorage.getItem('synthetic-existing-setting')),'keep');
     const databases=await page.evaluate(()=>indexedDB.databases());
-    assert.deepEqual(databases.map(db=>({name:db.name,version:db.version})),[{name:'reisekosten-pro',version:1}]);
+    // Seit 1.9 kann die Bilddatenbank „spesenkit-belege“ hinzukommen; der Bestand bleibt in „reisekosten-pro“ v1.
+    assert.deepEqual(databases.map(db=>({name:db.name,version:db.version})).filter(db=>db.name!=='spesenkit-belege'),[{name:'reisekosten-pro',version:1}]);
     assert.deepEqual(await page.evaluate(()=>new Promise(resolve=>{const r=indexedDB.open('reisekosten-pro');r.onsuccess=()=>{const db=r.result;resolve([...db.objectStoreNames]);db.close();};})),['state']);
     const manifest=await (await page.request.get(url+'manifest.webmanifest')).json();
     for(const key of ['id','scope','start_url'])assert.equal(manifest[key],oldManifest[key]);

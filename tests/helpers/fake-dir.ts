@@ -30,7 +30,8 @@ export class FakeDir implements DirHandleLike {
         await faults.beforeOperation?.(name, "read");
         if (faults.denyRead) throw new DOMException("denied", "NotAllowedError");
         const content = dir.files.get(name) ?? "";
-        return { text: async () => typeof content === "string" ? content : content.text(), size: typeof content === "string" ? content.length : content.size };
+        return { text: async () => typeof content === "string" ? content : content.text(), size: typeof content === "string" ? content.length : content.size,
+          arrayBuffer: async () => typeof content === "string" ? new TextEncoder().encode(content).buffer as ArrayBuffer : content.arrayBuffer() };
       },
       async createWritable() {
         let buffer: string | Blob = "";

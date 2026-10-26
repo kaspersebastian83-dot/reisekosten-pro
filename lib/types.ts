@@ -95,7 +95,10 @@ export interface Receipt {
   type: string;
   size: number;
   hash: string;
+  /** Eingebettetes Bild (ältere Stände, frisch erfasste Belege) – leer, sobald das Bild unter fileId gespeichert ist. */
   dataUrl: string;
+  /** Fingerabdruck der Bilddatei (SHA-256 + Endung), siehe lib/receipt-images.ts. */
+  fileId?: string;
 }
 
 // Optional receipt context; old backups need no migration or inferred defaults.

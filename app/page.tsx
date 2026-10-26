@@ -46,6 +46,7 @@ import type {
 import { emptyState, expenseCategories } from "../lib/config";
 import {
   loadState,
+  loadStateForApp,
   saveState,
   normalizeState,
   commitTripImport,
@@ -70,7 +71,8 @@ import { manualTripErrors, manualTripInterval, manualTripReviewNotes, projectPla
 import { cleanContext, duplicateMessage, linkingErrors, paymentLabel, paymentPayer, similarExpense, syncExpenseLink, validDate } from "../lib/receipt-linking";
 import { buildAnnualAnalysis } from "../lib/annual-reports";
 import { jpegName, readReceiptFile, rotateReceiptImage } from "../lib/receipt-file";
-import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel } from "./receipt-link-fields";
+import { PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tripLabel, useReceiptDataUrl } from "./receipt-link-fields";
+import { MissingReceiptImageError, detachReceipts, pruneReceiptImages } from "../lib/receipt-images";
 import { MonthWorkspace } from "./month-workspace";
 import { StatementClosing } from "./statement-closing";
 import { StatementChanges } from "./statement-changes";
@@ -280,11 +282,15 @@ export default function Home() {
 
   const readLocalState = () => {
     setLoadError("");
-    return loadState().then((s) => {
+    return loadStateForApp().then(({ state: s, embeddedImages }) => {
       lastSaved.current = s;
       // Einmalig: Belegbilder aus älteren Protokolleinträgen entfernen – wird wie jede Änderung gespeichert.
-      setState(slimChangeLog(s));
+      // Ältere Stände mit eingebetteten Belegbildern: einmal im neuen Format speichern (Bilder getrennt, Bestand klein).
+      const next = slimChangeLog(s);
+      setState(embeddedImages && next === s ? { ...s } : next);
       setReady(true);
+      // Nicht mehr verwendete Belegbilder im Browser aufräumen (nur ältere, siehe pruneReceiptImages).
+      if (!embeddedImages) void loadState().then((current) => pruneReceiptImages(current)).catch(() => undefined);
     }).catch((error: unknown) => {
       console.error("Lokale Daten konnten nicht geladen werden", error);
       setLoadError(error instanceof Error ? error.message : "Unbekannter Speicherfehler");
@@ -334,8 +340,9 @@ export default function Home() {
   });
   const notifyRef = useRef(notify); notifyRef.current = notify;
   // Belegbilder nie ins Änderungsprotokoll kopieren (siehe lib/change-log.ts).
+  // Neu erfasste Belegbilder werden sofort herausgelöst: im Bestand steht nur der Verweis (lib/receipt-images.ts).
   const update = (fn: (s: AppState) => AppState) =>
-    setState((s) => slimChangeLog(fn(structuredClone(s))));
+    setState((s) => detachReceipts(slimChangeLog(fn(structuredClone(s)))));
   const statement = useMemo(() => buildStatement(state, month), [state, month]);
   const monthStatus = useMemo(() => monthOverview(state, month), [state, month]);
   const issueCount =
@@ -427,7 +434,7 @@ export default function Home() {
         <UpdateNotice canUpdate={canUpdate} prepare={setUpdatePreparing} />
         {saveError && <div className="error-box" role="alert">
           <p>{saveError}</p>
-          <button onClick={() => exportBackup(state)}>JSON-Sicherung herunterladen</button>
+          <button onClick={() => void exportBackup(state).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "JSON-Sicherung konnte nicht erstellt werden."))}>JSON-Sicherung herunterladen</button>
           <button onClick={() => setSaveRetry((n) => n + 1)}>Speichern erneut versuchen</button>
         </div>}
         <FolderBanner folder={folder} openBackup={() => navigate("Datensicherung")} />
@@ -663,6 +670,7 @@ function ReceiptCapture({
 }) {
   const now = new Date().toISOString().slice(0, 10);
   const [receipt, setReceipt] = useState(initial?.receipt);
+  const receiptUrl = useReceiptDataUrl(receipt);
   const [suggestion, setSuggestionState] = useState<import("../lib/types").ReceiptSuggestion>(
     initial?.suggestion || {
       date: now.startsWith(month) ? now : `${month}-01`,
@@ -963,7 +971,7 @@ function ReceiptCapture({
               !receipt.type.includes("heic") ? (
                 // Data-URLs aus der lokalen IndexedDB benötigen keine Bildoptimierung.
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={receipt.dataUrl} alt="Fotografierter Beleg" />
+                <img src={receiptUrl || undefined} alt="Fotografierter Beleg" />
               ) : (
                 <div>
                   <ReceiptText size={40} />
@@ -2418,7 +2426,7 @@ function Statements({
     if (pdfBusy.current) return;
     pdfBusy.current = true; setPdfWorking(true);
     try { await (print ? printPdf : exportPdf)(statement, exportState, number, exportContext); }
-    catch { notify("Die PDF konnte nicht erstellt werden. Bitte erneut versuchen; die Abrechnung bleibt gespeichert."); }
+    catch (error) { notify(error instanceof MissingReceiptImageError ? error.message : "Die PDF konnte nicht erstellt werden. Bitte erneut versuchen; die Abrechnung bleibt gespeichert."); }
     finally { pdfBusy.current = false; setPdfWorking(false); }
   };
   const usedVehicles = [
@@ -2717,7 +2725,7 @@ function Statements({
             <FileSpreadsheet />
             DATEV-CSV
           </button>
-          <button onClick={() => exportZip(statement, exportState, number, exportContext)}>
+          <button onClick={() => void exportZip(statement, exportState, number, exportContext).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "Das ZIP konnte nicht erstellt werden. Bitte erneut versuchen."))}>
             <Archive />
             ZIP + Belege
           </button>
@@ -3322,7 +3330,7 @@ function Backup({
           Exportiert Fahrten, Kosten, Belege, Regeln, Importprofile und
           abgeschlossene Abrechnungen als JSON.
         </p>
-        <button className="primary" onClick={() => exportBackup(state)}>
+        <button className="primary" onClick={() => void exportBackup(state).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "JSON-Sicherung konnte nicht erstellt werden."))}>
           <Download size={18} />
           Sicherung herunterladen
         </button>
