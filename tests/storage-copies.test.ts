@@ -79,6 +79,26 @@ describe("Kopien je Speichervorgang im Ordner", () => {
   });
 });
 
+describe("Tagessicherung: Ordner nur einmal am Tag auflisten", () => {
+  it("merkt sich den Tag über den Ordnernamen, nicht über das Handle-Objekt", async () => {
+    const root = new FakeDir(FOLDER_NAME);
+    let listed = 0;
+    const counting = new Proxy(root, { get(target, prop, receiver) { if (prop === "getDirectoryHandle") listed++; const v = Reflect.get(target, prop, receiver); return typeof v === "function" ? v.bind(target) : v; } });
+    const memo = {};
+    const first = await dailyBackup(counting, demoState(), at("2026-10-26", "09:00:00"), undefined, Object.assign(memo, { forKey: "Basti\\SpesenKit" }));
+    expect(first.written).toBeTruthy();
+    listed = 0;
+    // Neues Handle-Objekt wie aus IndexedDB, gleicher Ordner: kein Auflisten mehr
+    const again = await dailyBackup(new Proxy(counting, {}), demoState(), at("2026-10-26", "15:00:00"), undefined, Object.assign(memo, { forKey: "Basti\\SpesenKit" }));
+    expect(again.written).toBeNull();
+    expect(listed).toBe(0);
+    await dailyBackup(new Proxy(counting, {}), demoState(), at("2026-10-26", "16:00:00"));
+    expect(listed, "ohne Merker wird gelistet (Gegenprobe)").toBeGreaterThan(0);
+    // Anderer Tag: wieder prüfen und sichern
+    expect((await dailyBackup(root, demoState(), at("2026-10-27"), undefined, Object.assign(memo, { forKey: "Basti\\SpesenKit" }))).written).toBeTruthy();
+  });
+});
+
 describe("Belegfotos verkleinern", () => {
   it("längste Seite höchstens 2000 Pixel, Seitenverhältnis bleibt, nie vergrößern", () => {
     expect(receiptTargetSize(4032, 3024)).toEqual({ width: 2000, height: 1500 });

@@ -63,12 +63,14 @@ export function useFolderStorage({ ready, committed, waitForLocal, adoptState, n
   /** Datendatei schreiben; beim ersten Speichern des Tages vorher den bisherigen Stand sichern (best effort). */
   /** Kopien des letzten eigenen Speicherns; beim nächsten bestätigten Speichern entbehrlich (siehe staleCopies). */
   const lastCopies = useRef<{ hash: string; names: string[] } | null>(null);
+  /** Tagessicherung heute schon vorhanden? Schlüssel: Ordnername der Verknüpfung (der Handle ist jedes Mal ein neues Objekt). */
+  const dailyMemo = useRef<{ key?: string; day?: string }>({});
   const writeFile = async (link: FolderLink, state: AppState, expected: number, options: { replaceInvalid?: boolean } = {}) => {
     let copies: string[] = [];
     const result = await writeDataFile(link.handle, state, expected, appRelease, new Date(), { expectedHash: link.hash || undefined, ...options,
       staleCopies: lastCopies.current || undefined, onCopies: (names) => { copies = names; },
       beforeReplace: async (current) => {
-        try { const result = await dailyBackup(link.handle, current.state); if (result.written) setBackupRun((n) => n + 1); setBackupNote(""); }
+        try { const result = await dailyBackup(link.handle, current.state, new Date(), undefined, Object.assign(dailyMemo.current, { forKey: linkName(link) })); if (result.written) setBackupRun((n) => n + 1); setBackupNote(""); }
         catch (error) { setBackupNote(`Tagessicherung konnte nicht angelegt werden: ${message(error)}`); }
       } });
     lastCopies.current = { hash: result.hash, names: copies };

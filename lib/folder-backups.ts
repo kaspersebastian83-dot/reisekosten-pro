@@ -77,16 +77,21 @@ export function copiesToPrune(entries: BackupEntry[], now: Date, days = COPY_RET
   return entries.filter((entry) => (entry.kind === "speicherkandidat" || entry.kind === "vor_speichern") && entry.date < limit).map((entry) => entry.name);
 }
 
-/** Pro Ordner: Tag der zuletzt vorhandenen Tagessicherung – erspart das Auflisten bei jedem Speichern. */
-const autoDone = new WeakMap<DirHandleLike, string>();
+/**
+ * Merker des Aufrufers: Für welchen Ordner (stabiler Schlüssel, z. B. Anzeigename der Verknüpfung) ist die
+ * Tagessicherung heute schon vorhanden? Erspart das Auflisten bei jedem Speichern. Der Ordner-Handle selbst taugt
+ * nicht als Schlüssel: Aus IndexedDB kommt bei jedem Lesen ein neues Objekt.
+ */
+export interface DailyBackupMemo { key?: string; day?: string }
 
 /** Tagessicherung des bisherigen Stands (falls heute noch keine), danach aufräumen. Ergebnis für die Anzeige. */
-export async function dailyBackup(root: DirHandleLike, previous: AppState, now = new Date(), policy = defaultRetention) {
-  if (autoDone.get(root) === localDate(now)) return { written: null as string | null, pruned: [] as string[] };
+export async function dailyBackup(root: DirHandleLike, previous: AppState, now = new Date(), policy = defaultRetention, memo?: DailyBackupMemo & { forKey: string }) {
+  const today = localDate(now), done = () => { if (memo) { memo.key = memo.forKey; memo.day = today; } };
+  if (memo && memo.key === memo.forKey && memo.day === today) return { written: null as string | null, pruned: [] as string[] };
   const entries = await listBackups(root);
-  if (!autoBackupDue(entries, now)) { autoDone.set(root, localDate(now)); return { written: null as string | null, pruned: [] as string[] }; }
+  if (!autoBackupDue(entries, now)) { done(); return { written: null as string | null, pruned: [] as string[] }; }
   const written = await writeSafetyCopy(root, "auto", previous, now);
-  autoDone.set(root, localDate(now));
+  done();
   const after = await listBackups(root);
   const pruned = [...backupsToPrune(after, now, policy), ...copiesToPrune(after, now)];
   for (const name of pruned) await removeFile(root, [COPY_DIR], name);
