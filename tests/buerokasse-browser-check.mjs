@@ -139,8 +139,20 @@ try {
 
     await page.reload(); await page.getByTestId('kassenstand').waitFor();
     assert.equal(await stand(page), '299,50 €', 'Modus und Kassenbuch bleiben nach dem Neuladen');
-    assert.deepEqual(errors.filter((e) => !/importScripts|tesseract/i.test(e)), []);
     console.log('PASS 390: Sicherung als Datei (ohne Teilen-Menü), Modus bleibt nach dem Neuladen');
+
+    // Haken „Ich führe die Bürokasse“ wieder wegnehmen – bleibt weg, auch nach dem Neuladen (Rückmeldung 27.10.)
+    await nav(page, 'Einstellungen');
+    await page.getByLabel('Ich führe die Bürokasse', { exact: false }).uncheck();
+    assert.deepEqual(await chip(page).getByRole('radio').allInnerTexts(), ['Außendienst', 'Innendienst']);
+    await page.waitForTimeout(500);
+    assert.equal(await page.getByLabel('Ich führe die Bürokasse', { exact: false }).isChecked(), false);
+    await page.reload(); await page.getByRole('heading', { name: 'Monatsübersicht', exact: true }).waitFor(); await page.waitForTimeout(500);
+    assert.deepEqual(await chip(page).getByRole('radio').allInnerTexts(), ['Außendienst', 'Innendienst']);
+    await kasseEinschalten(page);
+    assert.equal(await stand(page), '299,50 €', 'Kassenbuch bleibt beim Ausblenden erhalten');
+    assert.deepEqual(errors.filter((e) => !/importScripts|tesseract/i.test(e)), []);
+    console.log('PASS 390: Haken „Ich führe die Bürokasse“ lässt sich wieder entfernen, Kassenbuch bleibt');
   }
   // ---------- PC ----------
   {

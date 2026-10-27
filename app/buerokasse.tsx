@@ -34,13 +34,15 @@ async function kasseVorhanden() {
 export function useKasseModus() {
   const [sichtbar, setSichtbarState] = useState(() => lesen(SICHTBAR_KEY) === "1");
   const [modus, setModusState] = useState<Modus>(() => lesen(SICHTBAR_KEY) === "1" && lesen(MODUS_KEY) === "buerokasse" ? "buerokasse" : "spesen");
+  // Einmal beim Start: Gibt es schon ein Kassenbuch und wurde die Bürokasse nie bewusst ausgeblendet, sie anbieten
+  // (z. B. nach gelöschtem Browserspeicher). Ein abgewählter Haken („0“) bleibt abgewählt.
   useEffect(() => {
-    if (sichtbar) return;
-    void kasseVorhanden().then((da) => { if (da) { setSichtbarState(true); if (lesen(MODUS_KEY) === "buerokasse") setModusState("buerokasse"); } });
-  }, [sichtbar]);
+    if (lesen(SICHTBAR_KEY) !== null) return;
+    void kasseVorhanden().then((da) => { if (da && lesen(SICHTBAR_KEY) === null) { setSichtbarState(true); schreiben(SICHTBAR_KEY, "1"); } });
+  }, []);
   const setModus = useCallback((next: Modus) => { setModusState(next); schreiben(MODUS_KEY, next); }, []);
   const setSichtbar = useCallback((next: boolean) => {
-    setSichtbarState(next); schreiben(SICHTBAR_KEY, next ? "1" : null);
+    setSichtbarState(next); schreiben(SICHTBAR_KEY, next ? "1" : "0");
     if (!next) { setModusState("spesen"); schreiben(MODUS_KEY, "spesen"); }
   }, []);
   return { modus: sichtbar ? modus : "spesen" as Modus, setModus, sichtbar, setSichtbar };
