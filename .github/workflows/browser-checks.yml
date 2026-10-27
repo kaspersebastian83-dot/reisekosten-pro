@@ -17,7 +17,7 @@ concurrency:
 jobs:
   browser-checks:
     name: Browserprüfungen (chromium)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # fest: Playwright 1.56 unterstützt Ubuntu 26 (neues ubuntu-latest) noch nicht
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
