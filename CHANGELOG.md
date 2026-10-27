@@ -1,5 +1,12 @@
 # Release Notes
 
+## 1.11.1 – 27. Oktober 2026
+
+- **Haken „Ich führe die Bürokasse“ ließ sich nicht mehr entfernen:** Gab es auf dem Gerät schon ein Kassenbuch, schaltete
+  SpesenKit die Bürokasse sofort wieder ein. Jetzt bleibt der Haken weg (auch nach dem Neuladen); das Kassenbuch bleibt
+  gespeichert und ist nach erneutem Anhaken wieder da.
+- Browsercheck `buerokasse-browser-check.mjs`: Haken wegnehmen, neu laden, wieder anhaken.
+
 ## 1.11.0 – 27. Oktober 2026
 
 Rückmeldung aus dem Einsatz: Innendienst/Außendienst war nur in den Einstellungen zu finden, und die Büro-Barkasse
