@@ -2971,3 +2971,112 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .timeline-calc .calculation-details > summary { font-size: 11px; color: var(--muted); cursor: pointer; padding: 2px 0 4px; width: fit-content; }
 .timeline-calc .calculation-details > summary:hover { color: var(--green); }
 @media (max-width: 760px) { .workspace-inbox { padding: 10px 16px; } .timeline-calc { grid-column: 1 / -1; } }
+
+/* ---------- Arbeitsbereich: Außendienst · Innendienst · Bürokasse ---------- */
+.modus-chip { display: inline-flex; margin-left: auto; padding: 4px; gap: 3px; border-radius: 999px; background: var(--mint); border: 1px solid var(--line); flex: none; }
+.modus-chip button { border: 0; background: transparent; color: var(--ink); font-weight: 800; font-size: 14px; padding: 8px 14px; border-radius: 999px; min-height: 38px; white-space: nowrap; }
+.modus-chip button:hover { background: rgba(255, 255, 255, 0.7); }
+.modus-chip button.aktiv { background: var(--green); color: #fff; box-shadow: var(--shadow); }
+.modus-chip + .top-actions { margin-left: 16px; }
+.check-row { display: flex !important; flex-direction: row !important; gap: 10px; align-items: flex-start; }
+.check-row input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+.check-row span { display: grid; gap: 2px; }
+@media (max-width: 760px) {
+  .modus-chip { order: 3; width: 100%; margin: 4px 0 0; }
+  .modus-chip button { flex: 1; padding: 10px 6px; font-size: 15px; min-height: 44px; }
+  .modus-chip + .top-actions { margin-left: 0; }
+}
+
+/* ---------- Bürokasse: groß und einfach ---------- */
+.kasse { display: grid; gap: 16px; font-size: 17px; max-width: 920px; }
+.kasse .card { margin: 0; }
+.kasse h2 { font-size: 22px; margin: 0; }
+.kasse h3 { font-size: 19px; margin: 0 0 6px; }
+.kasse .muted { font-size: 15px; }
+.kasse-gross { min-height: 56px; font-size: 18px; padding: 12px 18px; border-radius: 14px; }
+.kasse-kopf { display: grid; gap: 14px; }
+.kasse-stand { display: grid; gap: 2px; }
+.kasse-stand span { color: var(--muted); font-weight: 700; }
+.kasse-stand strong { font-size: 40px; letter-spacing: -1px; }
+.kasse-sicherung { padding: 10px 14px; border-radius: 12px; font-weight: 800; }
+.kasse-sicherung.ok { background: var(--mint); color: #22507f; }
+.kasse-sicherung.warn { background: var(--yellow-bg); color: #8a5510; }
+.kasse-sicherung.alarm { background: var(--red-bg); color: var(--red); }
+.kasse-knoepfe { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+.kasse .link { background: none; border: 0; color: var(--green); font-weight: 700; text-decoration: underline; padding: 6px 0; text-align: left; font-size: 15px; }
+.kasse-monat header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kasse-monat header h2 { min-width: 180px; text-align: center; }
+.kasse-monat .status-pill { margin-left: auto; display: inline-flex; gap: 4px; align-items: center; }
+.kasse-summen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+.kasse-summen div { background: var(--paper); border-radius: 10px; padding: 8px 10px; }
+.kasse-summen dt { font-size: 13px; color: var(--muted); font-weight: 700; }
+.kasse-summen dd { margin: 0; font-weight: 700; }
+.kasse-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.kasse-zeile { width: 100%; display: flex; justify-content: space-between; gap: 12px; text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 17px; color: var(--ink); }
+.kasse-zeile:hover { background: #f4f9fe; }
+.kasse-zeile small { display: block; color: var(--muted); font-size: 14px; margin-top: 2px; }
+.kasse-zeile-text { min-width: 0; }
+.kasse-zeile-betrag { text-align: right; white-space: nowrap; }
+.kasse-zeile .minus { color: var(--red); }
+.kasse-zeile .plus { color: #1f6a3c; }
+.kasse-zeile.storniert b, .kasse-zeile.storniert .kasse-zeile-betrag b { text-decoration: line-through; opacity: .65; }
+.kasse-zeile.anfangsbestand { background: var(--mint); }
+.kasse-monat footer, .kasse-formular footer, .kasse-fuss { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; justify-content: flex-end; }
+.kasse-monat footer { justify-content: flex-start; }
+.kasse-zaehlungen { margin: 10px 0 0; }
+.kasse-sichern { display: grid; gap: 10px; justify-items: start; }
+.kasse-datei { position: relative; overflow: hidden; cursor: pointer; }
+.kasse-datei input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.kasse-ordner { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; width: 100%; }
+.kasse-ordner p { margin: 0; flex-basis: 100%; font-size: 15px; }
+.kasse-nurlesen { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.kasse-start { display: grid; gap: 12px; max-width: 620px; }
+.kasse-start-weitere { display: flex; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.kasse-formular { display: grid; gap: 12px; font-size: 17px; }
+.kasse-formular label { display: grid; gap: 5px; font-weight: 700; }
+.kasse-formular input, .kasse-formular select { font-size: 18px; min-height: 48px; padding: 8px 12px; border-radius: 10px; }
+.kasse-betrag span { display: flex; align-items: center; gap: 8px; }
+.kasse-betrag input { font-size: 26px !important; font-weight: 800; max-width: 220px; text-align: right; }
+.kasse-betrag b { font-size: 22px; }
+.kasse-check { display: flex !important; flex-direction: row; align-items: center; gap: 10px; font-weight: 600 !important; }
+.kasse-check input { width: 24px; height: 24px; min-height: 0 !important; flex: none; }
+.kasse-kamera { position: relative; display: grid !important; justify-items: center; gap: 6px; padding: 26px 14px; border: 2px dashed var(--green); border-radius: 16px; background: var(--mint); color: #22507f; text-align: center; cursor: pointer; }
+.kasse-kamera b { font-size: 20px; }
+.kasse-kamera small { color: var(--muted); font-weight: 600; }
+.kasse-kamera input, .kasse-foto label input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.kasse-foto { display: grid; gap: 8px; justify-items: start; }
+.kasse-foto img { max-height: 260px; max-width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+.kasse-foto label { position: relative; overflow: hidden; }
+.kasse-lesen { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--mint); font-weight: 700; }
+.kasse-mehr summary, .kasse-zaehlhilfe summary { cursor: pointer; font-weight: 700; color: var(--green); padding: 4px 0; }
+.kasse-mehr { display: grid; gap: 10px; }
+.kasse-zaehlhilfe > div { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; }
+.kasse-zaehlhilfe label { display: grid; grid-template-columns: 1fr 64px; align-items: center; gap: 6px; font-weight: 700; }
+.kasse-zaehlhilfe input { min-height: 40px !important; font-size: 17px !important; text-align: right; padding: 4px 8px !important; }
+.kasse-vergleich { margin: 0; }
+.kasse-vergleich .ok { color: #1f6a3c; font-weight: 800; }
+.kasse-vergleich .alarm { color: var(--red); font-weight: 800; }
+.kasse-detail { display: grid; gap: 6px; margin: 0 0 12px; }
+.kasse-detail div { display: grid; grid-template-columns: 120px 1fr; gap: 8px; }
+.kasse-detail dt { color: var(--muted); font-weight: 700; }
+.kasse-detail dd { margin: 0; }
+.kasse-beleg { max-width: 100%; max-height: 60vh; border-radius: 10px; border: 1px solid var(--line); margin-bottom: 12px; }
+.kasse-auswahl { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+.kasse-fenster .modal { max-width: 560px; }
+@media (max-width: 760px) {
+  .kasse { font-size: 18px; }
+  .kasse-knoepfe { grid-template-columns: 1fr 1fr; }
+  .kasse-knoepfe .primary { grid-column: 1 / -1; min-height: 64px; font-size: 20px; }
+  .kasse-summen { grid-template-columns: 1fr 1fr; }
+  .kasse-monat header h2 { min-width: 0; flex: 1; font-size: 19px; }
+  .kasse-monat .status-pill { margin-left: 0; }
+  .kasse-sichern .kasse-gross, .kasse-sichern .kasse-datei { width: 100%; }
+  .kasse-nurlesen { flex-direction: column; align-items: stretch; }
+  .kasse-formular footer .kasse-gross { flex: 1; }
+  .kasse-detail div { grid-template-columns: 1fr; gap: 0; }
+}
+.kasse-fenster .kasse-formular label, .kasse-fenster .kasse-check, .kasse-fenster .kasse-auswahl label { font-size: 16px; color: var(--ink); }
+.kasse-fenster .kasse-formular input, .kasse-fenster .kasse-formular select { font-size: 18px; }
+.kasse-fenster .kasse-kamera small { font-size: 14px; }
+.kasse .kasse-datei { font-size: 16px; font-weight: 800; min-height: 48px; flex-direction: row; gap: 8px; }
+.kasse-sichern .kasse-datei { justify-content: center; }

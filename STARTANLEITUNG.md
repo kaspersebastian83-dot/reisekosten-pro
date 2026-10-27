@@ -1,6 +1,6 @@
 # SpesenKit – Anleitung
 
-Stand: Version 1.10.1. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
+Stand: Version 1.11.0. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
 Büro-Terminal (RDP, eigenes Windows-Profil) in **Edge oder Chrome** genutzt.
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ – oder in der
@@ -14,6 +14,7 @@ Projektzentrale ganz unten rechts unter „Weitere Apps“ auf **SpesenKit**.
    markieren.
    **Tätigkeit:** Außendienst (Dienstreisen, Fahrtenbuch, Verpflegung) oder
    Innendienst (nur Kosten und Belege, ohne Reise- und Projektzuordnung).
+   Umschalten geht jederzeit oben über **Außendienst · Innendienst**.
 2. **Ordner einrichten** (gelber Hinweis oben oder links unten): einen eigenen
    Ordner wählen, z. B. im persönlichen Laufwerk. SpesenKit legt darin den
    Ordner `SpesenKit` an und speichert jede Änderung dort. Ohne diesen Ordner
@@ -62,6 +63,30 @@ Alles passiert in der **Monatsübersicht**.
 
 Freigabe und Auszahlung sind getrennt: SpesenKit gibt nichts automatisch frei
 und zahlt nichts aus.
+
+## Bürokasse (Kassenbuch der Büro-Barkasse)
+
+Nur für die Person, die die Bürokasse führt. Auf dem **Handy** (Chrome) einrichten:
+
+1. **Einstellungen → „Ich führe die Bürokasse“** anhaken. Oben erscheint **Bürokasse** – antippen.
+2. **Kassenbuch beginnen:** Datum und das gezählte Geld in der Kasse eintragen (Zählhilfe für Scheine und Münzen).
+3. **Ausgabe mit Beleg:** Beleg fotografieren – Betrag und Datum werden gelesen, bitte prüfen; „Wofür?“ wählen,
+   **Ausgabe buchen**. Ohne Beleg: „Kein Beleg vorhanden“ anhaken und beschreiben.
+4. **Einnahme:** z. B. Bankabhebung. **Kasse zählen:** Gezähltes eintragen; eine Differenz wird als
+   „Kassendifferenz“ gebucht.
+5. **Falsch gebucht?** Eintrag antippen → **Stornieren** mit Grund. Der Eintrag bleibt sichtbar, die Gegenbuchung hebt
+   ihn auf. Danach richtig neu buchen.
+6. **Monat abschließen** (am Monatsende): zählen, abschließen. Danach ist der Monat fest.
+
+**Sicherung:** Das Kassenbuch liegt auf dem Handy nur im Browser. Oben steht, wie viel noch nicht gesichert ist.
+**Sicherung senden** → im Teilen-Menü **OneDrive** wählen → speichern. Spätestens nach dem Monatsabschluss, besser
+jede Woche. Doppelt senden schadet nicht.
+
+**Am PC (Edge/Chrome):** Bürokasse wie oben einschalten, einmal **Bürokasse-Ordner wählen** (Ordner auf dem
+Laufwerk, darin entsteht `Bürokasse`). Dann **Vom Handy übernehmen** → die Sicherungsdatei aus OneDrive wählen.
+SpesenKit legt alle Einträge, Belege und je abgeschlossenem Monat das Kassenbuch (PDF und CSV) im Ordner ab.
+Gebucht wird nur auf dem Handy; der PC zeigt „Nur Ansicht und Ablage“. Neues Handy: dort **Sicherung einspielen**
+und **Hier weiterbuchen**.
 
 ## Sicherungen
 

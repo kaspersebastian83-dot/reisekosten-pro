@@ -75,6 +75,8 @@ import { MerchantInput, PaymentSelect, ReceiptAttachment, ReceiptLinkFields, tri
 import { knownMerchants, learnMerchant, type KnownMerchant } from "../lib/merchants";
 import { MissingReceiptImageError, detachReceipts, pruneReceiptImages } from "../lib/receipt-images";
 import { MonthWorkspace } from "./month-workspace";
+import { Buerokasse, ModusChip, useKasseModus, type ModusWahl } from "./buerokasse";
+import { latestStatement } from "../lib/month-navigation";
 import { StatementClosing } from "./statement-closing";
 import { StatementChanges } from "./statement-changes";
 import { compareClosedStatementWithCurrent, isClosedStatement, persistCorrectionDraft, relatedTripsForSnapshot, snapshotHistoryLimitations, stateForStatementVersion } from "../lib/statement-comparison";
@@ -228,6 +230,8 @@ export default function Home() {
   };
   const [saveRetry, setSaveRetry] = useState(0);
   const [tab, setTab] = useState<Tab>("Monatsübersicht");
+  // Arbeitsbereich je Gerät: Außendienst / Innendienst (persönliche Spesen) oder Bürokasse (Kassenbuch der Büro-Barkasse).
+  const kasse = useKasseModus();
   const [month, setMonth] = useState(() => previousCalendarMonth());
   const [sidebar, setSidebar] = useState(false);
   const [toast, setToast] = useState("");
@@ -253,6 +257,7 @@ export default function Home() {
   };
   const returnToWorkspace = () => {if (leaveForm()) finishWorkspaceEntry();};
   const navigate = (target: Tab) => {
+    if (kasse.modus === "buerokasse") { kasse.setModus("spesen"); setTab(target); return; }
     if (target === tab) return;
     if (!leaveForm()) return;
     if (target === "Monatsübersicht" && workspaceEntry) finishWorkspaceEntry();
@@ -356,6 +361,26 @@ export default function Home() {
     state.expenses.filter((e) => e.warnings.length || e.status === "ungeprüft")
       .length;
 
+  const wahleModus = (wahl: ModusWahl) => {
+    if (!leaveForm()) return;
+    if (wahl === "buerokasse") { kasse.setModus("buerokasse"); setSidebar(false); return; }
+    kasse.setModus("spesen");
+    if (state.settings.staffRole !== wahl) {
+      update((s) => { s.settings.staffRole = wahl; return s; });
+      notify(wahl === "innendienst" ? "Innendienst: nur Kosten und Belege, ohne Dienstreisen." : "Außendienst: Dienstreisen, Fahrtenbuch und Verpflegung.");
+    }
+  };
+  /** Persönliche Kosten, die in die Bürokasse übernommen werden können (nicht storniert, Monat nicht abgeschlossen). */
+  const kostenFuerKasse = {
+    kosten: state.expenses.filter((e) => e.status !== "storniert" && e.paymentType !== "Bürokasse" && !(() => { const s = latestStatement(state, e.date.slice(0, 7)); return !!s && isClosedStatement(s); })()),
+    uebernommen: (ids: string[]) => update((s) => {
+      for (const expense of s.expenses) if (ids.includes(expense.id)) {
+        expense.paymentType = "Bürokasse"; expense.paidBy = paymentPayer("Bürokasse"); expense.reimbursementStatus = "nicht erstattungsfähig";
+        syncExpenseLink(s, expense);
+      }
+      return s;
+    }),
+  };
   if (!ready)
     return (
       <div className="loading">
@@ -391,8 +416,8 @@ export default function Home() {
           {tabs.map(({ name, icon: Icon }) => (
             <button
               key={name}
-              className={tab === name || (tab === "Fahrten importieren" && name === "Monatsübersicht") ? "active" : ""}
-              aria-current={tab === name || (tab === "Fahrten importieren" && name === "Monatsübersicht") ? "page" : undefined}
+              className={kasse.modus !== "buerokasse" && (tab === name || (tab === "Fahrten importieren" && name === "Monatsübersicht")) ? "active" : ""}
+              aria-current={kasse.modus !== "buerokasse" && (tab === name || (tab === "Fahrten importieren" && name === "Monatsübersicht")) ? "page" : undefined}
               onClick={() => {
                 navigate(name);
                 setSidebar(false);
@@ -438,7 +463,8 @@ export default function Home() {
           <button onClick={() => void exportBackup(state).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "JSON-Sicherung konnte nicht erstellt werden."))}>JSON-Sicherung herunterladen</button>
           <button onClick={() => setSaveRetry((n) => n + 1)}>Speichern erneut versuchen</button>
         </div>}
-        <FolderBanner folder={folder} openBackup={() => navigate("Datensicherung")} />
+        {/* Der Hinweis gilt dem persönlichen SpesenKit-Ordner – in der Bürokasse hat sie ihre eigene Sicherung. */}
+        {kasse.modus !== "buerokasse" && <FolderBanner folder={folder} openBackup={() => navigate("Datensicherung")} />}
         <header className="topbar">
           <button
             className="icon mobile-only"
@@ -448,10 +474,11 @@ export default function Home() {
             <Menu />
           </button>
           <div>
-            <p className="eyebrow">Reisekostenabrechnung</p>
-            <h1>{tab}</h1>
+            <p className="eyebrow">{kasse.modus === "buerokasse" ? "Kassenbuch" : "Reisekostenabrechnung"}</p>
+            <h1>{kasse.modus === "buerokasse" ? "Bürokasse" : tab}</h1>
           </div>
-          <div className="top-actions">
+          <ModusChip staffRole={state.settings.staffRole} modus={kasse.modus} kasse={kasse.sichtbar} onWahl={wahleModus} />
+          {kasse.modus !== "buerokasse" && <div className="top-actions">
             <label className="month-picker">
               Abrechnungsmonat
               <input
@@ -465,9 +492,10 @@ export default function Home() {
               <CircleGauge size={18} />
               <span>{monthLabel(month)} · {monthStatus.label}</span>
             </button>}
-          </div>
+          </div>}
         </header>
         <div className="content">
+          {kasse.modus === "buerokasse" ? <Buerokasse appVersion={appRelease.version} notify={notify} uebernahme={kostenFuerKasse} /> : <>
           {tab === "Fahrten importieren" && (
             <ImportWizard
               state={state}
@@ -513,11 +541,12 @@ export default function Home() {
           )}
           {tab === "Auswertungen" && <Reports state={state} month={month} />}
           {tab === "Einstellungen" && (
-            <SettingsPanel state={state} update={update} notify={notify} />
+            <SettingsPanel state={state} update={update} notify={notify} kasse={kasse} />
           )}
           {tab === "Datensicherung" && (
             <Backup state={state} setState={setState} notify={notify} folder={folder} />
           )}
+          </>}
         </div>
       </main>
       {inboxQueue && (() => {
@@ -2841,12 +2870,17 @@ function SettingsPanel({
   state,
   update,
   notify,
+  kasse,
 }: {
   state: AppState;
   update: (f: (s: AppState) => AppState) => void;
   notify: (s: string) => void;
+  /** Bürokasse auf diesem Gerät anbieten (gilt sofort, nur für dieses Gerät). */
+  kasse?: { sichtbar: boolean; setSichtbar: (value: boolean) => void };
 }) {
   const [local, setLocal] = useState(structuredClone(state.settings));
+  // Oben über „Außendienst · Innendienst“ umgeschaltet: hier übernehmen, sonst würde „Speichern“ es zurückdrehen.
+  useEffect(() => setLocal((current) => current.staffRole === state.settings.staffRole ? current : { ...current, staffRole: state.settings.staffRole }), [state.settings.staffRole]);
   usePendingWork(JSON.stringify(local) !== JSON.stringify(state.settings));
   const addVehicle = (ownership: VehicleProfile["ownership"]) => {
     const vehicle: VehicleProfile = {
@@ -2954,8 +2988,12 @@ function SettingsPanel({
               <option value="aussendienst">Außendienst – Dienstreisen, Fahrtenbuch, Verpflegung</option>
               <option value="innendienst">Innendienst – nur Kosten und Belege</option>
             </select>
-            <small>Innendienst: keine Dienstreisen und kein Fahrtenbuch-Import, Kosten ohne Reise- und Projektzuordnung. Vorhandene Einträge bleiben erhalten.</small>
+            <small>Innendienst: keine Dienstreisen und kein Fahrtenbuch-Import, Kosten ohne Reise- und Projektzuordnung. Vorhandene Einträge bleiben erhalten. Umschalten geht auch oben über die Auswahl „Außendienst · Innendienst“.</small>
           </label>
+          {kasse && <label className="check-row">
+            <input type="checkbox" checked={kasse.sichtbar} onChange={(e) => { kasse.setSichtbar(e.target.checked); notify(e.target.checked ? "Bürokasse ist oben zur Auswahl." : "Bürokasse ausgeblendet – das Kassenbuch bleibt gespeichert."); }} />
+            <span><b>Ich führe die Bürokasse</b><small>Zeigt oben zusätzlich „Bürokasse“ (Kassenbuch der Büro-Barkasse). Gilt nur für dieses Gerät, sofort.</small></span>
+          </label>}
           <label>
             Zeitzone
             <input

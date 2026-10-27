@@ -1,5 +1,36 @@
 # Release Notes
 
+## 1.11.0 – 27. Oktober 2026
+
+Rückmeldung aus dem Einsatz: Innendienst/Außendienst war nur in den Einstellungen zu finden, und die Büro-Barkasse
+soll mit Belegfoto auf dem Handy geführt werden.
+- **Auswahl oben: Außendienst · Innendienst (· Bürokasse).** Ein Tipp schaltet um, auf dem Handy über die ganze Breite.
+  Außendienst/Innendienst ist dieselbe Einstellung „Tätigkeit“ wie bisher. „Bürokasse“ erscheint, wenn in den
+  Einstellungen „Ich führe die Bürokasse“ angehakt ist (je Gerät, sofort).
+- **Bürokasse – Kassenbuch der Büro-Barkasse.** Anfangsbestand (gezählt), Ausgabe mit Belegfoto (Betrag, Datum,
+  Geschäft, MwSt und Rechnungsnummer werden lokal gelesen), Einnahme (z. B. Bankabhebung), Kasse zählen mit Zählhilfe
+  (Scheine und Münzen). Jede Buchung bekommt eine fortlaufende Nummer je Jahr (2026-0001 …); der Bestand kann nie
+  negativ werden. Nichts wird geändert oder gelöscht: Fehler werden storniert (Gegenbuchung mit Grund, beide bleiben
+  sichtbar). Ausgabe ohne Beleg nur als Eigenbeleg mit Begründung. Eine Zähldifferenz wird als „Kassendifferenz“ gebucht.
+  **Monatsabschluss** mit Zählung, der Reihe nach; danach keine Buchungen in diesem oder früheren Monaten.
+  Kassenbuch je Monat als PDF (mit Belegbildern im Anhang) und Excel-CSV. Große Schrift und Knöpfe.
+- **Sicherung vom Handy:** „Sicherung senden“ teilt eine Datei (`Buerokasse-Sicherung_….txt`) – OneDrive wählen.
+  Anzeige oben, wie viele Einträge noch nicht gesichert sind (gelb, ab 3 Tagen rot). Enthalten sind alle Einträge und die
+  Belegbilder der offenen Monate und des zuletzt abgeschlossenen; „Vollständige Sicherung“ mit allen Bildern.
+- **Am PC: „Vom Handy übernehmen“** liest die Datei ein und legt alles im **Bürokasse-Ordner** auf dem Laufwerk ab:
+  `Bürokasse/Buchungen/<Jahr>/` (jeder Eintrag eine eigene Datei, wird nie überschrieben), `Bürokasse/Belege/`,
+  `Bürokasse/Abschlüsse/<Jahr>/<Monat>/Kassenbuch_<Monat>.pdf|.csv`. Doppelt übernehmen schadet nicht (gleiche Einträge
+  werden übersprungen). Gebucht wird nur auf dem Gerät, auf dem das Kassenbuch begonnen wurde; andere Geräte zeigen
+  „Nur Ansicht und Ablage“ („Hier weiterbuchen“ z. B. für ein neues Handy).
+- **Bürokasse als Zahlungsart** bei den eigenen Kosten („Aus der Bürokasse bezahlt“, zählt wie vom Unternehmen bezahlt,
+  keine Erstattung). Kosten, die schon in SpesenKit erfasst sind, lassen sich mit Belegbild in die Bürokasse übernehmen;
+  sie stehen danach mit dieser Zahlungsart in den eigenen Spesen.
+- Speicher: Die Bürokasse hat eine eigene Browser-Datenbank `spesenkit-buerokasse`; der persönliche Bestand
+  (`reisekosten-pro`, `spesenkit.json`) und sein Format sind unverändert. Eine DATEV-Übergabe der Kasse folgt nach dem
+  ersten Monat mit echten Daten (alle nötigen Angaben werden schon erfasst).
+- Tests: `buerokasse.test.ts` (Nummern, Bestand, Storno, Zählung, Abschluss, CSV, Sicherung, Ordner) und
+  `tests/buerokasse-browser-check.mjs` (Handy und PC).
+
 ## 1.10.1 – 26. Oktober 2026
 
 Fehlerbehebungen aus einer Durchsicht der Suite:

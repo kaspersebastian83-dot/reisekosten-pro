@@ -89,7 +89,7 @@ export function checkStatementForClosing(state: AppState, month: string, snapsho
     const direct = projectNumber(expense.projectNumber);
     const indirect = projectNumber(linked?.order);
     if (!free && ((!direct && !indirect) || (direct && indirect && direct !== indirect))) issue(warnings, 'project', `${label}: Projektzuordnung ist unklar oder widersprüchlich.`, target);
-    if (!['privat vorgestreckt', 'Unternehmen', 'Firmenkarte', 'bereits erstattet'].includes(expense.paymentType)) issue(warnings, 'payment', `${label}: Zahlungsart unbekannt; zählt nicht zur offenen persönlichen Erstattung.`, target);
+    if (!['privat vorgestreckt', 'Unternehmen', 'Firmenkarte', 'Bürokasse', 'bereits erstattet'].includes(expense.paymentType)) issue(warnings, 'payment', `${label}: Zahlungsart unbekannt; zählt nicht zur offenen persönlichen Erstattung.`, target);
     if (expense.status === 'ungeprüft' || expense.status === 'importiert') issue(warnings, 'unreviewed', `${label}: Eintrag ist noch ungeprüft.`, target);
     for (const warning of new Set([
       ...expense.warnings, ...linkingErrors(expense),

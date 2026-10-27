@@ -68,10 +68,11 @@ export function syncExpenseLink(state: AppState, expense: Expense) {
 export function paymentLabel(payment: string) {
   return payment === 'privat vorgestreckt' ? 'Privat bezahlt' :
     ['Firmenkarte', 'Unternehmen'].includes(payment) ? 'Vom Unternehmen bezahlt' :
+    payment === 'Bürokasse' ? 'Aus der Bürokasse bezahlt' :
     payment === 'bereits erstattet' ? 'Bereits erstattet' : 'Zahlungsart ungeklärt – keine Auszahlung';
 }
 export function paymentPayer(payment: string) {
-  return payment === 'privat vorgestreckt' ? 'Reisender' : ['Firmenkarte', 'Unternehmen'].includes(payment) ? 'Unternehmen' : '';
+  return payment === 'privat vorgestreckt' ? 'Reisender' : ['Firmenkarte', 'Unternehmen', 'Bürokasse'].includes(payment) ? 'Unternehmen' : '';
 }
 export function similarExpense(expenses: Expense[], draft: Partial<Expense>) {
   return expenses.find(e => e.id !== draft.id && !!normalized(draft.merchant) && normalized(e.merchant) === normalized(draft.merchant) && e.date === draft.date && e.gross === draft.gross && (!e.invoiceNumber || !draft.invoiceNumber));

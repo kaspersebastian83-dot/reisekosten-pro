@@ -12,8 +12,9 @@ export function PaymentSelect({ value, onChange }: { value: PaymentType; onChang
     <option value="privat vorgestreckt">Privat bezahlt</option>
     <option value="Unternehmen">Vom Unternehmen bezahlt</option>
     <option value="Firmenkarte">Firmenkarte</option>
+    <option value="Bürokasse">Aus der Bürokasse bezahlt</option>
     <option value="bereits erstattet">Bereits erstattet</option>
-    {!["privat vorgestreckt", "Unternehmen", "Firmenkarte", "bereits erstattet"].includes(value) && <option value={value}>{paymentLabel(value)}</option>}
+    {!["privat vorgestreckt", "Unternehmen", "Firmenkarte", "Bürokasse", "bereits erstattet"].includes(value) && <option value={value}>{paymentLabel(value)}</option>}
   </select></label>;
 }
 
