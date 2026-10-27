@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run && npm run build && node --test tests/static-build.test.mjs",
     "test:unit": "vitest run",
+    "test:browser": "node tests/run-browser-checks.mjs",
     "check": "tsc --noEmit"
   },
   "dependencies": {

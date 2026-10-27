@@ -424,7 +424,17 @@ try {
     assert.equal((await readFolder(p)).file.state.settings.profileName, 'Nach Sicherungsfehler');
     // Auch die neue Kandidatenwiederherstellung darf bei einem anschließenden Ordnerfehler keinen Erfolg melden.
     const beforeRestore = (await readFolder(p)).file;
-    const oldCandidate = (await readFolder(p)).copies.find((copy) => copy.name.startsWith('spesenkit_speicherkandidat_') && JSON.parse(copy.text).settings.profileName === ''); assert.ok(oldCandidate);
+    // Älterer Speicherkandidat (Name noch leer): Seit 1.8.3 löscht SpesenKit den Kandidaten eines Speichervorgangs beim nächsten
+    // erfolgreichen Speichern – ein liegengebliebener (z. B. aus einer abgebrochenen Sitzung) wird hier daher selbst abgelegt.
+    const oldCandidate = await p.evaluate(async (state) => {
+      const z = (n) => String(n).padStart(2, '0'), d = new Date();
+      const name = `spesenkit_speicherkandidat_${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}_00000000-0000-4000-8000-00000000c0de.json`;
+      const text = JSON.stringify({ ...state, settings: { ...state.settings, profileName: '' } }, null, 2);
+      const app = await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Max Mustermann')).getDirectoryHandle('SpesenKit');
+      const w = await (await (await app.getDirectoryHandle('Sicherungen', { create: true })).getFileHandle(name, { create: true })).createWritable(); await w.write(text); await w.close();
+      return { name, text };
+    }, beforeRestore.state);
+    assert.equal(JSON.parse(oldCandidate.text).settings.profileName, '');
     await nav(p, 'Datensicherung'); const list = p.locator('.folder-backups');
     await list.getByLabel('Speicherkandidaten und Vorgänger anzeigen').check();
     await p.evaluate(() => localStorage.setItem('test-fail-write', '1'));

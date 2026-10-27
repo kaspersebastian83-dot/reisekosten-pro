@@ -108,6 +108,15 @@ Der Befehl führt die Berechnungs- und Importtests aus, prüft TypeScript, baut
 die statische App und kontrolliert das Ergebnis auf GitHub-Pages-kompatible
 relative Pfade.
 
+```bash
+npm run build && npm run test:browser          # alle Browserprüfungen (Playwright nötig)
+npm run test:browser -- buerokasse fremdwaehrung # nur einzelne
+```
+
+Die Browserprüfungen (`tests/*browser*.mjs`: Speichern, Belege, Monatsabschluss, Korrekturen, Bürokasse,
+Fremdwährung …) laufen bei jedem Pull Request automatisch im Workflow „Browserprüfungen“ – getrennt vom
+Veröffentlichen. Ausgenommen ist nur `branding-browser-check.mjs` (braucht eine alte Produktionsversion).
+
 ## Enthaltene Kernfunktionen
 
 - Monatsübersicht als Arbeitsplatz: Monatsleiste, Werkzeugleiste, Zeitleiste

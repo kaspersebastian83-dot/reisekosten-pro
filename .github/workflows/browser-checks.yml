@@ -1,0 +1,37 @@
+name: Browserprüfungen
+
+# Die Prüfungen in tests/*browser*.mjs (Speichern, Belege, Monatsabschluss, Korrekturen, Bürokasse, Fremdwährung …)
+# liefen bisher nur von Hand. Getrennt vom Pages-Workflow, damit eine hängende Browser-Installation nie das Veröffentlichen blockiert.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-checks:
+    name: Browserprüfungen (chromium)
+    runs-on: ubuntu-24.04   # fest: Playwright 1.56 unterstützt Ubuntu 26 (neues ubuntu-latest) noch nicht
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Playwright installieren (fest gepinnt, nicht Teil des Projekts)
+        timeout-minutes: 8
+        run: |
+          npm install --no-save --no-package-lock --prefix "$RUNNER_TEMP/pw" playwright@1.56.1
+          echo "PLAYWRIGHT_MODULE=$RUNNER_TEMP/pw/node_modules/playwright" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Browserprüfungen
+        run: node tests/run-browser-checks.mjs
