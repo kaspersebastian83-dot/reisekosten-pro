@@ -1,6 +1,6 @@
 # SpesenKit – Anleitung
 
-Stand: Version 1.11.1. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
+Stand: Version 1.12.0. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
 Büro-Terminal (RDP, eigenes Windows-Profil) in **Edge oder Chrome** genutzt.
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ – oder in der
@@ -112,6 +112,17 @@ und **Hier weiterbuchen**.
 Beim ersten Einsatz der Texterkennung wird einmalig ein Sprachmodell geladen.
 Danach läuft die Erkennung im Browser; der Beleg wird dabei nicht an den
 Anbieter der App übertragen. Die Erkennungsvorschläge immer kurz prüfen.
+
+Gelesen wird der **Bruttobetrag** (zu zahlen / Summe inkl. MwSt.), nicht Netto oder Zwischensumme.
+Der Beleg wird so gelesen, wie er fotografiert ist – das geht schnell. Fehlen danach Betrag oder Datum, weil der
+Beleg quer oder kopfüber liegt: **„Beleg liegt quer – gedreht lesen“**. Wer lieber immer alle Richtungen
+probieren lassen will (langsamer): **Einstellungen → „Belege automatisch in allen Richtungen lesen“** (je Gerät).
+
+**Belege in Fremdwährung** (z. B. US-Dollar): Betrag in der Währung des Belegs eintragen und **Währung** wählen.
+SpesenKit holt den **EZB-Referenzkurs** zum Belegdatum (Wochenende/Feiertag: letzter Kurs davor) und zeigt den
+Euro-Betrag. Bei Kartenzahlung besser den **Euro-Betrag laut Kartenabrechnung** eintragen – das ist der
+tatsächlich gezahlte Betrag. Kurs und Quelle stehen in der Abrechnung. Ohne Internet: Kurs von Hand eintragen.
+Welcher Kurs im Büro gilt, mit dem Steuerberater abstimmen.
 
 Die Abrechnungs-PDF nummeriert Kosten und Belege automatisch. Bildbelege und
 lesbare PDF-Belege werden in derselben Reihenfolge angehängt; lange Bons werden

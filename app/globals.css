@@ -3080,3 +3080,15 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .kasse-fenster .kasse-kamera small { font-size: 14px; }
 .kasse .kasse-datei { font-size: 16px; font-weight: 800; min-height: 48px; flex-direction: row; gap: 8px; }
 .kasse-sichern .kasse-datei { justify-content: center; }
+
+/* ---------- Fremdwährung und „gedreht lesen“ ---------- */
+.currency-box { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: var(--mint); border: 1px solid var(--line); }
+.currency-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.currency-row > label { display: grid; gap: 4px; }
+.currency-input { display: inline-flex; align-items: center; gap: 6px; }
+.currency-input input { width: 120px; }
+.currency-result { margin: 0; }
+.currency-error { color: var(--red); font-weight: 700; }
+.turn-hint button, .kasse-drehen button { margin-top: 8px; }
+.kasse-drehen { display: grid; gap: 4px; }
+.kasse-drehen p { margin: 0; }

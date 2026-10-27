@@ -88,7 +88,9 @@ import { MonthNavigation } from "./month-navigation";
 import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel, monthOverview } from "../lib/month-navigation";
 import { demoState } from "../lib/demo";
 import { slimChangeLog } from "../lib/change-log";
-import { applyMerchantRule, recognizeReceiptLocally } from "../lib/receipt-ocr";
+import { RECEIPT_ROTATIONS, TURNED_ONLY, UPRIGHT_ONLY, applyMerchantRule, readingIncomplete, recognizeReceiptLocally } from "../lib/receipt-ocr";
+import { readAllDirections, setReadAllDirections } from "../lib/device-settings";
+import { CurrencyFields } from "./currency-fields";
 import {
   exportBackup,
   exportCsv,
@@ -720,6 +722,10 @@ function ReceiptCapture({
   const [progress, setProgress] = useState(0);
   const [scanStatus, setScanStatus] = useState("");
   const [scanError, setScanError] = useState("");
+  /** Nur aufrecht gelesen und Betrag oder Datum fehlen: „gedreht lesen“ anbieten. */
+  const [turnable, setTurnable] = useState(false);
+  /** Was die letzte Texterkennung tatsächlich gefunden hat (nicht vorbelegte Formularwerte). */
+  const ocrFound = useRef<{ gross?: number; date?: string }>({});
   usePendingWork(true);
 
   const selectedTripId = tripId;
@@ -742,7 +748,7 @@ function ReceiptCapture({
   const scanRevision = useRef(0);
   const editedFields = useRef(new Set<string>());
   useEffect(() => () => { scanRevision.current++; fileRevision.current++; }, []);
-  const scan = async (nextReceipt: NonNullable<typeof receipt>) => {
+  const scan = async (nextReceipt: NonNullable<typeof receipt>, turned = false) => {
     if (!/^image\/(jpeg|jpg|png|webp)$/i.test(nextReceipt.type)) {
       setScanError(
         "Dieser Dateityp kann gespeichert, aber nicht automatisch gelesen werden.",
@@ -752,6 +758,9 @@ function ReceiptCapture({
     const revision = ++scanRevision.current;
     setScanning(true);
     setScanError("");
+    setTurnable(false);
+    // Vorgabe: nur aufrecht lesen (schnell). Alle Richtungen nur mit Geräteeinstellung oder über „gedreht lesen“.
+    const all = readAllDirections();
     try {
       const recognized = await recognizeReceiptLocally(
         nextReceipt.dataUrl,
@@ -760,10 +769,17 @@ function ReceiptCapture({
           setProgress(value);
           setScanStatus(status);
         },
+        turned ? TURNED_ONLY : all ? RECEIPT_ROTATIONS : UPRIGHT_ONLY,
       );
       const { rotation, ocrConfidence: _ocrConfidence, ...read } = recognized;
       const learned = applyMerchantRule(read, state.merchantRules, merchants);
       if (revision !== scanRevision.current) return;
+      if (turned) {
+        const found = (x: { gross?: number; date?: string }) => (x.gross ? 1 : 0) + (x.date ? 1 : 0);
+        const better = (!!learned.suggestion.gross && !ocrFound.current.gross) || found(learned.suggestion) > found(ocrFound.current);
+        if (!better) { setScanError("Auch gedreht nicht besser lesbar – bitte Betrag und Datum eintippen."); return; }
+      } else if (!all && readingIncomplete(learned.suggestion)) setTurnable(true);
+      ocrFound.current = { gross: learned.suggestion.gross, date: learned.suggestion.date };
       setSuggestionState(current => ({...current, ...Object.fromEntries(Object.entries(learned.suggestion).filter(([key]) => !editedFields.current.has(key)))}));
       // Quer oder kopfüber gelesen: gespeichertes Foto aufrecht drehen (Fingerabdruck bleibt der der Originaldatei).
       if (rotation) {
@@ -851,6 +867,8 @@ function ReceiptCapture({
       notify("Bitte Datum und Betrag bestätigen");
       return;
     }
+    const currency = suggestion.currency || "EUR", exchangeRate = currency === "EUR" ? 1 : suggestion.exchangeRate || 0;
+    if (!(exchangeRate > 0)) { notify(`Bitte den Kurs für ${currency} angeben (EZB-Kurs holen oder Kartenabrechnung).`); return; }
     const problem = linkingErrors({...suggestion, date:suggestion.date!, category:suggestion.category || ""})[0] || duplicateMessage(state, {id:initial?.expenseId, receipt, merchant:suggestion.merchant, invoiceNumber:suggestion.invoiceNumber}, initial?.id);
     if (problem) return notify(problem);
     const vatRate = suggestion.vatRate ?? 19;
@@ -881,8 +899,9 @@ function ReceiptCapture({
       net,
       vatRate,
       vat: round2(suggestion.gross - net),
-      currency: "EUR",
-      exchangeRate: 1,
+      currency,
+      exchangeRate,
+      exchangeRateSource: currency === "EUR" ? undefined : suggestion.exchangeRateSource,
       paymentType,
       paidBy:
         paymentPayer(paymentType),
@@ -1045,6 +1064,16 @@ function ReceiptCapture({
                   </div>
                 </div>
               )}
+              {turnable && !scanning && receipt && (
+                <div className="info-box yellow turn-hint">
+                  <RotateCcw size={18} />
+                  <div>
+                    <b>{!suggestion.gross ? "Betrag" : "Datum"} nicht gelesen</b>
+                    <p>Liegt der Beleg auf dem Foto quer oder auf dem Kopf? Dann gedreht lesen lassen (dauert etwas länger).</p>
+                    <button type="button" className="ghost" onClick={() => void scan(receipt, true)}>Beleg liegt quer – gedreht lesen</button>
+                  </div>
+                </div>
+              )}
               {(duplicateReceipt || similarReceipt) && (
                 <div className="info-box yellow">
                   <Copy size={18} />
@@ -1077,7 +1106,7 @@ function ReceiptCapture({
                   />
                 </label>
                 <label>
-                  Betrag (€)
+                  Betrag ({suggestion.currency && suggestion.currency !== "EUR" ? suggestion.currency : "€"})
                   <input
                     inputMode="decimal"
                     type="number"
@@ -1120,6 +1149,8 @@ function ReceiptCapture({
                   </select>
                 </label>
                 <label>Rechnungsnummer<input value={suggestion.invoiceNumber || ""} onChange={e=>setSuggestion({...suggestion, invoiceNumber:e.target.value})} /></label>
+                <CurrencyFields value={{currency: suggestion.currency || "EUR", exchangeRate: suggestion.exchangeRate ?? (suggestion.currency && suggestion.currency !== "EUR" ? 0 : 1), exchangeRateSource: suggestion.exchangeRateSource, gross: suggestion.gross || 0, date: suggestion.date || ""}}
+                  onChange={patch => { for (const key of ["currency", "exchangeRate", "exchangeRateSource"]) editedFields.current.add(key); setSuggestionState(current => ({...current, ...patch})); }} />
                 <PaymentSelect value={paymentType} onChange={setPaymentType} />
                 <ReceiptLinkFields value={{...suggestion, category:suggestion.category || "", date:suggestion.date || "", tripId:selectedTripId}} onChange={patch => {
                   const {tripId:nextTrip, ...context} = patch;
@@ -2058,7 +2089,8 @@ function Expenses({
   useEffect(() => { if (!editing) setBatch(0); }, [editing]);
   const save = (next = false) => {
     if (!editing || readingReceipt || saving.current) return;
-    const problem = linkingErrors(editing)[0] || (!validDate(editing.date) || !Number.isFinite(editing.gross) || editing.gross <= 0 ? "Bitte Rechnungsdatum und positiven Betrag prüfen" : "") || duplicateMessage(state, editing);
+    const problem = linkingErrors(editing)[0] || (!validDate(editing.date) || !Number.isFinite(editing.gross) || editing.gross <= 0 ? "Bitte Rechnungsdatum und positiven Betrag prüfen" : "")
+      || (editing.currency !== "EUR" && !(editing.exchangeRate > 0) ? `Bitte den Kurs für ${editing.currency} angeben (EZB-Kurs holen oder Kartenabrechnung).` : "") || duplicateMessage(state, editing);
     if (problem) return notify(problem);
     const duplicateReceipt =
       !!editing.receipt &&
@@ -2197,7 +2229,7 @@ function Expenses({
               />
             </label>
             <label>
-              Brutto (€)
+              Brutto ({editing.currency && editing.currency !== "EUR" ? editing.currency : "€"})
               <input
                 type="number"
                 step="0.01"
@@ -2214,6 +2246,8 @@ function Expenses({
                 }}
               />
             </label>
+            <CurrencyFields value={{currency: editing.currency || "EUR", exchangeRate: editing.exchangeRate, exchangeRateSource: editing.exchangeRateSource, gross: editing.gross, date: editing.date}}
+              onChange={patch => setEditing(current => current ? {...current, ...patch} : current)} />
             <PaymentSelect value={editing.paymentType} onChange={paymentType => setEditing({...editing, paymentType, paidBy:paymentPayer(paymentType)})} />
             {editing.category === "Tanken" && (
               <>
@@ -2879,6 +2913,7 @@ function SettingsPanel({
   kasse?: { sichtbar: boolean; setSichtbar: (value: boolean) => void };
 }) {
   const [local, setLocal] = useState(structuredClone(state.settings));
+  const [allDirections, setAllDirections] = useState(readAllDirections);
   // Oben über „Außendienst · Innendienst“ umgeschaltet: hier übernehmen, sonst würde „Speichern“ es zurückdrehen.
   useEffect(() => setLocal((current) => current.staffRole === state.settings.staffRole ? current : { ...current, staffRole: state.settings.staffRole }), [state.settings.staffRole]);
   usePendingWork(JSON.stringify(local) !== JSON.stringify(state.settings));
@@ -2994,6 +3029,10 @@ function SettingsPanel({
             <input type="checkbox" checked={kasse.sichtbar} onChange={(e) => { kasse.setSichtbar(e.target.checked); notify(e.target.checked ? "Bürokasse ist oben zur Auswahl." : "Bürokasse ausgeblendet – das Kassenbuch bleibt gespeichert."); }} />
             <span><b>Ich führe die Bürokasse</b><small>Zeigt oben zusätzlich „Bürokasse“ (Kassenbuch der Büro-Barkasse). Gilt nur für dieses Gerät, sofort.</small></span>
           </label>}
+          <label className="check-row">
+            <input type="checkbox" checked={allDirections} onChange={(e) => { setReadAllDirections(e.target.checked); setAllDirections(e.target.checked); notify(e.target.checked ? "Belege werden in allen Richtungen gelesen (langsamer)." : "Belege werden nur aufrecht gelesen – bei Bedarf „gedreht lesen“."); }} />
+            <span><b>Belege automatisch in allen Richtungen lesen</b><small>Langsamer: Liest ein quer oder kopfüber fotografierter Beleg sich schlecht, probiert SpesenKit selbst alle Richtungen. Ohne Haken wird nur aufrecht gelesen; fehlen Betrag oder Datum, erscheint „Beleg liegt quer – gedreht lesen“. Gilt nur für dieses Gerät.</small></span>
+          </label>
           <label>
             Zeitzone
             <input

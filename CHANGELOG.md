@@ -1,5 +1,25 @@
 # Release Notes
 
+## 1.12.0 – 27. Oktober 2026
+
+Rückmeldungen aus dem Einsatz zur Belegerkennung und zu Dollar-Belegen.
+- **Bruttobetrag statt Netto:** Oft wurde die Nettosumme gelesen – gewonnen hatte der größte Betrag in irgendeiner
+  „Summe“-Zeile, auch „Nettosumme“ oder „Zwischensumme“. Jetzt zählen Netto, Zwischensumme, Steuerzeilen (ohne
+  „inkl.“), gegeben/Rückgeld, Trinkgeld und Rabatt nie als Betrag. „Zu zahlen“, „Brutto“, „Endbetrag“, „Gesamtbetrag“,
+  „Rechnungsbetrag“ und „Summe inkl. MwSt“ werden bevorzugt; stehen Netto und Steuer lesbar da, gilt Netto + Steuer.
+  Gilt für Beleg-Eingang und Bürokasse.
+- **Schneller lesen:** Belege werden nur noch so gelesen, wie sie fotografiert sind (ein Durchgang). Fehlen Betrag
+  oder Datum, erscheint **„Beleg liegt quer – gedreht lesen“** (probiert 90°, 270°, 180°; übernommen wird nur ein
+  besseres Ergebnis). Einstellung je Gerät: **„Belege automatisch in allen Richtungen lesen“** (wie bisher, langsamer).
+- **Fremdwährung:** Neues Feld **Währung** im Kostenfenster und im Beleg-Eingang (EUR, USD, GBP, CHF u. a.); die
+  Belegerkennung erkennt $, USD, £ und CHF. Kurs = EUR je 1 Einheit: automatisch der **EZB-Referenzkurs zum
+  Belegdatum** (Wochenende/Feiertag: letzter Kurs davor), überschreibbar mit dem Kurs oder dem **Euro-Betrag laut
+  Kartenabrechnung**. Kurs und Quelle werden an der Kostenposition gespeichert (`exchangeRateSource`, neu, freiwillig)
+  und erscheinen in der Abrechnungs-PDF („× Kurs = Euro-Betrag“) und im Belegverzeichnis des ZIP. Ohne Kurs keine
+  Speicherung. Abgefragt werden nur Währung und Datum (EZB, sonst frankfurter.dev mit denselben EZB-Kursen).
+- Tests: `receipt-ocr.test.ts` (Brutto in sechs Belegformen, Währung), `exchange-rates.test.ts` (EZB-Antwort,
+  Wochenende, zweiter Weg, Richtungen), Browsercheck `fremdwaehrung-browser-check.mjs`.
+
 ## 1.11.1 – 27. Oktober 2026
 
 - **Haken „Ich führe die Bürokasse“ ließ sich nicht mehr entfernen:** Gab es auf dem Gerät schon ein Kassenbuch, schaltete
