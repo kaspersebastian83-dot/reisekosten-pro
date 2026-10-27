@@ -23,25 +23,69 @@ function parseDate(text: string) {
     : date;
 }
 
+/*
+ * Bruttobetrag finden. Zeilen bekommen eine Stufe:
+ *   3  eindeutig brutto: „zu zahlen“, „Brutto“, „Endbetrag“, „Gesamtbetrag“, „Rechnungsbetrag“, „inkl. MwSt“
+ *   2  Summenzeile: „Summe“, „Gesamt“, „Total“, „Betrag“
+ *   1  sonstige Zeile mit Betrag
+ *  –   nie der Bruttobetrag: Netto, Zwischensumme, Steuerzeilen (ohne „inkl.“), gegeben/Rückgeld, Trinkgeld, Rabatt
+ * Genommen wird der größte Betrag der höchsten vorhandenen Stufe. Stehen Netto und Steuer lesbar da und gibt es
+ * einen Betrag = Netto + Steuer, ist das der Bruttobetrag (Rückmeldung: oft wurde die Nettosumme gelesen).
+ */
+const BRUTTO = /(zu\s*zahlen|zahlbetrag|brutto|endbetrag|endsumme|gesamtbetrag|rechnungsbetrag|amount\s*due|grand\s*total|\binkl\b|\bincl\b|inklusive)/i;
+const SUMME = /(summe|gesamt|total|betrag)/i;
+const NETTO = /(netto|\bnet\b|zwischen\s*-?\s*summe|zw\.?\s*-?\s*summe|sub\s*-?\s*total|exkl|excl|ohne\s*(mwst|ust|steuer))/i;
+const STEUER = /(mwst|mw\.?\s*st|\bust\b|u\.\s*st|umsatzsteuer|mehrwertsteuer|steuer|\btax\b|\bvat\b)/i;
+const KEIN_BETRAG = /(gegeben|r[üu]ckgeld|wechselgeld|trinkgeld|\btip\b|rabatt|nachlass|gutschein|pfand|\bchange\b|cash\s*tendered)/i;
+
+function lineAmounts(line: string) {
+  // Datum und Uhrzeit sind keine Beträge („26.10.2026“ ergäbe sonst 26,10).
+  const withoutDates = line
+    .replace(/\b\d{1,2}[.\/-]\d{1,2}[.\/-](?:20)?\d{2}\b/g, " ")
+    .replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, " ")
+    .replace(/\b\d{1,2}(?:[.,]\d{1,2})?\s*%/g, " ");   // Steuersätze wie „19,00 %“
+  return (withoutDates.match(/\b\d{1,5}(?:[.,]\d{2})\b/g) || [])
+    .map(parseGermanNumber).filter((amount): amount is number => !!amount && amount > 0 && amount < 100000);
+}
+const cents = (n: number) => Math.round(n * 100);
+
 function findGross(lines: string[]) {
-  const priority =
-    /(gesamt|summe|total|zu zahlen|zahlbetrag|endbetrag|brutto)/i;
-  const candidates: Array<{ amount: number; priority: boolean }> = [];
+  const candidates: Array<{ amount: number; tier: number }> = [];
+  const netto: number[] = [], steuer: number[] = [];
   for (const line of lines) {
-    // Datum und Uhrzeit sind keine Beträge („26.10.2026“ ergäbe sonst 26,10).
-    const withoutDates = line
-      .replace(/\b\d{1,2}[.\/-]\d{1,2}[.\/-](?:20)?\d{2}\b/g, " ")
-      .replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, " ");
-    const matches = withoutDates.match(/\b\d{1,5}(?:[.,]\d{2})\b/g) || [];
-    for (const value of matches) {
-      const amount = parseGermanNumber(value);
-      if (amount && amount > 0 && amount < 100000)
-        candidates.push({ amount, priority: priority.test(line) });
-    }
+    const amounts = lineAmounts(line);
+    if (!amounts.length) continue;
+    const brutto = BRUTTO.test(line);
+    if (NETTO.test(line) && !/brutto/i.test(line)) { netto.push(...amounts); continue; }
+    if (STEUER.test(line) && !brutto) { steuer.push(...amounts); continue; }
+    if (KEIN_BETRAG.test(line)) continue;
+    const tier = brutto ? 3 : SUMME.test(line) ? 2 : 1;
+    for (const amount of amounts) candidates.push({ amount, tier });
   }
-  const preferred = candidates.filter((item) => item.priority);
-  const pool = preferred.length ? preferred : candidates;
-  return pool.sort((a, b) => b.amount - a.amount)[0]?.amount;
+  // Netto + Steuer = Brutto, wenn dieser Betrag auf dem Beleg steht.
+  for (const n of netto) for (const t of steuer) {
+    if (t >= n) continue;
+    const hit = candidates.find((c) => cents(c.amount) === cents(n) + cents(t));
+    if (hit && hit.tier >= 2) return hit.amount;
+  }
+  const best = Math.max(0, ...candidates.map((c) => c.tier));
+  const pool = candidates.filter((c) => c.tier === best);
+  if (pool.length) return pool.sort((a, b) => b.amount - a.amount)[0].amount;
+  // Nur Netto und Steuer lesbar: zusammenzählen.
+  if (netto.length && steuer.length) {
+    const n = Math.max(...netto), t = Math.max(...steuer.filter((x) => x < n), 0);
+    if (t) return (cents(n) + cents(t)) / 100;
+  }
+  return undefined;
+}
+
+/** Währung des Belegs; ohne Hinweis EUR. */
+export function detectCurrency(text: string) {
+  if (/€|\beur\b|\beuro\b/i.test(text)) return "EUR";
+  if (/\busd\b|us\s*\$|\$\s*\d|\d\s*\$/i.test(text)) return "USD";
+  if (/£|\bgbp\b/i.test(text)) return "GBP";
+  if (/\bchf\b|\bsfr\b|\bfr\.\s*\d/i.test(text)) return "CHF";
+  return "EUR";
 }
 
 function inferCategory(text: string) {
@@ -100,6 +144,7 @@ export function parseReceiptText(rawText: string): ReceiptSuggestion {
   const merchant = merchantFromLines(lines);
   const date = parseDate(rawText);
   const gross = findGross(lines);
+  const currency = detectCurrency(rawText);
   const category = inferCategory(rawText);
   const invoiceNumber = rawText.match(
     /(?:rechnungs?(?:nr|nummer)?|beleg(?:nr|nummer)?|bon)[\s.:#-]*([A-Z0-9\/-]{4,})/i,
@@ -117,6 +162,7 @@ export function parseReceiptText(rawText: string): ReceiptSuggestion {
     merchant,
     date,
     gross,
+    ...(currency !== "EUR" ? { currency } : {}),
     category,
     invoiceNumber,
     vatRate: inferVat(rawText, category),
@@ -191,9 +237,9 @@ type OcrImage = import("tesseract.js").ImageLike;
  * Dann wird gedreht erneut gelesen und das beste Ergebnis genommen. `rotation` (Grad) sagt, um wie viel gedreht
  * gelesen wurde.
  */
-export async function readReceiptRotated(worker: OcrWorker, image: OcrImage, onPhase?: (text: string) => void) {
+export async function readReceiptRotated(worker: OcrWorker, image: OcrImage, onPhase?: (text: string) => void, rotations: readonly number[] = RECEIPT_ROTATIONS) {
   let best: { suggestion: ReceiptSuggestion; score: number; rotation: number; confidence: number } | undefined;
-  for (const rotation of RECEIPT_ROTATIONS) {
+  for (const rotation of rotations) {
     onPhase?.(rotation ? `Beleg liegt quer oder auf dem Kopf – lese gedreht (${rotation}°)` : "");
     const result = await worker.recognize(image, rotation ? { rotateRadians: (rotation * Math.PI) / 180 } : {});
     const suggestion = parseReceiptText(result.data.text);
@@ -205,9 +251,16 @@ export async function readReceiptRotated(worker: OcrWorker, image: OcrImage, onP
 }
 
 /** Texterkennung im Browser (tesseract.js, Sprachdaten Deutsch und Englisch). */
+/** Nur aufrecht (schnell) – „gedreht lesen“ probiert danach die übrigen Richtungen. */
+export const UPRIGHT_ONLY = [0] as const;
+export const TURNED_ONLY = [90, 270, 180] as const;
+/** Fehlen nach dem Lesen Betrag oder Datum, lohnt sich „gedreht lesen“. */
+export const readingIncomplete = (suggestion: Pick<ReceiptSuggestion, "gross" | "date">) => !suggestion.gross || !suggestion.date;
+
 export async function recognizeReceiptLocally(
   image: string,
   onProgress?: (progress: number, status: string) => void,
+  rotations: readonly number[] = RECEIPT_ROTATIONS,
 ) {
   const { createWorker } = await import("tesseract.js");
   let phase = "";
@@ -219,7 +272,7 @@ export async function recognizeReceiptLocally(
       ),
   });
   try {
-    return await readReceiptRotated(worker, image, (text) => { phase = text; });
+    return await readReceiptRotated(worker, image, (text) => { phase = text; }, rotations);
   } finally {
     await worker.terminate();
   }

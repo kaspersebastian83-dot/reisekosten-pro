@@ -114,6 +114,10 @@ export interface ExpenseContext {
 export interface ReceiptSuggestion extends ExpenseContext {
   date?: string;
   gross?: number;
+  /** Währung laut Beleg (fehlt = EUR) und Kurs EUR je Einheit mit Quelle. */
+  currency?: string;
+  exchangeRate?: number;
+  exchangeRateSource?: string;
   merchant?: string;
   invoiceNumber?: string;
   category?: string;
@@ -155,7 +159,10 @@ export interface Expense extends ExpenseContext {
   vatRate: number;
   vat: number;
   currency: string;
+  /** EUR je 1 Einheit der Währung (EUR: 1). */
   exchangeRate: number;
+  /** Herkunft des Kurses, z. B. „EZB-Referenzkurs 14.10.2026“ oder „Kartenabrechnung“. */
+  exchangeRateSource?: string;
   paymentType: PaymentType;
   paidBy: string;
   reimbursementStatus: "offen" | "erstattet" | "nicht erstattungsfähig";

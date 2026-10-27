@@ -295,7 +295,9 @@ export async function zipFile(
   zip.file('Belegverzeichnis.csv', '\ufeff' + Papa.unparse(entries.map(entry => ({
     Beleg: entry.number, Datum: entry.expense.date, Kostenart: entry.expense.category,
     Beschreibung: entry.expense.description, Originalbetrag: entry.expense.gross,
-    Währung: entry.expense.currency, Datei: entry.archivePath || '',
+    Währung: entry.expense.currency,
+    Kurs: entry.expense.currency !== 'EUR' ? String(entry.expense.exchangeRate).replace('.', ',') : '', Kursquelle: entry.expense.currency !== 'EUR' ? entry.expense.exchangeRateSource || '' : '',
+    Datei: entry.archivePath || '',
     Hinweis: entry.expense.receipt ? 'Originaldatei beigefügt' : 'Beleg fehlt',
   })), { delimiter: ';' }));
   return { name: statementExportFilename(data.month, 'zip', context), blob: await zip.generateAsync({ type: "blob" }) };

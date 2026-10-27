@@ -12,7 +12,8 @@ import { belegLaden, belegSpeichern, dauerhaftSpeichern, kasseHinzufuegen, kasse
 import { kasseOrdner, ordnerBeleg, ordnerLesen, ordnerSchreiben, ordnerZugriff } from "../lib/buerokasse-ordner";
 import { readReceiptFile, rotateReceiptImage } from "../lib/receipt-file";
 import { receiptDataUrl, receiptFileId } from "../lib/receipt-images";
-import { recognizeReceiptLocally } from "../lib/receipt-ocr";
+import { RECEIPT_ROTATIONS, TURNED_ONLY, UPRIGHT_ONLY, readingIncomplete, recognizeReceiptLocally } from "../lib/receipt-ocr";
+import { readAllDirections } from "../lib/device-settings";
 import { today } from "../lib/config";
 import type { DirHandleLike } from "../lib/folder-store";
 import type { Expense, Settings } from "../lib/types";
@@ -421,10 +422,41 @@ function BuchungFenster({ art, records, busy, schliessen, buchen }: {
   const setze = <T,>(feld: string, setter: (v: T) => void) => (v: T) => { geaendert.current.add(feld); setter(v); };
   useEffect(() => () => { revision.current++; }, []);
 
+  const [drehen, setDrehen] = useState(false);
+  /** Foto lesen: Vorgabe nur aufrecht (schnell); „gedreht lesen“ probiert die übrigen Richtungen. */
+  const lesenFoto = async (foto: { dataUrl: string; name: string }, rev: number, gedrehtLesen: boolean) => {
+    const alle = readAllDirections();
+    setDrehen(false);
+    const titel = gedrehtLesen ? "Beleg wird gedreht gelesen" : "Beleg wird gelesen";
+    setLesen(`${titel} …`);
+    const erkannt = await recognizeReceiptLocally(foto.dataUrl, (p) => { if (rev === revision.current) setLesen(`${titel} … ${p} %`); },
+      gedrehtLesen ? TURNED_ONLY : alle ? RECEIPT_ROTATIONS : UPRIGHT_ONLY);
+    if (rev !== revision.current) return;
+    if (gedrehtLesen && readingIncomplete(erkannt) && !(erkannt.gross && !centAusEingabe(betrag))) {
+      setLesen("Auch gedreht nicht besser lesbar – bitte Betrag und Datum eintippen."); return;
+    }
+    const frei = (feld: string) => !geaendert.current.has(feld);
+    if (frei("datum") && erkannt.date && erkannt.date <= today()) setDatum(erkannt.date);
+    if (frei("betrag") && erkannt.gross && erkannt.gross > 0) setBetrag(betragText(Math.round(erkannt.gross * 100)));
+    if (frei("haendler") && erkannt.merchant) setHaendler(erkannt.merchant);
+    if (frei("mwst") && erkannt.vatRate !== undefined && MWST_SAETZE.includes(erkannt.vatRate)) setMwst(erkannt.vatRate);
+    if (frei("rechnungsnr") && erkannt.invoiceNumber) setRechnungsnr(erkannt.invoiceNumber);
+    // Gleicher Händler wie früher: dieselbe Kategorie vorschlagen.
+    const frueher = erkannt.merchant && [...records].reverse().find((r) => r.art === art && r.haendler && r.haendler.toLowerCase() === erkannt.merchant!.toLowerCase());
+    if (frei("kategorie") && frueher && frueher.kategorie) setKategorie(frueher.kategorie);
+    if (erkannt.rotation) {
+      const gedreht = await rotateReceiptImage(foto.dataUrl, erkannt.rotation);
+      const id = gedreht && receiptFileId(gedreht.dataUrl);
+      if (gedreht && id && rev === revision.current) setBild({ fileId: id, dataUrl: gedreht.dataUrl, name: foto.name.replace(/\.[a-z0-9]+$/i, "") + ".jpg", type: "image/jpeg", size: gedreht.size });
+    }
+    if (rev !== revision.current) return;
+    setLesen("");
+    if (!gedrehtLesen && !alle && readingIncomplete(erkannt)) setDrehen(true);
+  };
   const datei = async (file?: File) => {
     if (!file) return;
     const rev = ++revision.current;
-    setLesen("Foto wird vorbereitet …");
+    setLesen("Foto wird vorbereitet …"); setDrehen(false);
     try {
       const gelesen = await readReceiptFile(file);
       const fileId = receiptFileId(gelesen.dataUrl);
@@ -432,27 +464,16 @@ function BuchungFenster({ art, records, busy, schliessen, buchen }: {
       if (!fileId) throw new Error("Bild nicht lesbar");
       setBild({ fileId, dataUrl: gelesen.dataUrl, name: gelesen.name, type: gelesen.type, size: gelesen.size }); setOhneBeleg(false);
       if (!/^image\/(jpeg|jpg|png|webp)$/i.test(gelesen.type)) { setLesen(""); return; }
-      setLesen("Beleg wird gelesen …");
-      const erkannt = await recognizeReceiptLocally(gelesen.dataUrl, (p) => { if (rev === revision.current) setLesen(`Beleg wird gelesen … ${p} %`); });
-      if (rev !== revision.current) return;
-      const frei = (feld: string) => !geaendert.current.has(feld);
-      if (frei("datum") && erkannt.date && erkannt.date <= today()) setDatum(erkannt.date);
-      if (frei("betrag") && erkannt.gross && erkannt.gross > 0) setBetrag(betragText(Math.round(erkannt.gross * 100)));
-      if (frei("haendler") && erkannt.merchant) setHaendler(erkannt.merchant);
-      if (frei("mwst") && erkannt.vatRate !== undefined && MWST_SAETZE.includes(erkannt.vatRate)) setMwst(erkannt.vatRate);
-      if (frei("rechnungsnr") && erkannt.invoiceNumber) setRechnungsnr(erkannt.invoiceNumber);
-      // Gleicher Händler wie früher: dieselbe Kategorie vorschlagen.
-      const frueher = erkannt.merchant && [...records].reverse().find((r) => r.art === art && r.haendler && r.haendler.toLowerCase() === erkannt.merchant!.toLowerCase());
-      if (frei("kategorie") && frueher && frueher.kategorie) setKategorie(frueher.kategorie);
-      if (erkannt.rotation) {
-        const gedreht = await rotateReceiptImage(gelesen.dataUrl, erkannt.rotation);
-        const id = gedreht && receiptFileId(gedreht.dataUrl);
-        if (gedreht && id && rev === revision.current) setBild({ fileId: id, dataUrl: gedreht.dataUrl, name: gelesen.name.replace(/\.[a-z0-9]+$/i, "") + ".jpg", type: "image/jpeg", size: gedreht.size });
-      }
-      if (rev === revision.current) setLesen("");
+      await lesenFoto(gelesen, rev, false);
     } catch {
       if (rev === revision.current) setLesen("Automatisches Lesen nicht möglich – bitte Betrag und Datum eintippen.");
     }
+  };
+  const gedrehtLesen = async () => {
+    if (!bild) return;
+    const rev = ++revision.current;
+    try { await lesenFoto(bild, rev, true); }
+    catch { if (rev === revision.current) setLesen("Automatisches Lesen nicht möglich – bitte Betrag und Datum eintippen."); }
   };
 
   const cent = centAusEingabe(betrag);
@@ -476,6 +497,8 @@ function BuchungFenster({ art, records, busy, schliessen, buchen }: {
         <input type="file" accept="image/*,.pdf" capture="environment" aria-label="Beleg fotografieren" onChange={(e) => void datei(e.target.files?.[0])} />
       </label>}
       {lesen && <p className={liest ? "kasse-lesen" : "info-box yellow"} role="status">{lesen}</p>}
+      {drehen && !liest && bild && <div className="info-box yellow kasse-drehen"><p><b>Betrag oder Datum nicht gelesen.</b> Liegt der Beleg auf dem Foto quer?</p>
+        <button type="button" className="ghost" onClick={() => void gedrehtLesen()}>Beleg liegt quer – gedreht lesen</button></div>}
       <BetragFeld label="Betrag" wert={betrag} setWert={setze("betrag", setBetrag)} />
       <label>Datum<input type="date" value={datum} max={today()} onChange={(e) => setze("datum", setDatum)(e.target.value)} /></label>
       <label>{ausgabe ? "Wofür?" : "Woher?"}<select value={kategorie} onChange={(e) => setze("kategorie", setKategorie)(e.target.value)}>
