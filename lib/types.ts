@@ -11,7 +11,7 @@ export type ReviewStatus =
 export type VehicleType =
   "firmenfahrzeug" | "privatfahrzeug" | "mietwagen" | "öffentlich" | "anderes";
 export type PaymentType =
-  "Firmenkarte" | "privat vorgestreckt" | "Unternehmen" | "bereits erstattet" | "unbekannt";
+  "Firmenkarte" | "privat vorgestreckt" | "Unternehmen" | "Bürokasse" | "bereits erstattet" | "unbekannt";
 
 export interface VehicleProfile {
   id: string;

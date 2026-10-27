@@ -392,7 +392,7 @@ export function buildStatement(state: AppState, month: string): StatementData {
       const mileage = round2(mileageDetails.reduce((sum, item) => sum + item.amount, 0));
       const companyPaid = round2(
         expenses
-          .filter((e) => ["Firmenkarte", "Unternehmen"].includes(e.paymentType))
+          .filter((e) => ["Firmenkarte", "Unternehmen", "Bürokasse"].includes(e.paymentType))
           .reduce((s, e) => s + expenseGrossEur(e), 0),
       );
       const reimbursed = round2(
