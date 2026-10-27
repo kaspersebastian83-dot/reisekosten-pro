@@ -29,7 +29,8 @@ try {
     const context = await browser.newContext({ viewport });
     await context.route(/https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
     const abfragen = [];
-    await context.route(/data-api\.ecb\.europa\.eu/, (r) => { abfragen.push(r.request().url()); r.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'text/csv' }, body: 'KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE\nEXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2026-03-06,1.0800\n' }); });
+    let warten = 0;
+    await context.route(/data-api\.ecb\.europa\.eu/, async (r) => { abfragen.push(r.request().url()); if (warten) await new Promise((ok) => setTimeout(ok, warten)); r.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'text/csv' }, body: 'KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE\nEXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2026-03-06,1.0800\n' }); });
     const page = await context.newPage(), errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto(url); await page.getByRole('heading', { name: 'Monatsübersicht', exact: true }).waitFor();
@@ -61,6 +62,27 @@ try {
     s = await waitState(page, (x) => x.expenses[0].exchangeRateSource === 'Kartenabrechnung');
     assert.equal(s.expenses[0].exchangeRate, 0.95);
     assert.equal(abfragen.length, vorher, 'gespeicherter Kurs wird beim Öffnen nicht neu geladen');
+    // Datum geändert: alter Kurs gilt nicht mehr, bis der neue geladen ist (Codex-Hinweis)
+    await page.getByRole('region', { name: 'Monat im Überblick', exact: true }).getByText(/sonstige Nebenkosten|Parken/).first().click();
+    await editor.waitFor();
+    await editor.getByLabel('Euro-Betrag laut Kartenabrechnung').fill('');
+    await editor.getByRole('button', { name: 'EZB-Kurs holen' }).click();
+    await editor.getByText('EZB-Referenzkurs 06.03.2026').waitFor();
+    warten = 6000;
+    await editor.getByLabel('Datum', { exact: true }).fill('2026-03-07');
+    await editor.getByRole('button', { name: 'Speichern & fertig', exact: true }).click();
+    await page.locator('.toast', { hasText: 'Bitte den Kurs für USD angeben' }).waitFor();
+    await editor.getByText('EZB-Referenzkurs 06.03.2026').waitFor();
+    // Kartenbetrag während einer laufenden Abfrage: die Abfrage überschreibt ihn nicht (Codex-Hinweis)
+    await editor.getByLabel('Datum', { exact: true }).fill('2026-03-08');
+    await editor.getByLabel('Euro-Betrag laut Kartenabrechnung').fill('51,30');
+    await page.waitForTimeout(6500);
+    await editor.getByText('Kartenabrechnung', { exact: false }).first().waitFor();
+    assert.equal(await editor.getByText('EZB-Referenzkurs').count(), 0);
+    await editor.getByRole('button', { name: 'Speichern & fertig', exact: true }).click(); await editor.waitFor({ state: 'detached' });
+    s = await waitState(page, (x) => x.expenses[0].date === '2026-03-08' && x.expenses[0].exchangeRateSource === 'Kartenabrechnung');
+    assert.equal(s.expenses[0].exchangeRate, 0.95);
+    warten = 0;
     // ohne Kurs kein Speichern
     await page.locator('.month-entry-workspace').getByRole('button', { name: 'Sonstige Kosten erfassen', exact: true }).click(); await editor.waitFor();
     await editor.getByLabel('Datum', { exact: true }).fill('2026-03-09');

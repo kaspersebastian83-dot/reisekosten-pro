@@ -423,6 +423,8 @@ function BuchungFenster({ art, records, busy, schliessen, buchen }: {
   useEffect(() => () => { revision.current++; }, []);
 
   const [drehen, setDrehen] = useState(false);
+  /** Was die letzte Texterkennung tatsächlich gefunden hat (nicht vorbelegte Felder wie das heutige Datum). */
+  const gelesenRef = useRef<{ gross?: number; date?: string }>({});
   /** Foto lesen: Vorgabe nur aufrecht (schnell); „gedreht lesen“ probiert die übrigen Richtungen. */
   const lesenFoto = async (foto: { dataUrl: string; name: string }, rev: number, gedrehtLesen: boolean) => {
     const alle = readAllDirections();
@@ -432,9 +434,11 @@ function BuchungFenster({ art, records, busy, schliessen, buchen }: {
     const erkannt = await recognizeReceiptLocally(foto.dataUrl, (p) => { if (rev === revision.current) setLesen(`${titel} … ${p} %`); },
       gedrehtLesen ? TURNED_ONLY : alle ? RECEIPT_ROTATIONS : UPRIGHT_ONLY);
     if (rev !== revision.current) return;
-    if (gedrehtLesen && readingIncomplete(erkannt) && !(erkannt.gross && !centAusEingabe(betrag))) {
+    const gefunden = (x: { gross?: number; date?: string }) => (x.gross ? 1 : 0) + (x.date ? 1 : 0);
+    if (gedrehtLesen && !((erkannt.gross && !gelesenRef.current.gross) || gefunden(erkannt) > gefunden(gelesenRef.current))) {
       setLesen("Auch gedreht nicht besser lesbar – bitte Betrag und Datum eintippen."); return;
     }
+    gelesenRef.current = { gross: erkannt.gross, date: erkannt.date };
     const frei = (feld: string) => !geaendert.current.has(feld);
     if (frei("datum") && erkannt.date && erkannt.date <= today()) setDatum(erkannt.date);
     if (frei("betrag") && erkannt.gross && erkannt.gross > 0) setBetrag(betragText(Math.round(erkannt.gross * 100)));

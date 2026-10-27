@@ -724,7 +724,8 @@ function ReceiptCapture({
   const [scanError, setScanError] = useState("");
   /** Nur aufrecht gelesen und Betrag oder Datum fehlen: „gedreht lesen“ anbieten. */
   const [turnable, setTurnable] = useState(false);
-  const suggestionRef = useRef(suggestion); suggestionRef.current = suggestion;
+  /** Was die letzte Texterkennung tatsächlich gefunden hat (nicht vorbelegte Formularwerte). */
+  const ocrFound = useRef<{ gross?: number; date?: string }>({});
   usePendingWork(true);
 
   const selectedTripId = tripId;
@@ -775,9 +776,10 @@ function ReceiptCapture({
       if (revision !== scanRevision.current) return;
       if (turned) {
         const found = (x: { gross?: number; date?: string }) => (x.gross ? 1 : 0) + (x.date ? 1 : 0);
-        const better = (!!learned.suggestion.gross && !suggestionRef.current.gross) || found(learned.suggestion) > found(suggestionRef.current);
+        const better = (!!learned.suggestion.gross && !ocrFound.current.gross) || found(learned.suggestion) > found(ocrFound.current);
         if (!better) { setScanError("Auch gedreht nicht besser lesbar – bitte Betrag und Datum eintippen."); return; }
       } else if (!all && readingIncomplete(learned.suggestion)) setTurnable(true);
+      ocrFound.current = { gross: learned.suggestion.gross, date: learned.suggestion.date };
       setSuggestionState(current => ({...current, ...Object.fromEntries(Object.entries(learned.suggestion).filter(([key]) => !editedFields.current.has(key)))}));
       // Quer oder kopfüber gelesen: gespeichertes Foto aufrecht drehen (Fingerabdruck bleibt der der Originaldatei).
       if (rotation) {

@@ -21,6 +21,8 @@ export function CurrencyFields({ value, onChange }: { value: CurrencyValue; onCh
   const [loading, setLoading] = useState(false);
   const request = useRef(0);
   useEffect(() => { setRateText(fmtRate(exchangeRate)); }, [exchangeRate]);
+  /** Laufende EZB-Abfrage verwerfen – ein selbst eingetragener Kurs oder Kartenbetrag darf nicht überschrieben werden. */
+  const cancel = () => { request.current++; setLoading(false); setStatus(''); };
   const fetchRate = async (code = currency, day = date) => {
     if (code === 'EUR' || !day) return;
     const id = ++request.current;
@@ -41,7 +43,10 @@ export function CurrencyFields({ value, onChange }: { value: CurrencyValue; onCh
     const opening = first.current; first.current = false;
     // Beim Öffnen einer gespeicherten Position mit Kurs nichts neu laden.
     if (opening && exchangeRate > 0) return;
-    if (foreign && auto && date) void fetchRate(currency, date);
+    if (!foreign || !auto || !date) return;
+    // Alten Kurs sofort verwerfen: bis der neue da ist, lässt sich nicht mit dem Kurs eines anderen Tages speichern.
+    if (exchangeRate > 0) onChange({ currency, exchangeRate: 0, exchangeRateSource: undefined });
+    void fetchRate(currency, date);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currency, date]);
   useEffect(() => () => { request.current++; }, []);
@@ -63,13 +68,13 @@ export function CurrencyFields({ value, onChange }: { value: CurrencyValue; onCh
         <label>
           Kurs: 1 {currency} =
           <span className="currency-input"><input inputMode="decimal" aria-label={`Euro je 1 ${currency}`} value={rateText}
-            onChange={(e) => { setRateText(e.target.value); const n = parse(e.target.value); if (n) onChange({ currency, exchangeRate: roundRate(n), exchangeRateSource: 'selbst eingetragen' }); }} /> €</span>
+            onChange={(e) => { setRateText(e.target.value); const n = parse(e.target.value); if (n) { cancel(); onChange({ currency, exchangeRate: roundRate(n), exchangeRateSource: 'selbst eingetragen' }); } }} /> €</span>
         </label>
         <button type="button" className="ghost" disabled={loading || !date} onClick={() => void fetchRate()}>EZB-Kurs holen</button>
         <label>
           Laut Kartenabrechnung abgebucht (€)
           <input inputMode="decimal" aria-label="Euro-Betrag laut Kartenabrechnung" value={cardText} placeholder="freiwillig"
-            onChange={(e) => { setCardText(e.target.value); const n = parse(e.target.value); if (n && gross > 0) onChange({ currency, exchangeRate: roundRate(n / gross), exchangeRateSource: 'Kartenabrechnung' }); }} />
+            onChange={(e) => { setCardText(e.target.value); const n = parse(e.target.value); if (n && gross > 0) { cancel(); onChange({ currency, exchangeRate: roundRate(n / gross), exchangeRateSource: 'Kartenabrechnung' }); } }} />
         </label>
       </div>
       <p className="currency-result" role="status">
