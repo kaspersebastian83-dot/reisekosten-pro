@@ -1,5 +1,14 @@
 # Release Notes
 
+## 1.12.1 – 30. Oktober 2026
+
+- **„Demo-Daten laden“ aus der normalen App entfernt.** Der Knopf unter „Datensicherung“ ersetzte ohne Rückfrage alle
+  echten Daten – auch abgeschlossene Monate – und speicherte das sofort in den SpesenKit-Ordner. Er erscheint jetzt
+  nur noch, wenn die Adresse den Test-Schalter `?demo` trägt (z. B. `…/reisekosten-pro/?demo=1`), und ist dort als
+  „nur Test“ gekennzeichnet. Die erfundenen Demo-Fahrten werden erst beim Klick nachgeladen (`lib/demo-switch.ts`).
+- Tests: `demo-switch.test.ts`, Build-Prüfung (Demo-Daten nur im nachgeladenen Teil), Browserprüfung „kein Demo-Knopf
+  ohne Schalter“; die Browserprüfungen, die Demo-Daten nutzen, öffnen die App mit `?demo=1`.
+
 ## 1.12.0 – 27. Oktober 2026
 
 Rückmeldungen aus dem Einsatz zur Belegerkennung und zu Dollar-Belegen.

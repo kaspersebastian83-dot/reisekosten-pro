@@ -46,7 +46,7 @@ try {
     const rawNav=async(name)=>page.locator('.sidebar nav button').filter({hasText:name}).evaluate(button=>button.click());
     let seed;
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+      await page.goto(url+'?demo=1');await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await check(`${engine} ${viewport.width}: one unified startup, twelve months, correct previous local month and read-only navigation`,async()=>{
         const labels=['Monatsübersicht','Auswertungen','Einstellungen','Datensicherung'];
         assert.deepEqual(await page.locator('.sidebar nav button span').allTextContents(),labels);assert.equal(await picker.inputValue(),'2026-11');assert.equal(await page.locator('.year-month').count(),12);

@@ -51,7 +51,8 @@ try {
     const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'page overflow');
     let frozen,tripId;
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+      await check(`${engine} ${viewport.width}: Demo-Daten nur mit ?demo in der Adresse`,async()=>{await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await nav(page,'Datensicherung');await page.getByRole('heading',{name:'Sicherung wiederherstellen',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).count(),0,'kein Demo-Knopf ohne Schalter');});
+      await page.goto(url+'?demo=1');await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await nav(page,'Datensicherung');await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).click();
       const seed=await waitState(page,s=>s?.trips.length>0);
       seed.trips=[];seed.expenses=[];seed.statements=[];seed.receiptInbox=[];seed.changes=[];seed.merchantRules=[];

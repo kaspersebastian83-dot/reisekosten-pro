@@ -1,6 +1,6 @@
 # SpesenKit – Anleitung
 
-Stand: Version 1.12.0. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
+Stand: Version 1.12.1. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
 Büro-Terminal (RDP, eigenes Windows-Profil) in **Edge oder Chrome** genutzt.
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ – oder in der

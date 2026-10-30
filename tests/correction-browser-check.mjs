@@ -52,7 +52,7 @@ try {
     const mutate=async(fn)=>{const saved=await state(page);fn(saved);await writeState(page,saved);await reload();return saved;};
     let frozen,second;
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+      await page.goto(url+'?demo=1');await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await nav(page,'Datensicherung');await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).click();
       const seed=await waitState(page,s=>s?.trips.length>0);
       seed.settings.profileName='Synthetisches Altprofil';seed.settings.company='Synthetische Altfirma';

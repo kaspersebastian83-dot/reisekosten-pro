@@ -59,7 +59,7 @@ try {
     };
     let baseline,frozen;
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+      await page.goto(url+'?demo=1');await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       assert.equal(await picker.inputValue(),'2026-11');await picker.fill('');assert.equal(await picker.inputValue(),'2026-11');
       await nav(page,'Datensicherung');await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).click();
       const seed=await waitState(page,s=>s?.trips.length>0);

@@ -48,7 +48,7 @@ try {
     const accept=async()=>{for(const checkbox of await dialog.getByRole('checkbox').all())await checkbox.check();};
     let frozen;
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+      await page.goto(url+'?demo=1');await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await nav(page,'Datensicherung');await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).click();
       const seed=await waitState(page,s=>s?.trips.length>0);
       seed.trips=[{...seed.trips[0],id:'closing-trip',date:'2026-06-10',endDate:'2026-06-10',startTime:'08:00',endTime:'17:00',destination:'Musterstadt',purpose:'Synthetischer Termin',order:'26.0123 Musterstadt',businessKm:0,privateKm:0,tripType:'dienstlich',absenceConfirmed:true,manualAbsenceMinutes:undefined,overnight:false,status:'geprüft',warnings:[],meals:{breakfast:false,lunch:false,dinner:false},dailyMeals:{}}];

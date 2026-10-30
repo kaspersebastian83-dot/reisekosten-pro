@@ -62,7 +62,7 @@ try {
   if (process.env.SANDBOX_HANDLE_SHIM) await context.addInitScript(handleShim);
   const page = await context.newPage(); page.setDefaultTimeout(20000);
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(url); await ready(page);
+  await page.goto(url + '?demo=1'); await ready(page);
 
   // Ausgangslage wie in 1.8: Demo-Daten, Juli-Entwurf, dann Bilder eingebettet in Kosten, Eingang und Version.
   await nav(page, 'Datensicherung'); await page.getByRole('button', { name: 'Demo-Daten laden', exact: true }).click();

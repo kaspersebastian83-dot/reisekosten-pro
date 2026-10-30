@@ -21,6 +21,21 @@ test("creates a GitHub Pages compatible static build", async () => {
   assert.doesNotMatch(html, /(?:href|src)=["']\/(?!\/)/);
 });
 
+test("Demo-Daten stecken nur in einem nachgeladenen Teil", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const assets = new URL("../dist/assets/", import.meta.url);
+  const mitDemo = [], mitKnopf = [];
+  for (const name of await readdir(assets)) {
+    if (!name.endsWith(".js")) continue;
+    const js = await readFile(new URL(name, assets), "utf8");
+    if (js.includes("K-RK 2026")) mitDemo.push(name);
+    if (js.includes("Demo-Daten laden")) mitKnopf.push(name);
+  }
+  assert.equal(mitDemo.length, 1, "erfundene Demo-Fahrten in genau einem Teil");
+  assert.match(mitDemo[0], /^demo-/);
+  assert.ok(mitKnopf.length && !mitKnopf.includes(mitDemo[0]), "Knopf (nur mit ?demo) lädt die Daten erst beim Klick");
+});
+
 test("SpesenKit branding preserves PWA identity, repository paths and icon sizes", async () => {
   const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
   const manifest = JSON.parse(await readFile(new URL("../dist/manifest.webmanifest", import.meta.url), "utf8"));

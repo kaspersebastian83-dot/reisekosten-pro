@@ -106,7 +106,7 @@ try {
   const page = await context.newPage(); page.setDefaultTimeout(15000);
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   const banner = page.locator('.folder-banner');
-  await page.goto(url); await ready(page);
+  await page.goto(url + '?demo=1'); await ready(page);
 
   await check('ohne Ordner: deutlicher Hinweis, Verhalten wie bisher', async () => {
     assert.equal(await folderStatus(page), 'none');
@@ -451,7 +451,7 @@ try {
     await check(`Layout ${viewport.width}px: Hinweis, Ordnerkarte und Konfliktdialog ohne Überlauf`, async () => {
       const ctx = await browser.newContext({ viewport, timezoneId: 'Europe/Berlin' });
       await prepare(ctx);
-      const p = await ctx.newPage(); await p.goto(url); await ready(p);
+      const p = await ctx.newPage(); await p.goto(url + '?demo=1'); await ready(p);
       await fits(p); await p.screenshot({ path: path.join(output, `hinweis-${viewport.width}.png`) });
       await p.locator('.folder-banner').getByRole('button', { name: 'Ordner einrichten' }).click();
       await until(async () => (await folderStatus(p)) === 'ok', 'ok');
