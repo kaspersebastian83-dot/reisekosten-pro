@@ -48,7 +48,7 @@ try {
     const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'page overflow');
     const july=async()=>{await nav(page,'Monatsübersicht');await page.locator('.year-months').getByRole('button',{name:/^Juli 2026 ·/}).click();await workspace.waitFor();};
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+      await page.goto(url+'?demo=1');await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await nav(page,'Datensicherung');await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).click();
       const seed=await waitState(page,s=>s?.trips.length>0);seed.receiptInbox=[inboxItem('b',12),inboxItem('a',11)];seed.changes=[];
       await writeState(page,seed);await page.reload();await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();await july();

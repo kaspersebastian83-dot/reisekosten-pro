@@ -62,7 +62,7 @@ try {
     const save=()=>modal.getByRole('button',{name:'Bestätigen & Ausgabe anlegen',exact:true}).click();
     const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'viewport overflow');
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+      await page.goto(url+'?demo=1');await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await nav(page,'Datensicherung');await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).click();
       const seed=await waitState(page,s=>s?.trips.length>0);const base={...seed.trips[0],date:'2026-10-20',endDate:'2026-10-21',startTime:'07:00',endTime:'18:00',order:'26.0123 Musterstadt',destination:'Musterstadt',purpose:'Synthetischer Ortstermin',businessKm:0,privateKm:0,manualAbsenceMinutes:undefined,overnight:true,absenceConfirmed:true,tripType:'dienstlich',status:'ungeprüft',warnings:[],meals:{breakfast:false,lunch:false,dinner:false},dailyMeals:{'2026-10-21':{breakfast:true,lunch:false,dinner:false}}};
       seed.trips=[{...base,id:'trip-a'},{...base,id:'trip-b',date:'2026-11-20',endDate:'2026-11-21',dailyMeals:{}},{...base,id:'trip-c',order:'26.0124 Köln',endDate:'2026-10-23',dailyMeals:{}},{...base,id:'trip-d',order:'26.0124 Köln',endDate:'2026-10-22',dailyMeals:{}}];

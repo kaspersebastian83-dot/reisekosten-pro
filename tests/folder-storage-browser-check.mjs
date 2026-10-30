@@ -48,7 +48,8 @@ const harness = () => {
       const file = JSON.parse(await (await handle.getFile()).text());
       file.state.settings.profileName = 'Anderer Terminalserver'; file.revision += 1; file.savedAt = new Date().toISOString();
       const copies = await root.getDirectoryHandle('Sicherungen');
-      const copy = await copies.getFileHandle(`spesenkit_speicherkandidat_2026-10-20_120000_${crypto.randomUUID()}.json`, { create: true });
+      const d = new Date(), tag = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // heutiges Datum: ältere Kandidaten räumt SpesenKit nach 7 Tagen weg
+      const copy = await copies.getFileHandle(`spesenkit_speicherkandidat_${tag}_120000_${crypto.randomUUID()}.json`, { create: true });
       const w = await original.call(copy); const text = JSON.stringify(file.state); await w.write(text); await w.close();
       if (await (await copy.getFile()).text() !== text) throw Error('Synthetischer Kandidat nicht bestätigt');
       const external = await original.call(handle); await external.write(JSON.stringify(file)); await external.close();
@@ -106,7 +107,7 @@ try {
   const page = await context.newPage(); page.setDefaultTimeout(15000);
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   const banner = page.locator('.folder-banner');
-  await page.goto(url); await ready(page);
+  await page.goto(url + '?demo=1'); await ready(page);
 
   await check('ohne Ordner: deutlicher Hinweis, Verhalten wie bisher', async () => {
     assert.equal(await folderStatus(page), 'none');
@@ -451,7 +452,7 @@ try {
     await check(`Layout ${viewport.width}px: Hinweis, Ordnerkarte und Konfliktdialog ohne Überlauf`, async () => {
       const ctx = await browser.newContext({ viewport, timezoneId: 'Europe/Berlin' });
       await prepare(ctx);
-      const p = await ctx.newPage(); await p.goto(url); await ready(p);
+      const p = await ctx.newPage(); await p.goto(url + '?demo=1'); await ready(p);
       await fits(p); await p.screenshot({ path: path.join(output, `hinweis-${viewport.width}.png`) });
       await p.locator('.folder-banner').getByRole('button', { name: 'Ordner einrichten' }).click();
       await until(async () => (await folderStatus(p)) === 'ok', 'ok');

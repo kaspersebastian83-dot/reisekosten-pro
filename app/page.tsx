@@ -86,7 +86,7 @@ import { FolderBanner, FolderCard, FolderConflictDialog, FolderStatusLine, State
 import { changeStatementStatus, persistStatementClosing, type ClosingConfirmation, type ClosingIssue } from "../lib/statement-closing";
 import { MonthNavigation } from "./month-navigation";
 import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel, monthOverview } from "../lib/month-navigation";
-import { demoState } from "../lib/demo";
+import { demoErlaubt } from "../lib/demo-switch";
 import { slimChangeLog } from "../lib/change-log";
 import { RECEIPT_ROTATIONS, TURNED_ONLY, UPRIGHT_ONLY, applyMerchantRule, readingIncomplete, recognizeReceiptLocally } from "../lib/receipt-ocr";
 import { readAllDirections, setReadAllDirections } from "../lib/device-settings";
@@ -3443,26 +3443,32 @@ function Backup({
           JSON auswählen
         </button>
       </section>
-      <section className="card full demo-box">
-        <div>
-          <p className="eyebrow">Demo-Modus</p>
-          <h3>Alle Sonderfälle in Ruhe ausprobieren</h3>
-          <p>
-            Erzeugt erfundene Fahrten mit Grenzfällen, Mehrtagesreise,
-            Mahlzeitenkürzung, Duplikat, Firmen- und Privatfahrzeug sowie
-            fehlendem Beleg.
-          </p>
-        </div>
-        <button
-          className="ghost"
-          onClick={() => {
-            setState(demoState());
-            notify("Demo-Daten geladen");
-          }}
-        >
-          Demo-Daten laden
-        </button>
-      </section>
+      {demoErlaubt() && (
+        <section className="card full demo-box">
+          <div>
+            <p className="eyebrow">Demo-Modus (nur Test)</p>
+            <h3>Alle Sonderfälle in Ruhe ausprobieren</h3>
+            <p>
+              Erzeugt erfundene Fahrten mit Grenzfällen, Mehrtagesreise,
+              Mahlzeitenkürzung, Duplikat, Firmen- und Privatfahrzeug sowie
+              fehlendem Beleg. Ersetzt alle vorhandenen Daten.
+            </p>
+          </div>
+          <button
+            className="ghost"
+            onClick={() => {
+              import("../lib/demo")
+                .then(({ demoState }) => {
+                  setState(demoState());
+                  notify("Demo-Daten geladen");
+                })
+                .catch(() => notify("Demo-Daten konnten nicht geladen werden."));
+            }}
+          >
+            Demo-Daten laden
+          </button>
+        </section>
+      )}
       <section className="card full">
         <div className="card-head">
           <div>

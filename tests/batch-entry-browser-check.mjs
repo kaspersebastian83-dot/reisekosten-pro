@@ -45,7 +45,7 @@ try {
     const clickAction=async(name)=>workspace.getByRole('button',{name,exact:true}).click();
     const fits=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'page overflow');
     try {
-      await page.goto(url);await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
+      await page.goto(url+'?demo=1');await page.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
       await nav(page,'Datensicherung');await page.getByRole('button',{name:'Demo-Daten laden',exact:true}).click();
       const seed=await waitState(page,s=>s?.trips.length>0);
       seed.trips=[];seed.expenses=[];seed.statements=[];seed.receiptInbox=[];seed.changes=[];seed.merchantRules=[];

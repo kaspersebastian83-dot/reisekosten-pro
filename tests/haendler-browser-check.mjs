@@ -34,7 +34,7 @@ try {
     const page = await context.newPage(); page.setDefaultTimeout(15000);
     const errors = []; page.on('pageerror', (e) => errors.push(e.message));
     await page.clock.setFixedTime(new Date('2026-10-18T10:00:00Z'));
-    await page.goto(url); await page.getByRole('heading', { name: 'Monatsübersicht', exact: true }).waitFor();
+    await page.goto(url + '?demo=1'); await page.getByRole('heading', { name: 'Monatsübersicht', exact: true }).waitFor();
     const nav = async (name) => { if (await page.getByRole('button', { name: 'Menü öffnen', exact: true }).isVisible()) await page.getByRole('button', { name: 'Menü öffnen', exact: true }).click(); await page.locator('.sidebar nav').getByRole('button', { name: new RegExp('^' + name) }).click(); };
     await nav('Datensicherung'); await page.getByRole('button', { name: 'Demo-Daten laden', exact: true }).click();
     const seed = await until(async () => { const s = await storedState(page); return s?.expenses?.length ? s : null; }, 'Demo-Daten');
