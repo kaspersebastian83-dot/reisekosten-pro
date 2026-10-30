@@ -48,7 +48,8 @@ const harness = () => {
       const file = JSON.parse(await (await handle.getFile()).text());
       file.state.settings.profileName = 'Anderer Terminalserver'; file.revision += 1; file.savedAt = new Date().toISOString();
       const copies = await root.getDirectoryHandle('Sicherungen');
-      const copy = await copies.getFileHandle(`spesenkit_speicherkandidat_2026-10-20_120000_${crypto.randomUUID()}.json`, { create: true });
+      const d = new Date(), tag = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // heutiges Datum: ältere Kandidaten räumt SpesenKit nach 7 Tagen weg
+      const copy = await copies.getFileHandle(`spesenkit_speicherkandidat_${tag}_120000_${crypto.randomUUID()}.json`, { create: true });
       const w = await original.call(copy); const text = JSON.stringify(file.state); await w.write(text); await w.close();
       if (await (await copy.getFile()).text() !== text) throw Error('Synthetischer Kandidat nicht bestätigt');
       const external = await original.call(handle); await external.write(JSON.stringify(file)); await external.close();

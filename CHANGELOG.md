@@ -8,6 +8,8 @@
   „nur Test“ gekennzeichnet. Die erfundenen Demo-Fahrten werden erst beim Klick nachgeladen (`lib/demo-switch.ts`).
 - Tests: `demo-switch.test.ts`, Build-Prüfung (Demo-Daten nur im nachgeladenen Teil), Browserprüfung „kein Demo-Knopf
   ohne Schalter“; die Browserprüfungen, die Demo-Daten nutzen, öffnen die App mit `?demo=1`.
+- Browserprüfung `folder-storage`: Der nachgebildete Speicherkandidat des „anderen Terminalservers“ trug das feste
+  Datum 20.10.2026 und wurde seit dem 28.10. von der 7-Tage-Aufräumregel entfernt; er trägt jetzt das heutige Datum.
 
 ## 1.12.0 – 27. Oktober 2026
 
