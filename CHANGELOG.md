@@ -1,5 +1,19 @@
 # Release Notes
 
+## 1.13.0 – 20. November 2026
+
+Audit Lauf 3 (Spektron-Büro-Apps), C18 Teil 1 und C19.
+- **Zwischenhalt im Büro oder zu Hause:** Liegt an einem eintägigen Reisetag zwischen zwei Dienstfahrten eine Fahrt, die an
+  der ersten Tätigkeitsstätte (Fahrtart „erste Tätigkeitsstätte“ oder Ziel = Adresse aus den Einstellungen) oder an der
+  Wohnadresse endet, zählt die Zeit dort in der Berechnung bisher als Abwesenheit. SpesenKit nennt das jetzt in „Weg zum
+  Abschluss“ und im Abschluss mit Uhrzeiten und der Dauer ohne den Zwischenhalt (z. B. „12:00 Std.; ohne sie 6:45 Std.“).
+  Abschließen geht erst, wenn an einer Reise dieses Tages „Manuelle Abwesenheit (Min.)“ eingetragen ist – auch wenn die
+  angezeigte Dauer stimmt. Nur bei Tagen mit Verpflegungspauschale.
+- **Die Berechnung selbst ist unverändert** (offener Punkt: Regel wird mit dem Steuerbüro bestätigt). Gespeicherte und
+  abgeschlossene Abrechnungen ändern sich nicht; der Hinweis entsteht nur in der Abschlussprüfung. Kein neues Datenfeld.
+- **Veröffentlichen nur noch aus `main`:** Der alte Zweig `bugfix/startup-and-workflows` ist aus dem Pages-Workflow entfernt.
+- Tests: `tests/zwischenhalt.test.ts`.
+
 ## 1.12.1 – 30. Oktober 2026
 
 - **„Demo-Daten laden“ aus der normalen App entfernt.** Der Knopf unter „Datensicherung“ ersetzte ohne Rückfrage alle

@@ -3,7 +3,7 @@
 Dienstreisen · Spesen · Abrechnungen
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
-1.12.1 (Release-Version aus [package.json](package.json), Änderungen in
+1.13.0 (Release-Version aus [package.json](package.json), Änderungen in
 [CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
 
 Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
@@ -20,7 +20,11 @@ Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV-, DATEV-CSV- und ZIP-Exporte.
 
-## Aktueller Stand in Kürze (1.12.1)
+## Aktueller Stand in Kürze (1.13.0)
+
+- **Zwischenhalt im Büro oder zu Hause (1.13.0):** Abschlussprüfung nennt eintägige Tage mit Zwischenhalt an der ersten
+  Tätigkeitsstätte bzw. zu Hause und verlangt „Manuelle Abwesenheit (Min.)“; die Berechnung ist unverändert
+  (`lib/zwischenhalt.ts`, offener Punkt bis zur Bestätigung durch das Steuerbüro).
 
 - **Belegfoto:** Bruttobetrag statt Netto (Netto, Zwischensumme, Steuerzeilen, gegeben/Rückgeld zählen nicht; Netto +
   Steuer als Abgleich). Gelesen wird nur aufrecht; „Beleg liegt quer – gedreht lesen“ bei fehlendem Betrag/Datum, alle
