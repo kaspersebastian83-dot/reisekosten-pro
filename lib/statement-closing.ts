@@ -4,6 +4,7 @@ import { isMonth, latestStatement } from './month-navigation';
 import { duplicateExpense, linkingErrors, projectNumber, similarExpense, validDate, withoutTripNeeded } from './receipt-linking';
 import type { AppState, ChangeLog, ReviewStatus, StatementSnapshot } from './types';
 import { compareSnapshotWithCurrent, relatedTripsForSnapshot } from './statement-comparison';
+import { zwischenhalte, zwischenhaltText } from './zwischenhalt';
 
 export interface ClosingIssue {
   code: string;
@@ -108,6 +109,10 @@ export function checkStatementForClosing(state: AppState, month: string, snapsho
         for (const trip of row.trips) {
           if (!trip.absenceConfirmed && row.allowanceBefore > 0) issue(errors, 'absence', `Reise ${trip.date} · ${trip.destination || trip.id}: Die für die Verpflegungsberechnung benötigte Abwesenheitsdauer ist nicht bestätigt.`, { kind: 'trip', id: trip.id });
         }
+        // C18 (Audit Lauf 3): Zwischenhalt im Büro/zu Hause → Hinweis und Abschluss erst nach ausdrücklicher Angabe der Abwesenheit
+        // („Manuelle Abwesenheit (Min.)“). Nur Prüfung – buildStatement und gespeicherte Abrechnungen bleiben unverändert.
+        const halte = row.allowanceBefore > 0 && row.trips[0] ? zwischenhalte(state.trips, row.date, state.settings) : [];
+        if (halte.length) issue(errors, 'zwischenhalt', `Reise ${row.date} · ${row.trips[0].destination || row.trips[0].id}: ${zwischenhaltText(halte, row.absenceMinutes)}`, { kind: 'trip', id: row.trips[0].id });
         for (const warning of row.warnings) {
           if (!row.trips.some(t => [...validateTrip(t), ...t.warnings].includes(warning))) issue(warnings, 'day-warning', `${row.date}: ${warning}`, row.trips[0] ? { kind: 'trip', id: row.trips[0].id } : undefined);
         }

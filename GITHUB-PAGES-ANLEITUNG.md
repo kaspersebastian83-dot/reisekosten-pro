@@ -130,7 +130,7 @@ Pages-Konfiguration, Website-Artefakt oder Deployment. Die Concurrency-Gruppe
 ist pro Git-Ref getrennt, damit PR-Prüfungen laufende Deployments nicht abbrechen.
 Falls GitHub keinen automatischen PR-Lauf meldet, kann **Run workflow** auf dem
 Feature-Branch zur Prüfung gestartet werden. Pages-Schritte sind zusätzlich
-auf die freigegebenen Branches `main` / `bugfix/startup-and-workflows` begrenzt;
+auf den Branch `main` begrenzt (der frühere Zweig `bugfix/startup-and-workflows` veröffentlicht seit 1.13.0 nicht mehr);
 auch ein manueller Feature-Lauf veröffentlicht nichts.
 
 Falls eine alte Version hartnäckig bleibt: In den Chrome-Entwicklertools unter
