@@ -3,6 +3,8 @@ name: Browserprüfungen
 # Die Prüfungen in tests/*browser*.mjs (Speichern, Belege, Monatsabschluss, Korrekturen, Bürokasse, Fremdwährung …)
 # liefen bisher nur von Hand. Getrennt vom Pages-Workflow, damit eine hängende Browser-Installation nie das Veröffentlichen blockiert.
 on:
+  schedule:
+    - cron: '7 5 * * *'  # UTC
   pull_request:
     branches: [main]
   workflow_dispatch:
