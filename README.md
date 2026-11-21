@@ -120,6 +120,9 @@ npm run test:browser -- buerokasse fremdwaehrung # nur einzelne
 Die Browserprüfungen (`tests/*browser*.mjs`: Speichern, Belege, Monatsabschluss, Korrekturen, Bürokasse,
 Fremdwährung …) laufen bei jedem Pull Request automatisch im Workflow „Browserprüfungen“ – getrennt vom
 Veröffentlichen. Ausgenommen ist nur `branding-browser-check.mjs` (braucht eine alte Produktionsversion).
+Wird eine Prüfung rot, hängt der Lauf das Artefakt **„browserpruefungen-fehlschlag“** an (14 Tage): je roter Prüfung
+das volle Protokoll (`protokoll.txt`) und Bildschirmfotos aller Seiten, die beim Abbruch offen waren. Lokal dasselbe mit
+`BROWSER_ARTEFAKTE_DIR=<Ordner> npm run test:browser`.
 
 ## Enthaltene Kernfunktionen
 

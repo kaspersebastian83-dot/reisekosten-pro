@@ -37,3 +37,14 @@ jobs:
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
       - name: Browserprüfungen
         run: node tests/run-browser-checks.mjs
+        env:
+          BROWSER_ARTEFAKTE_DIR: ${{ runner.temp }}/browserpruefungen
+      # E9 (Audit Lauf 5): bei Rot volles Protokoll und Bildschirmfotos je roter Prüfung, damit ein seltener Fehlschlag (C21) aufzuklären ist
+      - name: Protokolle und Bildschirmfotos bei Fehlschlag
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browserpruefungen-fehlschlag
+          path: ${{ runner.temp }}/browserpruefungen/
+          if-no-files-found: warn
+          retention-days: 14
