@@ -22,7 +22,7 @@ Kosten und Belege und erzeugt PDF-, Excel-, CSV- und ZIP-Exporte sowie eine Buch
 
 ## Aktueller Stand in Kürze (1.18.2)
 
-- **1.18.2:** Netzwerkgrenze (`connect-src`: nur eigene Adresse, EZB, frankfurter.dev), Datumsangaben in Ortszeit, dompurify 3.5.0.
+- **1.18.2:** Abrechnung auf dem Handy: Summen zuerst, Einzelaufstellung aufklappbar. Netzwerkgrenze (`connect-src`: nur eigene Adresse, EZB, frankfurter.dev), Datumsangaben in Ortszeit, dompurify 3.5.0.
 - **1.18.1:** Zeitleiste auf dem Handy nennt je Eintrag den Stand der Übergabe (gesendet / geändert / noch nicht gesendet).
 - **1.18.0 – Übergabe Handy → PC:** Handy „An den PC senden“ (eine Datei mit den offenen Reisen, Kosten, Belegen an das
   Teilen-Menü), PC „Vom Handy übernehmen“ (Vorschau, fügt hinzu, ersetzt nichts). Regeln und Dateiformat

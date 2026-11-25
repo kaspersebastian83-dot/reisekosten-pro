@@ -2,7 +2,9 @@
 
 ## 1.18.2 – 25. November 2026
 
-Aufräumen aus der Durchsicht vom 25.11.2026; keine Änderung an Bedienung oder Berechnung.
+Aufräumen aus der Durchsicht vom 25.11.2026; keine Änderung an der Berechnung.
+- **Abrechnung auf dem Handy:** Auf Geräten mit Fingerbedienung stehen die Summen zuerst; „Einzelaufstellung und Rechenweg“
+  (die breite Tabelle je Reisetag und die Rechenwege) ist zugeklappt und öffnet sich auf Antippen. Am PC unverändert.
 - **Netzwerkgrenze:** Die veröffentlichte App darf nur noch die eigene Adresse und die zwei Quellen für den
   Fremdwährungskurs erreichen (EZB, frankfurter.dev). Alles andere lehnt der Browser ab (`Content-Security-Policy`
   mit `connect-src`, beim Build in `index.html` eingesetzt). Skripte, Stile, Bilder und PDF-Vorschauen sind nicht begrenzt.

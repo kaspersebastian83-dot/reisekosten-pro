@@ -89,7 +89,7 @@ import { isMonth, previousCalendarMonth, localCalendarMonth, monthLabel, monthOv
 import { demoErlaubt } from "../lib/demo-switch";
 import { slimChangeLog } from "../lib/change-log";
 import { RECEIPT_ROTATIONS, TURNED_ONLY, UPRIGHT_ONLY, applyMerchantRule, readingIncomplete, recognizeReceiptLocally } from "../lib/receipt-ocr";
-import { readAllDirections, setReadAllDirections } from "../lib/device-settings";
+import { readAllDirections, setReadAllDirections, touchDevice } from "../lib/device-settings";
 import { isEmptyState } from "../lib/folder-store";
 import { CurrencyFields } from "./currency-fields";
 import { HandoffImportCard, HandoffSendCard, useHandoff, type Handoff, type SendStatus } from "./uebergabe";
@@ -2487,6 +2487,9 @@ function Statements({
   folder: FolderStorage;
 }) {
   const [reviewMonth, setReviewMonth] = useState<string | null>(null);
+  // Handy/Tablet: Einzelaufstellung der Abrechnung zunächst zugeklappt (siehe unten); am PC gibt es das Aufklappen nicht.
+  const [foldDetails] = useState(() => touchDevice());
+  const [detailsOpen, setDetailsOpen] = useState(false);
   // Filter der Zeitleiste aus „Prüfen“; beim Monatswechsel zurücksetzen.
   const [timelineFilter, setTimelineFilter] = useState<TimelineFilter | null>(null);
   useEffect(() => setTimelineFilter(null), [month]);
@@ -2652,6 +2655,99 @@ function Statements({
   };
   const setStatus = (status: ReviewStatus) =>
     update((s) => changeStatementStatus(s, existing!.id, status, { id: uid(), at: new Date().toISOString() }));
+  const detailBlock = <>
+      <section className="card">
+        <div className="card-head">
+          <div>
+            <p className="eyebrow">Einzelaufstellung</p>
+            <h3>Berechnung je Reisetag</h3>
+          </div>
+          <span className="status-pill">{existing?.status || "Entwurf"}</span>
+        </div>
+        <div className="table-wrap statement-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Datum</th>
+                <th>Zeit / Dauer</th>
+                <th>Ziel & Zweck</th>
+                <th>km</th>
+                <th>Spesen vor</th>
+                <th>Kürzungen</th>
+                <th>Spesen nach</th>
+                <th>Fahrtkosten</th>
+                <th>Hotel</th>
+                <th>Sonstiges</th>
+                <th>Offen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {statement.rows.map((r) => (
+                <tr key={r.date}>
+                  <td>
+                    <b>{dateDe(r.date)}</b>
+                  </td>
+                  <td>
+                    {r.firstStart}–{r.lastEnd}
+                    <small>{duration(r.absenceMinutes)}</small>
+                  </td>
+                  <td>
+                    {r.destinations.join(", ")}
+                    <small>{r.trips.map((t) => t.purpose).join(", ")}</small>
+                  </td>
+                  <td>{r.totalKm}</td>
+                  <td>{euro(r.allowanceBefore)}</td>
+                  <td>-{euro(r.breakfastCut + r.lunchCut + r.dinnerCut)}</td>
+                  <td>
+                    <b>{euro(r.allowanceAfter)}</b>
+                  </td>
+                  <td>{euro(r.mileage + r.fuel)}</td>
+                  <td>{euro(r.accommodation)}</td>
+                  <td>{euro(r.other)}</td>
+                  <td>
+                    <b>{euro(r.openAmount)}</b>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={6}>Summen</td>
+                <td>{euro(statement.totals.allowance)}</td>
+                <td>
+                  {euro(statement.totals.mileage + statement.totals.fuel)}
+                </td>
+                <td>{euro(statement.totals.accommodation)}</td>
+                <td>{euro(statement.totals.other)}</td>
+                <td>{euro(statement.totals.openAmount)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div className="statement-day-details">{statement.rows.map((row) => <DayDetails key={row.date} day={row} frozen={!!existing?.locked} />)}</div>
+      </section>
+      <MonthDetails statement={statement} frozen={!!existing?.locked} />
+  </>;
+  const summaryGrid = (
+      <section className="summary-grid">
+        <div>
+          <span>Verpflegungspauschalen</span>
+          <b>{euro(statement.totals.allowance)}</b>
+        </div>
+        <div>
+          <span>Kilometererstattung</span>
+          <b>{euro(statement.totals.mileage)}</b>
+        </div>
+        <div>
+          <span>Privat vorgestreckt</span>
+          <b>{euro(statement.totals.privatelyAdvanced)}</b>
+        </div>
+        <div className="total">
+          <span>Persönlicher Erstattungsbetrag laut Abrechnungsstand</span>
+          <b>{euro(statement.totals.openAmount)}</b>
+        </div>
+      </section>
+  );
   return (
     <>
       <MonthWorkspace state={state} month={month} statement={currentStatement} startEntry={startEntry} openCapture={openCapture}
@@ -2745,95 +2841,15 @@ function Statements({
         </div>
       )}
       {exportFirst && exportCard}
-      <section className="card">
-        <div className="card-head">
-          <div>
-            <p className="eyebrow">Einzelaufstellung</p>
-            <h3>Berechnung je Reisetag</h3>
-          </div>
-          <span className="status-pill">{existing?.status || "Entwurf"}</span>
-        </div>
-        <div className="table-wrap statement-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Datum</th>
-                <th>Zeit / Dauer</th>
-                <th>Ziel & Zweck</th>
-                <th>km</th>
-                <th>Spesen vor</th>
-                <th>Kürzungen</th>
-                <th>Spesen nach</th>
-                <th>Fahrtkosten</th>
-                <th>Hotel</th>
-                <th>Sonstiges</th>
-                <th>Offen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {statement.rows.map((r) => (
-                <tr key={r.date}>
-                  <td>
-                    <b>{dateDe(r.date)}</b>
-                  </td>
-                  <td>
-                    {r.firstStart}–{r.lastEnd}
-                    <small>{duration(r.absenceMinutes)}</small>
-                  </td>
-                  <td>
-                    {r.destinations.join(", ")}
-                    <small>{r.trips.map((t) => t.purpose).join(", ")}</small>
-                  </td>
-                  <td>{r.totalKm}</td>
-                  <td>{euro(r.allowanceBefore)}</td>
-                  <td>-{euro(r.breakfastCut + r.lunchCut + r.dinnerCut)}</td>
-                  <td>
-                    <b>{euro(r.allowanceAfter)}</b>
-                  </td>
-                  <td>{euro(r.mileage + r.fuel)}</td>
-                  <td>{euro(r.accommodation)}</td>
-                  <td>{euro(r.other)}</td>
-                  <td>
-                    <b>{euro(r.openAmount)}</b>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={6}>Summen</td>
-                <td>{euro(statement.totals.allowance)}</td>
-                <td>
-                  {euro(statement.totals.mileage + statement.totals.fuel)}
-                </td>
-                <td>{euro(statement.totals.accommodation)}</td>
-                <td>{euro(statement.totals.other)}</td>
-                <td>{euro(statement.totals.openAmount)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        <div className="statement-day-details">{statement.rows.map((row) => <DayDetails key={row.date} day={row} frozen={!!existing?.locked} />)}</div>
-      </section>
-      <MonthDetails statement={statement} frozen={!!existing?.locked} />
-      <section className="summary-grid">
-        <div>
-          <span>Verpflegungspauschalen</span>
-          <b>{euro(statement.totals.allowance)}</b>
-        </div>
-        <div>
-          <span>Kilometererstattung</span>
-          <b>{euro(statement.totals.mileage)}</b>
-        </div>
-        <div>
-          <span>Privat vorgestreckt</span>
-          <b>{euro(statement.totals.privatelyAdvanced)}</b>
-        </div>
-        <div className="total">
-          <span>Persönlicher Erstattungsbetrag laut Abrechnungsstand</span>
-          <b>{euro(statement.totals.openAmount)}</b>
-        </div>
-      </section>
+      {/* Handy: erst die Summen, die Einzelaufstellung (breite Tabelle, Rechenweg je Tag) aufklappbar – die Seite war dort
+          rund zehn Bildschirme lang. Am PC unverändert: alles offen, Summen nach der Einzelaufstellung. */}
+      {foldDetails ? <>
+        {summaryGrid}
+        <details className="statement-fold" open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
+          <summary><span>Einzelaufstellung und Rechenweg</span><small>{statement.rows.length} {statement.rows.length === 1 ? "Tag" : "Tage"} · {detailsOpen ? "zuklappen" : "aufklappen"}</small></summary>
+          {detailsOpen && detailBlock}
+        </details>
+      </> : <>{detailBlock}{summaryGrid}</>}
       {!exportFirst && exportCard}
       {existing && isClosedStatement(existing) && <StatementFiling folder={folder} snapshot={existing} label={`${monthLabel(month)} (Version ${existing.version})`} print={() => void makePdf(true)} />}
       </>}

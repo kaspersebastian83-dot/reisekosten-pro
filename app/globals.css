@@ -3189,3 +3189,12 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .handoff-closing-hint { margin-top: 8px; }
 .timeline-sent { font-weight: 700; color: var(--muted); }
 .timeline-sent.geaendert, .timeline-sent.offen { color: var(--yellow); }
+
+/* ---------- Handy (ab 1.18.2): Einzelaufstellung der Abrechnung aufklappbar ---------- */
+.statement-fold { margin: 0; }
+.statement-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 12px 16px;
+  background: var(--white); border: 1px solid var(--line); border-radius: 12px; font-weight: 800; }
+.statement-fold > summary::-webkit-details-marker { display: none; }
+.statement-fold > summary small { color: var(--green); font-weight: 700; font-size: 13px; white-space: nowrap; }
+.statement-fold[open] > summary { margin-bottom: 14px; }
+.statement-fold > * + * { margin-top: 14px; }
