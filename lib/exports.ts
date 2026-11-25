@@ -1,3 +1,4 @@
+import { today } from "./config";
 import { markBackupDay } from "./device-settings";
 import JSZip from "jszip";
 import Papa from "papaparse";
@@ -264,9 +265,9 @@ export async function exportBackup(state: AppState, options: { download?: boolea
   state = await withAllReceiptImages(state);
   (options.download ? download : deliver)(
     new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
-    `Reisekosten_Backup_${new Date().toISOString().slice(0, 10)}.json`,
+    `Reisekosten_Backup_${today()}.json`,   // Kalendertag des Geräts, nicht UTC (zwischen 0 und 1 bzw. 2 Uhr sonst der Vortag)
   );
-  markBackupDay(new Date().toLocaleDateString("sv-SE"));
+  markBackupDay(today());
 }
 
 export async function exportZip(

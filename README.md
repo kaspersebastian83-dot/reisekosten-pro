@@ -3,7 +3,7 @@
 Dienstreisen · Spesen · Abrechnungen
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
-1.18.1 (Release-Version aus [package.json](package.json), Änderungen in
+1.18.2 (Release-Version aus [package.json](package.json), Änderungen in
 [CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
 
 Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
@@ -20,8 +20,9 @@ Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV- und ZIP-Exporte sowie eine Buchungsliste (CSV).
 
-## Aktueller Stand in Kürze (1.18.1)
+## Aktueller Stand in Kürze (1.18.2)
 
+- **1.18.2:** Netzwerkgrenze (`connect-src`: nur eigene Adresse, EZB, frankfurter.dev), Datumsangaben in Ortszeit, dompurify 3.5.0.
 - **1.18.1:** Zeitleiste auf dem Handy nennt je Eintrag den Stand der Übergabe (gesendet / geändert / noch nicht gesendet).
 - **1.18.0 – Übergabe Handy → PC:** Handy „An den PC senden“ (eine Datei mit den offenen Reisen, Kosten, Belegen an das
   Teilen-Menü), PC „Vom Handy übernehmen“ (Vorschau, fügt hinzu, ersetzt nichts). Regeln und Dateiformat

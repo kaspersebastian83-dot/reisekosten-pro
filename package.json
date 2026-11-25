@@ -1,6 +1,6 @@
 {
   "name": "reisekosten-pro",
-  "version": "1.18.1",
+  "version": "1.18.2",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -43,7 +43,7 @@
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "dompurify": "^3.4.16",
+    "dompurify": "^3.5.0",
     "uuid": "^11.1.1"
   },
   "type": "module",
