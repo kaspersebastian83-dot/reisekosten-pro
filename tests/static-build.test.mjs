@@ -37,6 +37,18 @@ test("Belegerkennung liegt in der App selbst (kein Nachladen von einem fremden S
   assert.ok(own, "createWorker bekommt workerPath/corePath/langPath aus ./tesseract/");
 });
 
+test("Netzwerkgrenze: die fertige App darf nur die eigene Adresse und die Kursquellen erreichen", async () => {
+  const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+  const csp = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1] || "";
+  const connect = csp.split(";").map((part) => part.trim()).find((part) => part.startsWith("connect-src ")) || "";
+  assert.deepEqual(connect.split(" ").slice(1).sort(), ["'self'", "blob:", "data:", "https://api.frankfurter.dev", "https://data-api.ecb.europa.eu"]);
+  assert.match(csp, /base-uri 'self'/);
+  assert.match(csp, /form-action 'self'/);
+  assert.doesNotMatch(csp, /default-src|script-src|\*/, "nur Netzwerkzugriffe begrenzt, keine Platzhalter");
+  // Die Quellvorlage bleibt ohne Grenze (Entwicklungsserver).
+  assert.doesNotMatch(await readFile(new URL("../index.html", import.meta.url), "utf8"), /Content-Security-Policy/);
+});
+
 test("Demo-Daten stecken nur in einem nachgeladenen Teil", async () => {
   const { readdir } = await import("node:fs/promises");
   const assets = new URL("../dist/assets/", import.meta.url);

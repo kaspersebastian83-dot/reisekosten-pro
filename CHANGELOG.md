@@ -1,5 +1,18 @@
 # Release Notes
 
+## 1.18.2 – 25. November 2026
+
+Aufräumen aus der Durchsicht vom 25.11.2026; keine Änderung an der Berechnung.
+- **Abrechnung auf dem Handy:** Auf Geräten mit Fingerbedienung stehen die Summen zuerst; „Einzelaufstellung und Rechenweg“
+  (die breite Tabelle je Reisetag und die Rechenwege) ist zugeklappt und öffnet sich auf Antippen. Am PC unverändert.
+- **Netzwerkgrenze:** Die veröffentlichte App darf nur noch die eigene Adresse und die zwei Quellen für den
+  Fremdwährungskurs erreichen (EZB, frankfurter.dev). Alles andere lehnt der Browser ab (`Content-Security-Policy`
+  mit `connect-src`, beim Build in `index.html` eingesetzt). Skripte, Stile, Bilder und PDF-Vorschauen sind nicht begrenzt.
+- **Datum in Ortszeit:** Dateiname der JSON-Sicherung sowie „gültig ab“/„geprüft am“ eines neuen Tarifs nehmen den
+  Kalendertag des Geräts statt UTC (zwischen 0 und 1 bzw. 2 Uhr war es der Vortag).
+- **dompurify 3.5.0** (über jsPDF eingebunden): behebt den Hinweis aus `npm audit` (niedrig).
+- Tests: Build-Prüfung „Netzwerkgrenze“.
+
 ## 1.18.1 – 25. November 2026
 
 - **Zeitleiste auf dem Handy:** Jede Reise und Kostenposition nennt in ihrer Detailzeile den Stand der Übergabe an den PC –

@@ -19,6 +19,7 @@ const ocrFiles: Record<string, string> = {
 };
 // Ändert sich nur mit den Paketversionen: Der OCR-Cache des Service Workers übersteht damit App-Updates.
 const ocrId = createHash("sha256").update(["tesseract.js", "tesseract.js-core", "@tesseract.js-data/deu", "@tesseract.js-data/eng"].map((name) => `${name}@${packageVersion(name)}`).join("|") + Object.keys(ocrFiles).join("|")).digest("hex").slice(0, 16);
+const netzwerkgrenze = "connect-src 'self' blob: data: https://data-api.ecb.europa.eu https://api.frankfurter.dev; base-uri 'self'; form-action 'self'";
 let commit = process.env.GITHUB_SHA || "";
 if (!commit) { try { commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(); } catch { /* Source archive build. */ } }
 export default defineConfig({
@@ -27,6 +28,15 @@ export default defineConfig({
   // user.github.io/repository-name without knowing the repository in advance.
   base: "./",
   plugins: [react(), {
+    // Netzwerkzugriffe der fertigen App auf das Nötige begrenzen: die eigene Adresse und die zwei Stellen für den
+    // Fremdwährungskurs (lib/exchange-rates.ts). Alles andere lehnt der Browser ab – so hält die Zusage „keine Übertragung
+    // Ihrer Abrechnungsdaten“ auch dann, wenn eine eingebundene Bibliothek etwas nachladen wollte. Nur im Build: Der
+    // Entwicklungsserver braucht seine eigene Verbindung. Bewusst nur connect-src/base-uri/form-action, kein default-src:
+    // Skripte, Stile, Bilder und PDF-Vorschauen bleiben unberührt.
+    name: "reisekosten-netzwerkgrenze",
+    apply: "build",
+    transformIndexHtml: (html) => html.replace("<head>", `<head>\n    <meta http-equiv="Content-Security-Policy" content="${netzwerkgrenze}" />`),
+  }, {
     name: "reisekosten-offline-shell",
     generateBundle(_, bundle) {
       const assets = Object.keys(bundle).filter((name) => /\.(js|css)$/.test(name)).sort();

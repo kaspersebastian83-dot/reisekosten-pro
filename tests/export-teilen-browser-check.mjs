@@ -71,6 +71,23 @@ try {
     assert.equal(await wahl.getByRole('button', { name: 'Teilen', exact: true }).getAttribute('aria-pressed'), 'true');
     assert.match(await wahl.innerText(), /Teilen-Menü dieses Geräts/);
   });
+  await check('Handy: Abrechnung zeigt erst die Summen; Einzelaufstellung und Rechenweg sind zugeklappt (seit 1.18.2)', async () => {
+    const fold = page.locator('details.statement-fold');
+    await fold.waitFor();
+    assert.equal(await fold.evaluate((el) => el.open), false);
+    assert.equal(await page.locator('.statement-table').count(), 0, 'breite Tabelle erst nach dem Aufklappen');
+    assert.equal(await page.evaluate(() => !!(document.querySelector('.summary-grid').compareDocumentPosition(document.querySelector('.statement-fold')) & Node.DOCUMENT_POSITION_FOLLOWING)), true, 'Summen vor der Einzelaufstellung');
+    const zu = await page.evaluate(() => document.documentElement.scrollHeight);
+    await fold.locator(':scope > summary').click();
+    await page.locator('.statement-table').waitFor();
+    await page.locator('.statement-day-details').waitFor();
+    assert.match(await fold.locator(':scope > summary').innerText(), /zuklappen/);
+    const auf = await page.evaluate(() => document.documentElement.scrollHeight);
+    assert.ok(auf > zu + 1500, `aufgeklappt deutlich länger (${zu} → ${auf})`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, 'Tabelle scrollt in sich, die Seite nicht');
+    await fold.locator(':scope > summary').click();
+    await page.locator('.statement-table').waitFor({ state: 'detached' });
+  });
   await check('Handy: CSV geht mit unverändertem Namen an das Teilen-Menü, kein Download', async () => {
     await card.getByRole('button', { name: 'CSV', exact: true }).click();
     await until(async () => (await geteilt()).length === 1, 'CSV geteilt');
@@ -125,7 +142,7 @@ try {
     await sicherung.getByRole('button', { name: 'Sicherung teilen', exact: true }).waitFor();
   });
   await check('Abgeschlossene Abrechnung: „Abrechnung weitergeben“ steht vor der Tagesberechnung, Entwurf wie bisher danach', async () => {
-    const vor = async () => page.evaluate(() => { const karte = document.querySelector('.export-card'), tage = document.querySelector('.statement-day-details'); return !!(karte.compareDocumentPosition(tage) & Node.DOCUMENT_POSITION_FOLLOWING); });
+    const vor = async () => page.evaluate(() => { const karte = document.querySelector('.export-card'), tage = document.querySelector('.statement-day-details') || document.querySelector('.statement-fold'); return !!(karte.compareDocumentPosition(tage) & Node.DOCUMENT_POSITION_FOLLOWING); });
     await h.nav('Monatsübersicht'); await page.getByRole('button', { name: /^Jul/ }).click();
     await page.getByRole('button', { name: 'Abrechnung fortsetzen', exact: true }).click(); await page.locator('.export-card').waitFor();
     assert.equal(await vor(), false, 'Entwurf: Export am Ende');
@@ -146,6 +163,8 @@ try {
   const pcCard = await juliEntwurf(p);
   await check('PC: keine Wahl, CSV wird heruntergeladen, nichts geht an ein Teilen-Menü', async () => {
     assert.equal(await p.page.getByRole('group', { name: 'Exporte auf diesem Gerät' }).count(), 0);
+    assert.equal(await p.page.locator('.statement-fold').count(), 0, 'PC: kein Aufklappen');
+    assert.equal(await p.page.evaluate(() => !!(document.querySelector('.statement-table').compareDocumentPosition(document.querySelector('.summary-grid')) & Node.DOCUMENT_POSITION_FOLLOWING)), true, 'PC: Summen nach der Einzelaufstellung wie bisher');
     await pcCard.getByRole('button', { name: 'CSV', exact: true }).click();
     await until(async () => p.downloads.length === 1, 'CSV-Download am PC');
     assert.deepEqual(p.downloads, ['Reisekosten_2026-07_V01.csv']);
