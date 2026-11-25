@@ -60,6 +60,8 @@ Alles passiert in der **Monatsübersicht**.
    `SpesenKit\Spesen\<Jahr>\<Monat>\` ab (PDF und ZIP mit Belegen; Excel
    zuschaltbar). „Abrechnung drucken“ öffnet die PDF zum Drucken. Exporte
    (PDF, Excel, CSV, Buchungsliste, ZIP) gibt es zusätzlich in der Abrechnung.
+   Auf dem Handy oder Tablet steht dort **Teilen / Herunterladen**: „Teilen“ gibt die Datei an das Teilen-Menü des
+   Geräts (Mail, OneDrive …); kann das Gerät eine Dateiart nicht teilen, wird sie heruntergeladen.
 
 Freigabe und Auszahlung sind getrennt: SpesenKit gibt nichts automatisch frei
 und zahlt nichts aus.

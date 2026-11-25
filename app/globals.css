@@ -3092,3 +3092,13 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .turn-hint button, .kasse-drehen button { margin-top: 8px; }
 .kasse-drehen { display: grid; gap: 4px; }
 .kasse-drehen p { margin: 0; }
+
+/* Exporte teilen statt herunterladen (Handy/Tablet, app/export-share.tsx) */
+.export-delivery { margin: 12px 0 4px; max-width: 420px; }
+.export-delivery .segmented { margin: 0 0 6px; background: var(--paper, #eef4fb); }
+.export-delivery .segmented button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; font-size: 14px; }
+.export-delivery small { display: block; color: var(--muted, #5b6b7b); font-size: 13px; line-height: 1.4; }
+.backup-card .export-delivery { margin-left: auto; margin-right: auto; }
+.export-ready-file { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 28px; overflow-wrap: anywhere; }
+.export-ready-file small { color: var(--muted, #5b6b7b); }
+.export-ready .modal-actions button { min-height: 48px; flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }

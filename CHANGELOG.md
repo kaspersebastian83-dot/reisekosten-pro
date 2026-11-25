@@ -1,5 +1,25 @@
 # Release Notes
 
+## 1.15.0 – 25. November 2026
+
+Rückmeldung aus dem Einsatz: Der Export vom Handy (an den Laptop, per Mail) war umständlich.
+- **Exporte teilen statt herunterladen (Handy, Tablet):** In „Abrechnung weitergeben“ und bei der JSON-Sicherung steht auf
+  Geräten mit Fingerbedienung die Wahl **Teilen / Herunterladen** (Vorgabe: Teilen, je Gerät gemerkt). „Teilen“ übergibt
+  PDF, Excel, CSV, Buchungsliste, ZIP bzw. Sicherung an das Teilen-Menü des Geräts – also direkt an Mail, OneDrive usw.,
+  statt in den Download-Ordner des Handys. Dateinamen und Inhalte sind dieselben wie beim Herunterladen.
+- **Was ein Gerät nicht teilt, wird wie bisher heruntergeladen** (mit Hinweis) – welche Dateiarten das Teilen-Menü annimmt,
+  entscheidet der Browser je Datei. Dauert das Erstellen länger (große PDF oder ZIP mit Belegen), verlangt der Browser
+  einen zweiten Fingertipp: Dann erscheint **„Datei ist fertig“** mit „Teilen“ und „Herunterladen“.
+- **Notfall-Sicherung bleibt ein Download:** „JSON-Sicherung herunterladen“ in der Meldung bei einem Speicherfehler lädt
+  immer auf das Gerät, auch wenn Exporte sonst geteilt werden.
+- **Am PC ändert sich nichts** (Maus: weiterhin Download, keine neue Wahl). Ein Empfänger lässt sich nicht vorbelegen –
+  das Teilen-Menü gehört dem Gerät.
+- **Abgeschlossene Abrechnung: „Abrechnung weitergeben“ steht direkt unter dem Kopf** statt am Ende der Seite (auf dem
+  Handy lag sie rund neun Bildschirme tiefer). Entwürfe behalten die bisherige Reihenfolge.
+- Technik: `lib/share-file.ts` (Web Share API), `app/export-share.tsx`, Geräteeinstellung `localStorage`
+  `spesenkit-export-teilen`; alle Exporte in `lib/exports.ts` laufen über `setExportDelivery`. Kein neues Datenfeld.
+- Tests: `tests/share-file.test.ts`, Browserprüfung `export-teilen-browser-check.mjs` (nachgebildetes Teilen-Menü).
+
 ## 1.14.0 – 25. November 2026
 
 - **„DATEV-CSV“ heißt jetzt „Buchungsliste (CSV)“** (Dateiname `Buchungsliste_Reisekosten_<Monat>_<Version>.csv` statt
