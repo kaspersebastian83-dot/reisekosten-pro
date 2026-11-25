@@ -1,5 +1,20 @@
 # Release Notes
 
+## 1.17.0 – 25. November 2026
+
+Bedienung auf dem Handy; am PC ist alles unverändert.
+- **Schnellleiste unten (bis 760 px Breite):** In der Monatsübersicht stehen **Belegfoto** und **Neue Reise** fest am unteren
+  Rand, in Daumenreichweite. Bisher war „Beleg fotografieren“ der vierte von fünf Knöpfen, mehr als einen Bildschirm
+  tiefer. Die Knöpfe im Monatsarbeitsbereich bleiben; die Leiste weicht jedem geöffneten Fenster.
+- **Sicherungshinweis statt Ordner-Hinweis (Handy, Tablet):** Ohne verbundenen SpesenKit-Ordner erscheint auf Geräten mit
+  Fingerbedienung eine Zeile „Ihre Spesen liegen nur auf diesem Gerät.“ mit „Letzte Sicherung: …“ bzw. „Noch keine
+  Sicherung erstellt.“ und dem Knopf **Sichern** (führt zur Datensicherung). Bisher: auf Android der große Hinweis mit
+  „Terminalserver“ und „Ordner einrichten“, auf dem iPhone gar kein Hinweis. Ohne erfasste Daten erscheint nichts. Der
+  Ordner lässt sich weiterhin unter „Datensicherung“ einrichten, wo der Browser das kann.
+- Der Tag der letzten JSON-Sicherung wird je Gerät gemerkt (`localStorage` `spesenkit-letzte-sicherung`, gesetzt beim
+  Erstellen der Sicherung – ob eine geteilte Datei ihr Ziel erreicht hat, kann die App nicht wissen).
+- Tests: Browserprüfung `handy-leiste-browser-check.mjs`.
+
 ## 1.16.0 – 25. November 2026
 
 Bedienung auf dem Handy (bis 760 px Breite); am PC ist alles unverändert.
