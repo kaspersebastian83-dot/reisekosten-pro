@@ -38,8 +38,8 @@ describe('Versionssichere und zahlungsneutrale Exporte', () => {
     expect(statementExportFilename(month, extension, context(2))).toBe(`Reisekosten_2026-06_V02.${extension}`);
     expect(statementExportFilename(month, extension, context(103))).toContain('_V103.');
   });
-  it('unterscheidet DATEV-Versionen und kennzeichnet ungespeicherte Vorschauen ohne erfundene Versionsnummer', () => {
-    expect(statementExportFilename(month, 'csv', context(2), true)).toBe('DATEV_Reisekosten_2026-06_V02.csv');
+  it('unterscheidet Buchungslisten-Versionen und kennzeichnet ungespeicherte Vorschauen ohne erfundene Versionsnummer', () => {
+    expect(statementExportFilename(month, 'csv', context(2), true)).toBe('Buchungsliste_Reisekosten_2026-06_V02.csv');
     expect(statementExportFilename(month, 'pdf')).toBe('Reisekosten_2026-06_Entwurf.pdf');
   });
   it('zeigt Version und ursprüngliche Abrechnungsnummer in PDF, ohne offene Auszahlung zu behaupten', () => {
@@ -65,10 +65,10 @@ describe('Versionssichere und zahlungsneutrale Exporte', () => {
       expect(overview.join(' ')).toContain(`Version ${i + 1}`); if (i === 1) expect(overview.join(' ')).toContain(correctionExportNotice);
     }
   });
-  it.each([false, true])('bewahrt CSV/DATEV-Schema und vollständige historische Beträge (DATEV=%s)', async datev => {
+  it.each([false, true])('bewahrt CSV-/Buchungslisten-Schema und vollständige historische Beträge (Buchungsliste=%s)', async datev => {
     const files = downloads(); const { state, first, second } = fixture();
     for (const snapshot of [first, second]) exportCsv(snapshot.data, stateForStatementVersion(state, snapshot), datev, context(snapshot.version));
-    expect(files.map(file => file.name)).toEqual([1, 2].map(version => `${datev ? 'DATEV_' : ''}Reisekosten_2026-06_V0${version}.csv`));
+    expect(files.map(file => file.name)).toEqual([1, 2].map(version => `${datev ? 'Buchungsliste_' : ''}Reisekosten_2026-06_V0${version}.csv`));
     for (let i = 0; i < files.length; i++) {
       const csv = Papa.parse<Record<string, string>>(await files[i].blob.text(), { delimiter: ';', header: true });
       expect(csv.meta.fields).toEqual(datev ? datevColumns : columns); expect(csv.errors).toEqual([]);
@@ -102,7 +102,7 @@ describe('Restpunkte der Durchsicht (1.8.6)', () => {
     expect(data.totals.companyPaid).toBe(19);
     expect(data.totals.grandTotal).toBe(Math.round((data.totals.allowance + data.totals.mileage + 95 + 19) * 100) / 100);
   });
-  it('DATEV ohne 0,00-Zeilen; Buchungstext ohne leere Teile', async () => {
+  it('Buchungsliste ohne 0,00-Zeilen; Buchungstext ohne leere Teile', async () => {
     const files = downloads(); const { state } = fixture();
     state.trips = [];
     state.expenses = [{ ...state.expenses[0], id: 'park', date: '2026-06-10', category: 'Parken', gross: 6, net: 6, paymentType: 'privat vorgestreckt', reimbursementStatus: 'offen', receipt: undefined },

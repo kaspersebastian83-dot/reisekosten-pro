@@ -21,6 +21,22 @@ test("creates a GitHub Pages compatible static build", async () => {
   assert.doesNotMatch(html, /(?:href|src)=["']\/(?!\/)/);
 });
 
+test("Belegerkennung liegt in der App selbst (kein Nachladen von einem fremden Server)", async () => {
+  const { readdir, stat } = await import("node:fs/promises");
+  const dir = new URL("../dist/tesseract/", import.meta.url);
+  assert.deepEqual((await readdir(dir)).sort(), ["deu.traineddata.gz", "eng.traineddata.gz", "tesseract-core-lstm.wasm.js",
+    "tesseract-core-relaxedsimd-lstm.wasm.js", "tesseract-core-simd-lstm.wasm.js", "worker.min.js"]);
+  for (const name of await readdir(dir)) assert.ok((await stat(new URL(name, dir))).size > 100_000, `${name} ist vollständig`);
+  const worker = await readFile(new URL("../dist/sw.js", import.meta.url), "utf8");
+  assert.match(worker, /ocr:[0-9a-f]{16}`/);
+  assert.doesNotMatch(worker, /__OCR_ID__/);
+  // Das Programm nennt tesseract.js den eigenen Ordner für Arbeitsskript, Rechenkern und Sprachdateien.
+  const assets = new URL("../dist/assets/", import.meta.url);
+  let own = false;
+  for (const name of await readdir(assets)) if (name.endsWith(".js") && /workerBlobURL:\s*(?:!1|false)/.test(await readFile(new URL(name, assets), "utf8"))) own = true;
+  assert.ok(own, "createWorker bekommt workerPath/corePath/langPath aus ./tesseract/");
+});
+
 test("Demo-Daten stecken nur in einem nachgeladenen Teil", async () => {
   const { readdir } = await import("node:fs/promises");
   const assets = new URL("../dist/assets/", import.meta.url);

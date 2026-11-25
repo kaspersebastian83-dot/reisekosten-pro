@@ -59,7 +59,7 @@ Alles passiert in der **Monatsübersicht**.
 8. **Ablage:** Abgeschlossene Abrechnungen legt SpesenKit selbst im Ordner unter
    `SpesenKit\Spesen\<Jahr>\<Monat>\` ab (PDF und ZIP mit Belegen; Excel
    zuschaltbar). „Abrechnung drucken“ öffnet die PDF zum Drucken. Exporte
-   (PDF, Excel, CSV, DATEV-CSV, ZIP) gibt es zusätzlich in der Abrechnung.
+   (PDF, Excel, CSV, Buchungsliste, ZIP) gibt es zusätzlich in der Abrechnung.
 
 Freigabe und Auszahlung sind getrennt: SpesenKit gibt nichts automatisch frei
 und zahlt nichts aus.

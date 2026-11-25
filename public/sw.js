@@ -1,6 +1,10 @@
 const scopeUrl = new URL(self.registration.scope);
 const CACHE_PREFIX = `reisekosten-pro:${scopeUrl.pathname}:`;
 const CACHE = `${CACHE_PREFIX}__BUILD_ID__`;
+// Belegerkennung (./tesseract/: Arbeitsskript, Rechenkern, Sprachdateien – zusammen rund 12 MB). Eigener Cache, der App-Updates
+// übersteht und nur mit einer neuen tesseract-Version wechselt. Gefüllt beim ersten Lesen eines Belegs, nicht bei der Installation.
+const OCR_CACHE = `${CACHE_PREFIX}ocr:__OCR_ID__`;
+const ocrPath = new URL("./tesseract/", scopeUrl).pathname;
 // Der Produktionsbuild ergänzt alle eigenen JS-/CSS-Dateien für Offline-Starts.
 const appShell = ["./", "./manifest.webmanifest", "./favicon.svg", "./icon-192.png", "./icon-512.png", /* BUILD_ASSETS */].map(
   (path) => new URL(path, scopeUrl).href,
@@ -40,7 +44,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   const activated = (async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE).map((key) => caches.delete(key)));
+    await Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE && key !== OCR_CACHE).map((key) => caches.delete(key)));
     // Alte 1.6.0-Caches können mehrere Pages-Unterpfade enthalten.
     if (keys.includes("reisekosten-pro-v1.6.0")) {
       const legacy = await caches.open("reisekosten-pro-v1.6.0");
@@ -99,6 +103,18 @@ self.addEventListener("message", (event) => {
 self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
   if (event.request.method !== "GET" || requestUrl.origin !== scopeUrl.origin || !requestUrl.pathname.startsWith(scopeUrl.pathname)) return;
+  // Belegerkennung: unveränderliche Dateien je tesseract-Version – erst Cache, sonst Netz und merken.
+  if (requestUrl.pathname.startsWith(ocrPath)) {
+    event.respondWith((async () => {
+      const ocr = await caches.open(OCR_CACHE);
+      const cached = await ocr.match(event.request);
+      if (cached) return cached;
+      const response = await fetch(event.request);
+      if (response.ok) event.waitUntil(ocr.put(event.request, response.clone()));
+      return response;
+    })());
+    return;
+  }
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     // Keep the HTML and hashed assets of this active version together.

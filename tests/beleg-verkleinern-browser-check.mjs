@@ -11,10 +11,13 @@ const require = createRequire(import.meta.url);
 const engines = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const engine = process.env.BROWSER_ENGINE || 'chromium';
 const root = path.resolve('dist');
+let ocrHaengt = false;   // true: Anfragen an ./tesseract/ bleiben ohne Antwort (Texterkennung lädt nie fertig)
 const server = http.createServer(async (req,res) => {
   try {
     const pathname = decodeURIComponent(new URL(req.url,'http://localhost').pathname);
     if (!pathname.startsWith('/reisekosten-pro/')) throw Error();
+    if (pathname.includes('/tesseract/') && ocrHaengt) return;
+    if (pathname.includes('/tesseract/')) throw Error();   // Belegerkennung liegt seit 1.14.0 in der App selbst; hier bewusst nicht ausgeliefert (wie ohne Netz): geprüft wird die Eingabe von Hand
     const file = path.resolve(root, pathname.slice('/reisekosten-pro/'.length) || 'index.html');
     if (!file.startsWith(root+'/')) throw Error();
     const body = await readFile(file);
@@ -70,7 +73,8 @@ try {
   // 1.8.4: Speichern wartet auf die Texterkennung; hängt sie, lässt sie sich abbrechen.
   {
     const ctx2=await browser.newContext({viewport:{width:390,height:844}});
-    await ctx2.route(/https?:\/\/(?!127\.0\.0\.1)/,()=>{});            // Texterkennung lädt nie fertig
+    await ctx2.route(/https?:\/\/(?!127\.0\.0\.1)/,()=>{});
+    ocrHaengt=true;
     const p2=await ctx2.newPage();await p2.goto(url);await p2.getByRole('heading',{name:'Monatsübersicht',exact:true}).waitFor();
     await p2.locator('.month-entry-workspace').getByRole('button',{name:'Beleg fotografieren / OCR',exact:true}).click();
     await p2.locator('.receipt-capture input[type=file]').first().setInputFiles({name:'IMG_1.JPG',mimeType:'image/jpeg',buffer:foto});

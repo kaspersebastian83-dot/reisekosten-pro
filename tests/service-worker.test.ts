@@ -140,3 +140,43 @@ it("lässt eine intakte laufende Version weiterlaufen, bis alle Tabs zustimmen",
   await new Promise((r) => setTimeout(r, 0));
   expect(sw.calls.navigated).toEqual([]);
 });
+
+it("Belegerkennung: eigener Cache übersteht App-Updates, alte tesseract-Version wird entfernt", async () => {
+  const deleted: string[] = [];
+  const keys = ["reisekosten-pro:/reisekosten-pro/:old", "reisekosten-pro:/reisekosten-pro/:ocr:__OCR_ID__", "reisekosten-pro:/reisekosten-pro/:ocr:alt", "reisekosten-pro:/reisekosten-pro/:__BUILD_ID__"];
+  const handlers: Record<string, (event: { waitUntil: (promise: Promise<unknown>) => void }) => void> = {};
+  vm.runInNewContext(readFileSync(new URL("../public/sw.js", import.meta.url), "utf8"), {
+    URL, Response,
+    self: { registration: { scope: "https://example.test/reisekosten-pro/" }, clients: { claim: async () => undefined }, addEventListener: (name: string, handler: typeof handlers[string]) => { handlers[name] = handler; } },
+    caches: { keys: async () => keys, delete: async (key: string) => { deleted.push(key); } },
+  });
+  let completed: Promise<unknown> = Promise.resolve();
+  handlers.activate({ waitUntil: (promise) => { completed = promise; } });
+  await completed;
+  expect(deleted).toEqual(["reisekosten-pro:/reisekosten-pro/:old", "reisekosten-pro:/reisekosten-pro/:ocr:alt"]);
+});
+
+it("Belegerkennung: Dateien unter ./tesseract/ kommen nach dem ersten Laden ohne Netz aus dem OCR-Cache", async () => {
+  const handlers: Record<string, (event: unknown) => void> = {};
+  const stores: Record<string, Map<string, Response>> = {};
+  let online = true, fetched = 0;
+  vm.runInNewContext(readFileSync(new URL("../public/sw.js", import.meta.url), "utf8"), {
+    URL, Response,
+    self: { registration: { scope: "https://example.test/reisekosten-pro/" }, addEventListener: (name: string, fn: typeof handlers[string]) => handlers[name] = fn },
+    caches: { open: async (name: string) => {
+      const store = stores[name] ||= new Map();
+      return { match: async (request: { url: string }) => store.get(request.url)?.clone(), put: async (request: { url: string }, response: Response) => { store.set(request.url, response); } };
+    } },
+    fetch: async () => { if (!online) throw Error("offline"); fetched++; return new Response("sprachdatei"); },
+  });
+  const load = async () => {
+    let response = Promise.resolve(new Response()), stored: Promise<unknown> = Promise.resolve();
+    handlers.fetch({ request: { method: "GET", url: "https://example.test/reisekosten-pro/tesseract/deu.traineddata.gz", mode: "cors" }, respondWith: (p: Promise<Response>) => response = p, waitUntil: (p: Promise<unknown>) => stored = p });
+    const text = await (await response).text(); await stored; return text;
+  };
+  expect(await load()).toBe("sprachdatei");
+  online = false;
+  expect(await load()).toBe("sprachdatei");
+  expect(fetched).toBe(1);
+  expect(Object.keys(stores)).toEqual(["reisekosten-pro:/reisekosten-pro/:ocr:__OCR_ID__"]);   // nicht im Cache der Programmversion
+});

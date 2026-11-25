@@ -109,10 +109,10 @@ try {
           if(snapshot.version===2) {
             let downloads=0;const record=()=>downloads++;page.on('download',record);
             page.once('dialog',async dialog=>{assert.match(dialog.message(),/keine zusätzliche Differenzbuchung/);assert.match(dialog.message(),/frühere Buchungen und Zahlungen gesondert abstimmen/);await dialog.dismiss();});
-            await page.getByRole('button',{name:'DATEV-CSV',exact:true}).click();await page.waitForTimeout(150);assert.equal(downloads,0);page.off('download',record);
+            await page.getByRole('button',{name:'Buchungsliste (CSV)',exact:true}).click();await page.waitForTimeout(150);assert.equal(downloads,0);page.off('download',record);
             page.once('dialog',dialog=>dialog.accept());
           }
-          const datev=await download(page,'DATEV-CSV');assert.ok(datev.file.endsWith(`DATEV_Reisekosten_2026-06_${suffix}.csv`));assert.equal(datev.bytes.toString('utf8').replace(/^\uFEFF/,'').split(/\r?\n/)[0],'Belegdatum;Buchungstext;Betrag;Währung;Kostenstelle');
+          const datev=await download(page,'Buchungsliste (CSV)');assert.ok(datev.file.endsWith(`Buchungsliste_Reisekosten_2026-06_${suffix}.csv`));assert.equal(datev.bytes.toString('utf8').replace(/^\uFEFF/,'').split(/\r?\n/)[0],'Belegdatum;Buchungstext;Betrag;Währung;Kostenstelle');
         }
         assert.equal(new Set(names).size,8);assert.deepEqual((await state(page)).statements,[frozen,second]);
       });
