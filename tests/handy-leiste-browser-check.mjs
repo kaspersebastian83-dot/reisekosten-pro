@@ -77,6 +77,19 @@ try {
     await nav('Monatsübersicht');
     assert.match(await hinweis.innerText(), /Letzte Sicherung: 18\.10\.2026/);
   });
+  await check('Handy: bleiben nur gespeicherte Abrechnungen (Reisen und Kosten gelöscht), bleibt der Hinweis', async () => {
+    const schreiben = (value) => page.evaluate((value) => new Promise((resolve, reject) => { const r = indexedDB.open('reisekosten-pro', 1); r.onsuccess = () => { const tx = r.result.transaction('state', 'readwrite'); tx.objectStore('state').put(value, 'main'); tx.oncomplete = () => { r.result.close(); resolve(); }; tx.onerror = () => reject(tx.error); }; }), value);
+    await page.getByRole('button', { name: /^Jul/ }).click();
+    await page.getByRole('button', { name: 'Spesenabrechnung erstellen', exact: true }).click();
+    const state = await until(async () => { const s = await stored(page); return s?.statements?.length === 1 ? s : null; }, 'Entwurf');
+    await schreiben({ ...state, trips: [], expenses: [], receiptInbox: [] });
+    await page.reload(); await page.getByRole('heading', { name: 'Monatsübersicht', exact: true }).waitFor();
+    assert.equal((await stored(page)).trips.length, 0);
+    await hinweis.waitFor();
+    assert.match(await hinweis.innerText(), /nur auf diesem Gerät/);
+    await schreiben(state);
+    await page.reload(); await page.getByRole('heading', { name: 'Monatsübersicht', exact: true }).waitFor(); await hinweis.waitFor();
+  });
   await check('Handy: Inhalt endet über der Leiste, nichts ragt seitlich heraus', async () => {
     await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
     const { ende, leisteOben, breite } = await page.evaluate(() => { const karten = [...document.querySelectorAll('.content > *, .content section')].filter((el) => el.getClientRects().length); return { ende: Math.max(...karten.map((el) => el.getBoundingClientRect().bottom)), leisteOben: document.querySelector('.quick-bar').getBoundingClientRect().top, breite: document.documentElement.scrollWidth }; });
