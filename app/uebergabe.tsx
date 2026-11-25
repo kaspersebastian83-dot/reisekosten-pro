@@ -13,7 +13,12 @@ import type { FolderStorage } from "./folder-storage";
  *           Teilen-Menü (oder lädt sie herunter). Die Einträge bleiben auf dem Handy und gelten danach als gesendet.
  *   PC:     „Vom Handy übernehmen“ liest die Datei, zeigt vorab, was geschieht, und fügt hinzu – ersetzt wird nichts.
  */
-const tagDe = (iso: string) => iso.slice(0, 10).split("-").reverse().join(".");
+/** Kalendertag in Ortszeit: Zeitstempel sind UTC – kurz nach Mitternacht läge der Tag sonst einen zurück. */
+const tagDe = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10).split("-").reverse().join(".");
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+};
 const eintraege = (n: number) => `${n} ${n === 1 ? "Eintrag" : "Einträge"}`;
 
 /* ---------- Handy ---------- */
@@ -59,9 +64,11 @@ export function useHandoff(state: AppState, share: ExportShare, notify: (message
           // Erst jetzt hat die Datei die App verlassen. Vermerkt wird die gesendete Fassung – wer inzwischen weiter ändert, sieht den Eintrag wieder als offen.
           const next = alsGesendetVermerken(stateRef.current, sentRef.current, auswahl);
           const at = new Date().toISOString();
+          // Nur wenn der Vermerk gespeichert ist, gilt er auch hier – sonst bliebe „Alles gesendet“ bis zum Neuladen stehen,
+          // obwohl beim nächsten Start wieder alles offen wäre.
           const stored = setSentRecords(next, at);
-          setSent(next); setLast(at);
-          notify(`${eintraege(anzahl(auswahl))} an den PC gesendet. Am PC: Datensicherung → „Vom Handy übernehmen“.${fehlen ? ` ${fehlen} Belegbild(er) fehlen auf diesem Gerät.` : ""}${stored ? "" : " Der Vermerk „gesendet“ ließ sich nicht speichern – beim nächsten Mal wird erneut alles gesendet."}`);
+          if (stored) { setSent(next); setLast(at); }
+          notify(`${eintraege(anzahl(auswahl))} an den PC gesendet. Am PC: Datensicherung → „Vom Handy übernehmen“.${fehlen ? ` ${fehlen} Belegbild(er) fehlen auf diesem Gerät.` : ""}${stored ? "" : " Der Vermerk „gesendet“ ließ sich nicht speichern – die Einträge bleiben als offen stehen und werden beim nächsten Mal erneut gesendet."}`);
         });
       } catch { notify("Die Übergabe konnte nicht erstellt werden. Bitte erneut versuchen."); }
       finally { setBusy(false); }

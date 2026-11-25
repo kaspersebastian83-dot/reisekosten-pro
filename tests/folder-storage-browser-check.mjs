@@ -191,7 +191,7 @@ try {
     assert.notEqual((await readFolder(page)).file.state.settings.profileName, 'Während Ausfall');
     await page.evaluate(() => localStorage.removeItem('test-fail-write'));
     await banner.getByRole('button', { name: 'Erneut speichern' }).click();
-    await until(async () => (await readFolder(page))?.file.state.settings.profileName === 'Während Ausfall', 'nachgeholtes Speichern');
+    await until(async () => (await readFolder(page))?.file?.state.settings.profileName === 'Während Ausfall', 'nachgeholtes Speichern');
     assert.equal(await folderStatus(page), 'ok');
   });
 
@@ -261,7 +261,7 @@ try {
     assert.match(await banner.innerText(), /nicht im SpesenKit-Ordner gespeichert/);
     await page.evaluate(() => localStorage.removeItem('test-fail-write'));
     await banner.getByRole('button', { name: 'Erneut speichern' }).click();
-    await until(async () => (await readFolder(page))?.file.state.statements.find((s) => s.month === '2026-07')?.locked, 'Abschluss im Ordner nachgeholt');
+    await until(async () => (await readFolder(page))?.file?.state.statements.find((s) => s.month === '2026-07')?.locked, 'Abschluss im Ordner nachgeholt');
     // Die beim Abschluss nicht mögliche Ablage bleibt als Hinweis stehen und lässt sich nachholen.
     assert.deepEqual(await filedFiles(page, '2026', '07'), {});
     await until(async () => /noch nicht im SpesenKit-Ordner abgelegt/.test(await banner.innerText({ timeout: 500 }).catch(() => '')), 'Ablagehinweis');
@@ -345,7 +345,7 @@ try {
     await nav(page, 'Einstellungen');
     await page.getByLabel('Name', { exact: true }).fill('Nach der Sicherung geändert');
     await page.getByRole('button', { name: 'Einstellungen speichern', exact: true }).click();
-    await until(async () => (await readFolder(page))?.file.state.settings.profileName === 'Nach der Sicherung geändert', 'Änderung im Ordner');
+    await until(async () => (await readFolder(page))?.file?.state.settings.profileName === 'Nach der Sicherung geändert', 'Änderung im Ordner');
     await nav(page, 'Datensicherung');
     // … dann die manuelle Sicherung wiederherstellen: aktueller Stand wird vorher gesichert, Ordnerdatei folgt.
     const revision = (await readFolder(page)).file.revision;
@@ -353,7 +353,7 @@ try {
     await list.locator('tr', { hasText: 'Manuell' }).getByRole('button', { name: 'Wiederherstellen' }).click();
     await until(async () => (await names()).some((n) => n.startsWith('spesenkit_vor_wiederherstellung_')), 'Vorher-Sicherung');
     assert.doesNotMatch(message, /ACHTUNG/);
-    await until(async () => (await readFolder(page)).file.revision > revision, 'Ordnerdatei aktualisiert');
+    await until(async () => (await readFolder(page))?.file?.revision > revision, 'Ordnerdatei aktualisiert');
     assert.equal((await readFolder(page)).file.state.settings.profileName, current.settings.profileName, 'Ordnerdatei zeigt den wiederhergestellten Stand');
     assert.equal((await idbState(page)).settings.profileName, current.settings.profileName);
     assert.deepEqual(tripIds(await idbState(page)), tripIds(current));
