@@ -2,7 +2,7 @@ import { Send, Smartphone, Upload, X } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { deviceId, lastHandoff, sentRecords, setSentRecords, touchDevice } from "../lib/device-settings";
 import { localReceiptImage, rememberReceiptImage } from "../lib/receipt-images";
-import { alsGesendetVermerken, anzahl, belegeDerAuswahl, berichtKurz, offeneEintraege, uebergabeDateiname, uebergabeLesen, uebergabeText, uebernehmen, UebergabeFehler, type Uebergabe, type UebergabeAuswahl, type Uebernahme } from "../lib/uebergabe";
+import { alsGesendetVermerken, anzahl, belegeDerAuswahl, berichtKurz, fingerabdruck, offeneEintraege, uebergabeDateiname, uebergabeLesen, uebergabeText, uebernehmen, UebergabeFehler, type Uebergabe, type UebergabeAuswahl, type Uebernahme } from "../lib/uebergabe";
 import type { AppState } from "../lib/types";
 import type { ExportShare } from "./export-share";
 import type { FolderStorage } from "./folder-storage";
@@ -34,7 +34,12 @@ export interface Handoff {
   last: string | null;
   busy: boolean;
   send: (all?: boolean) => void;
+  /** Stand eines Eintrags für die Zeitleiste (nur auf dem Handy; am PC undefined). */
+  status: (id: string) => SendStatus | undefined;
 }
+/** gesendet: unverändert seit dem Senden · geaendert: nach dem Senden geändert · offen: noch nie gesendet */
+export type SendStatus = "gesendet" | "geaendert" | "offen";
+export const sendStatusLabel: Record<SendStatus, string> = { gesendet: "gesendet", geaendert: "geändert – noch nicht gesendet", offen: "noch nicht gesendet" };
 
 export function useHandoff(state: AppState, share: ExportShare, notify: (message: string) => void, appVersion: string): Handoff {
   const [phone] = useState(() => touchDevice());
@@ -45,6 +50,11 @@ export function useHandoff(state: AppState, share: ExportShare, notify: (message
   const sentRef = useRef(sent); sentRef.current = sent;
   const open = useMemo(() => phone ? anzahl(offeneEintraege(state, sent)) : 0, [phone, state, sent]);
   const total = state.trips.length + state.expenses.length + state.receiptInbox.length;
+  const states = useMemo(() => {
+    const map = new Map<string, SendStatus>();
+    if (phone) for (const item of [...state.trips, ...state.expenses, ...state.receiptInbox]) map.set(item.id, !sent[item.id] ? "offen" : sent[item.id] === fingerabdruck(item) ? "gesendet" : "geaendert");
+    return map;
+  }, [phone, state.trips, state.expenses, state.receiptInbox, sent]);
 
   const send = useCallback((all = false) => {
     if (busy) return;
@@ -75,7 +85,7 @@ export function useHandoff(state: AppState, share: ExportShare, notify: (message
     })();
   }, [busy, share, notify, appVersion]);
 
-  return { phone, open, total, last, busy, send };
+  return { phone, open, total, last, busy, send, status: (id) => states.get(id) };
 }
 
 /** Eine Zeile über der Kopfzeile (Handy, ohne verbundenen Ordner). */
