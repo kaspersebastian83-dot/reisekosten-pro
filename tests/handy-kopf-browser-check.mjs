@@ -62,6 +62,17 @@ try {
         assert.ok(felder.length >= 6, String(knopf));
         for (const feld of felder) { assert.ok(feld.schrift >= 16, `${knopf}: ${feld.name} ${feld.schrift}px`); assert.ok(feld.hoehe >= 48, `${knopf}: ${feld.name} ${feld.hoehe}px hoch`); }
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+        // Speicherleiste (seit 1.17.1): bündig am unteren Fensterrand, kein Streifen mit durchlaufendem Inhalt darunter.
+        const rand = await page.locator('.modal').evaluate((modal) => { const leiste = modal.querySelector('.modal-body > .modal-actions').getBoundingClientRect(), fenster = modal.getBoundingClientRect(); return [Math.round(leiste.bottom), Math.round(fenster.bottom), Math.round(leiste.left), Math.round(leiste.right)]; });
+        assert.deepEqual(rand, [780, 780, 0, width], `${knopf}: Speicherleiste bündig`);
+        const brutto = page.locator('.modal').getByLabel(/^Brutto/);
+        if (await brutto.count()) {
+          // Vorbelegte 0 wird beim Antippen markiert: die erste Ziffer ersetzt sie.
+          assert.equal(await brutto.inputValue(), '0');
+          await brutto.tap(); await page.waitForTimeout(150); await page.keyboard.type('5');
+          assert.equal(await brutto.inputValue(), '5', 'Brutto: 0 ersetzt, nicht „05“ oder „50“');
+          assert.equal(await brutto.getAttribute('inputmode'), 'decimal');
+        }
         await page.locator('.modal').getByRole('button', { name: 'Abbrechen', exact: true }).click();
       }
     });

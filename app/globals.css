@@ -3158,3 +3158,15 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
   body:has(.quick-bar) .content { padding-bottom: 110px; }
   body:has(.quick-bar) .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ---------- Handy (ab 1.17.1): Speicherleiste in den Erfassungsfenstern ---------- */
+@media (max-width: 760px) {
+  /* Bündig am unteren Rand: Vorher blieb unter der Leiste ein 20-px-Streifen, in dem der Fensterinhalt durchlief. */
+  /* Fenster als Spalte: Der Inhalt füllt genau den Rest unter dem Kopf (die feste Annahme „Kopf = 65 px“ ließ ihn 8 px überstehen). */
+  .modal { display: flex; flex-direction: column; }
+  .modal > header { flex: none; }
+  .modal > .modal-body { flex: 1 1 auto; min-height: 0; max-height: none; }
+  .modal-body > .modal-actions { bottom: -20px; padding: 10px 20px calc(10px + env(safe-area-inset-bottom, 0px)); gap: 8px; border-top: 1px solid var(--line); }
+  .modal-body > .modal-actions button { min-height: 48px; flex: 1 1 auto; justify-content: center; }
+  .modal-body > .modal-actions button.primary { flex-basis: 100%; }
+}
