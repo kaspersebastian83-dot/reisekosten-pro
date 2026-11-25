@@ -92,6 +92,7 @@ import { RECEIPT_ROTATIONS, TURNED_ONLY, UPRIGHT_ONLY, applyMerchantRule, readin
 import { readAllDirections, setReadAllDirections } from "../lib/device-settings";
 import { isEmptyState } from "../lib/folder-store";
 import { CurrencyFields } from "./currency-fields";
+import { HandoffImportCard, HandoffSendCard, useHandoff, type Handoff } from "./uebergabe";
 import { ExportDeliveryChoice, ExportReadySheet, useExportShare, type ExportShare } from "./export-share";
 import {
   exportBackup,
@@ -350,6 +351,7 @@ export default function Home() {
   });
   const notifyRef = useRef(notify); notifyRef.current = notify;
   const exportShare = useExportShare(notify);
+  const handoff = useHandoff(state, exportShare, notify, appRelease.version);
   // Belegbilder nie ins Änderungsprotokoll kopieren (siehe lib/change-log.ts).
   // Neu erfasste Belegbilder werden sofort herausgelöst: im Bestand steht nur der Verweis (lib/receipt-images.ts).
   const update = (fn: (s: AppState) => AppState) =>
@@ -469,7 +471,7 @@ export default function Home() {
           <button onClick={() => setSaveRetry((n) => n + 1)}>Speichern erneut versuchen</button>
         </div>}
         {/* Der Hinweis gilt dem persönlichen SpesenKit-Ordner – in der Bürokasse hat sie ihre eigene Sicherung. */}
-        {kasse.modus !== "buerokasse" && <FolderBanner folder={folder} openBackup={() => navigate("Datensicherung")} hasData={!isEmptyState(state)} />}
+        {kasse.modus !== "buerokasse" && <FolderBanner folder={folder} openBackup={() => navigate("Datensicherung")} hasData={!isEmptyState(state)} handoff={handoff} />}
         <header className="topbar">
           <button
             className="icon mobile-only"
@@ -552,7 +554,7 @@ export default function Home() {
             <SettingsPanel state={state} update={update} notify={notify} kasse={kasse} />
           )}
           {tab === "Datensicherung" && (
-            <Backup state={state} setState={setState} notify={notify} folder={folder} share={exportShare} />
+            <Backup state={state} setState={setState} notify={notify} folder={folder} share={exportShare} handoff={handoff} />
           )}
           </>}
         </div>
@@ -3395,12 +3397,14 @@ function Backup({
   notify,
   folder,
   share,
+  handoff,
 }: {
   state: AppState;
   setState: (s: AppState) => void;
   notify: (s: string) => void;
   folder: FolderStorage;
   share: ExportShare;
+  handoff: Handoff;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [restoring, setRestoring] = useState(false);
@@ -3452,6 +3456,8 @@ function Backup({
           {share.offered && share.sharing ? "Sicherung teilen" : "Sicherung herunterladen"}
         </button>
       </section>
+      {/* Übergabe Handy → PC: Das Handy sendet, der PC übernimmt (ersetzt nichts – anders als „Sicherung wiederherstellen“). */}
+      {handoff.phone ? <HandoffSendCard handoff={handoff} /> : <HandoffImportCard state={state} setState={setState} notify={notify} folder={folder} />}
       <section className="card backup-card">
         <div className="backup-icon">
           <RotateCcw />

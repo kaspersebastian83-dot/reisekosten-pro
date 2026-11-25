@@ -1,5 +1,28 @@
 # Release Notes
 
+## 1.18.0 – 25. November 2026
+
+Handy und PC nebeneinander nutzen: Bisher führte der einzige Weg vom Handy zum PC über die vollständige JSON-Sicherung,
+deren Wiederherstellung den Bestand am PC **ersetzt**.
+- **Handy – „An den PC senden“:** unter Datensicherung und in der Zeile über der Kopfzeile. Schickt die noch nicht gesendeten
+  Reisen, Kosten und Belegfotos als eine Datei (`SpesenKit-Uebergabe_<Datum>_<Zeit>.txt`) an das Teilen-Menü – zum Beispiel
+  OneDrive oder Mail an sich selbst. Die Einträge bleiben auf dem Handy und gelten danach als gesendet; wer einen Eintrag
+  später ändert, sieht ihn wieder als offen. „Alles erneut senden“ schickt alles noch einmal. Ein abgebrochenes Teilen
+  vermerkt nichts.
+- **PC – „Vom Handy übernehmen“:** unter Datensicherung. Datei wählen, Vorschau lesen, übernehmen. Es wird **hinzugefügt,
+  nichts ersetzt:** neue Einträge kommen als „ungeprüft“ an; schon vorhandene werden übersprungen (doppelt senden schadet
+  nicht); weicht ein Eintrag ab, bleibt der Stand am PC und die Abweichung wird genannt; mögliche Doppelte werden gemeldet.
+- **Fahrzeuge** werden über Kennung, Kennzeichen oder Name zugeordnet, sonst am PC angelegt – die Kilometererstattung bleibt
+  dieselbe wie auf dem Handy. Ist ein Fahrzeug am PC anders eingestellt, gilt der PC und die Vorschau sagt es.
+- **Abgeschlossene Monate bleiben eingefroren;** bekommt ein abgeschlossener Monat neue Einträge, nennt die Vorschau ihn
+  (Korrektur wie bisher über eine neue Version). Auf dem Handy gelöschte Einträge werden am PC nicht gelöscht.
+- **Abgeschlossen wird am PC:** Auf Geräten mit Fingerbedienung steht im Abschlussbereich ein Hinweis; gesperrt ist nichts.
+- Mit verbundenem SpesenKit-Ordner legt der PC vor dem Übernehmen eine Sicherung „Vor Übernahme vom Handy“ an.
+- Nicht übertragen werden Einstellungen, Tarife und Abrechnungen. `spesenkit.json` bleibt unverändert (Format 2). Der Vermerk
+  „gesendet“ liegt je Gerät im Browser (`localStorage` `spesenkit-uebergabe-gesendet`, `-zuletzt`, `spesenkit-geraet`).
+- Noch offen: Kennzeichnung „gesendet“ an den einzelnen Zeilen der Zeitleiste.
+- Tests: `tests/uebergabe.test.ts`, Browserprüfung `uebergabe-browser-check.mjs` (Handy sendet, PC übernimmt).
+
 ## 1.17.1 – 25. November 2026
 
 Erfassungsfenster auf dem Handy (bis 760 px Breite); am PC unverändert.

@@ -170,8 +170,9 @@ const BEZEICHNUNG: Record<string, string> = { date: "Datum", endDate: "Rückkehr
   overnight: "Übernachtung", manualAbsenceMinutes: "Manuelle Abwesenheit", absenceConfirmed: "Abwesenheit bestätigt", notes: "Notiz", category: "Kategorie", description: "Beschreibung",
   gross: "Brutto", net: "Netto", vat: "Steuer", vatRate: "Steuersatz", currency: "Währung", exchangeRate: "Kurs", paymentType: "Zahlungsart", merchant: "Händler", invoiceNumber: "Rechnungsnummer",
   tripId: "Reise-Zuordnung", receipt: "Beleg", projectNumber: "Projekt", businessShare: "Dienstlicher Anteil", reimbursementStatus: "Erstattung", tripType: "Reiseart" };
-/** Für den Vergleich unerheblich: Prüfstatus und Hinweise ändern sich am PC, ohne dass der Eintrag ein anderer wird. */
-const OHNE = new Set(["status", "warnings", "importedAt"]);
+/** Für den Vergleich unerheblich: Prüfstatus und Hinweise ändern sich am PC, ohne dass der Eintrag ein anderer wird;
+ *  sourceHash ist aus den übrigen Feldern abgeleitet und würde jede Abweichung doppelt nennen. */
+const OHNE = new Set(["status", "warnings", "importedAt", "sourceHash"]);
 const datumDe = (day: string) => day.split("-").reverse().join(".");
 const vergleichbar = (record: object) => Object.fromEntries(Object.entries(record).filter(([key, value]) => !OHNE.has(key) && value !== undefined)
   .map(([key, value]) => [key, key === "receipt" && value && typeof value === "object" ? { ...(value as object), dataUrl: "" } : value]));

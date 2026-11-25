@@ -60,24 +60,18 @@ try {
     await page.locator('.receipt-capture').getByRole('button', { name: 'Schließen' }).click();
     await leiste.waitFor();
   });
-  await check('Handy mit Daten: eine Zeile „nur auf diesem Gerät“ statt des großen Ordner-Hinweises; „Sichern“ führt zur Datensicherung', async () => {
+  await check('Handy mit Reisen: eine Zeile zur Übergabe an den PC statt des großen Ordner-Hinweises (seit 1.18.0)', async () => {
     await nav('Datensicherung'); await page.getByRole('button', { name: 'Demo-Daten laden', exact: true }).click();
     await until(async () => (await stored(page))?.trips?.length, 'Demo-Daten');
     await hinweis.waitFor();
-    assert.match(await hinweis.innerText(), /Ihre Spesen liegen nur auf diesem Gerät\.\s*Noch keine Sicherung erstellt\./);
+    assert.match(await hinweis.innerText(), /\d+ Einträge noch nicht gesendet\s*Bisher nur auf diesem Gerät\./);
     assert.doesNotMatch(await hinweis.innerText(), /Terminalserver|Ordner einrichten/);
     assert.ok((await hinweis.boundingBox()).height <= 90, 'eine kompakte Zeile');
     assert.equal(await leiste.count(), 0, 'Leiste nur in der Monatsübersicht');
-    await nav('Monatsübersicht'); await hinweis.getByRole('button', { name: 'Sichern', exact: true }).click();
-    await page.getByRole('heading', { name: 'Datensicherung', exact: true }).waitFor();
-  });
-  await check('Handy: nach „Sicherung herunterladen“ nennt der Hinweis den Tag', async () => {
-    await page.locator('.backup-card').first().getByRole('button', { name: 'Sicherung herunterladen', exact: true }).click();
-    await until(async () => page.evaluate(() => localStorage.getItem('spesenkit-letzte-sicherung')), 'Sicherung gemerkt');
+    await hinweis.getByRole('button', { name: 'Senden', exact: true }).waitFor();
     await nav('Monatsübersicht');
-    assert.match(await hinweis.innerText(), /Letzte Sicherung: 18\.10\.2026/);
   });
-  await check('Handy: bleiben nur gespeicherte Abrechnungen (Reisen und Kosten gelöscht), bleibt der Hinweis', async () => {
+  await check('Handy: bleiben nur gespeicherte Abrechnungen (Reisen und Kosten gelöscht), erinnert die Zeile an die Sicherung – mit Tag der letzten', async () => {
     const schreiben = (value) => page.evaluate((value) => new Promise((resolve, reject) => { const r = indexedDB.open('reisekosten-pro', 1); r.onsuccess = () => { const tx = r.result.transaction('state', 'readwrite'); tx.objectStore('state').put(value, 'main'); tx.oncomplete = () => { r.result.close(); resolve(); }; tx.onerror = () => reject(tx.error); }; }), value);
     await page.getByRole('button', { name: /^Jul/ }).click();
     await page.getByRole('button', { name: 'Spesenabrechnung erstellen', exact: true }).click();
@@ -86,7 +80,13 @@ try {
     await page.reload(); await page.getByRole('heading', { name: 'Monatsübersicht', exact: true }).waitFor();
     assert.equal((await stored(page)).trips.length, 0);
     await hinweis.waitFor();
-    assert.match(await hinweis.innerText(), /nur auf diesem Gerät/);
+    assert.match(await hinweis.innerText(), /Ihre Spesen liegen nur auf diesem Gerät\.\s*Noch keine Sicherung erstellt\./);
+    await hinweis.getByRole('button', { name: 'Sichern', exact: true }).click();
+    await page.getByRole('heading', { name: 'Datensicherung', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Sicherung herunterladen', exact: true }).click();
+    await until(async () => page.evaluate(() => localStorage.getItem('spesenkit-letzte-sicherung')), 'Sicherung gemerkt');
+    await nav('Monatsübersicht');
+    assert.match(await hinweis.innerText(), /Letzte Sicherung: 18\.10\.2026/);
     await schreiben(state);
     await page.reload(); await page.getByRole('heading', { name: 'Monatsübersicht', exact: true }).waitFor(); await hinweis.waitFor();
   });

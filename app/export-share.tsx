@@ -15,6 +15,9 @@ export interface ExportShare {
   offered: boolean;
   sharing: boolean;
   setSharing: (value: boolean) => void;
+  /** Eine einzelne Datei übergeben (Teilen-Menü oder Download, je nach Gerät und Wahl). onDelivered läuft erst, wenn die
+   *  Datei die App wirklich verlassen hat – geteilt oder heruntergeladen –, nicht bei abgebrochenem Teilen. */
+  send: (file: File, onDelivered?: () => void) => void;
   /** Fertige Datei, die auf den zweiten Tipp wartet. */
   ready: File | null;
   shareReady: () => void;
@@ -25,17 +28,22 @@ export interface ExportShare {
 export function useExportShare(notify: (message: string) => void): ExportShare {
   const [offered] = useState(() => touchDevice() && shareSupported());
   const [sharing, setSharingState] = useState(() => shareExports());
-  const [ready, setReady] = useState<File | null>(null);
+  const [ready, setReadyState] = useState<File | null>(null);
+  // Was nach erfolgreicher Übergabe der wartenden Datei geschehen soll (z. B. Einträge als gesendet vermerken).
+  const readyDone = useRef<(() => void) | undefined>(undefined);
+  const setReady = (file: File | null, onDelivered?: () => void) => { readyDone.current = file ? onDelivered : undefined; setReadyState(file); };
   const notifyRef = useRef(notify); notifyRef.current = notify;
 
-  const hand = useCallback(async (file: File, secondTap: boolean) => {
+  const hand = useCallback(async (file: File, secondTap: boolean, onDelivered?: () => void) => {
+    const done = secondTap ? readyDone.current : onDelivered;
     const outcome = await shareFile(file);
-    if (outcome === "shared") { setReady(null); return; }
+    if (outcome === "shared") { setReady(null); done?.(); return; }
     if (outcome === "cancelled") { if (!secondTap) notifyRef.current("Nicht geteilt – das Teilen-Menü wurde geschlossen."); return; }
-    if (outcome === "needs-tap" && !secondTap) { setReady(file); return; }
+    if (outcome === "needs-tap" && !secondTap) { setReady(file, onDelivered); return; }
     setReady(null);
     download(file, file.name);
     notifyRef.current(`„${file.name}“ lässt sich auf diesem Gerät nicht teilen – stattdessen heruntergeladen.`);
+    done?.();
   }, []);
 
   useEffect(() => {
@@ -48,7 +56,8 @@ export function useExportShare(notify: (message: string) => void): ExportShare {
     offered, sharing, ready,
     setSharing: (value) => { setShareExports(value); setSharingState(value); },
     shareReady: () => { if (ready) void hand(ready, true); },
-    downloadReady: () => { if (ready) download(ready, ready.name); setReady(null); },
+    send: (file, onDelivered) => { if (offered && sharing) void hand(file, false, onDelivered); else { download(file, file.name); onDelivered?.(); } },
+    downloadReady: () => { const done = readyDone.current; if (ready) { download(ready, ready.name); done?.(); } setReady(null); },
     dismissReady: () => setReady(null),
   };
 }

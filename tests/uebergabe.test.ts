@@ -114,7 +114,7 @@ describe('PC: übernehmen', () => {
     const fahrt = reise(), parken = kosten();
     const handy = bestand({ trips: [fahrt], expenses: [parken] });
     const pc = uebernehmen(bestand(), datei(handy), ctx).state;
-    const spaeter = { ...handy, trips: [{ ...handy.trips[0], businessKm: 155, destination: 'Köln-Deutz' }], expenses: [{ ...handy.expenses[0], gross: 14 }] };
+    const spaeter = { ...handy, trips: [{ ...handy.trips[0], businessKm: 155, destination: 'Köln-Deutz', sourceHash: 'neu-berechnet' }], expenses: [{ ...handy.expenses[0], gross: 14 }] };
     const { state, bericht, geaendert } = uebernehmen(pc, datei(spaeter), ctx);
     expect(geaendert).toBe(false);
     expect(state.trips[0].businessKm).toBe(140);
