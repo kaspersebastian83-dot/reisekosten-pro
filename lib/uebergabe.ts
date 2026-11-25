@@ -11,6 +11,7 @@
  *   gleiche Kennung, anderer Inhalt → der vorhandene Eintrag am PC bleibt; die Abweichung wird gemeldet
  *   andere Kennung, sieht gleich aus → hinzugefügt und als möglicher doppelter Eintrag gemeldet (nie still verworfen)
  *   Beleg-Eingang mit vorhandenem Belegbild → übersprungen (dasselbe Foto)
+ *   Beleg-Eingang, auf dem Handy inzwischen zu Kosten geworden → am PC als erledigt vermerkt (einzige Änderung an Vorhandenem)
  *   Fahrzeuge                       → Zuordnung über Kennung, dann Kennzeichen, dann Name + Art; sonst neu angelegt
  *   Löschungen                      → werden nicht übertragen
  * Abgeschlossene Monate bleiben eingefroren; betroffene Monate werden genannt (Korrektur über eine neue Version).
@@ -20,7 +21,7 @@
  */
 import { duplicateKey } from "./calculations";
 import { latestStatement } from "./month-navigation";
-import { FILE_ID } from "./receipt-images";
+import { FILE_ID, receiptFileId } from "./receipt-images";
 import { duplicateExpense, similarExpense } from "./receipt-linking";
 import { isClosedStatement, stableValue } from "./statement-comparison";
 import { normalizeState } from "./storage";
@@ -131,7 +132,9 @@ export function uebergabeLesen(inhalt: string): Uebergabe {
     throw new UebergabeFehler("Die Übergabe enthält einen ungültigen Eintrag und wurde nicht übernommen.");
   const belege: Record<string, string> = {};
   if (v.belege && typeof v.belege === "object" && !Array.isArray(v.belege))
-    for (const [id, url] of Object.entries(v.belege as Record<string, unknown>)) if (FILE_ID.test(id) && text(url) && url.startsWith("data:")) belege[id] = url;
+    // Nur Bilder, deren Inhalt zum Fingerabdruck passt: Eine beschädigte oder veränderte Datei darf kein fremdes Bild unter
+    // den Verweis eines Belegs legen. Ein verworfenes Bild meldet uebernehmen() als fehlend.
+    for (const [id, url] of Object.entries(v.belege as Record<string, unknown>)) if (FILE_ID.test(id) && text(url) && receiptFileId(url) === id) belege[id] = url;
   return { erstellt: text(v.erstellt) ? v.erstellt : "", app: text(v.app) ? v.app : undefined, geraet: text(v.geraet) ? v.geraet : "",
     // Fahrzeugverweise bleiben, wie das Handy sie gesendet hat – die Zuordnung zu den Fahrzeugen am PC macht uebernehmen().
     trips: (v.trips as Trip[]).map((trip, index) => ({ ...geprueft.trips[index], vehicleId: trip.vehicleId })),
@@ -145,6 +148,8 @@ export interface UebernahmeBericht {
   neu: { trips: number; expenses: number; receiptInbox: number };
   /** Einträge, die es am PC schon gibt (gleiche Kennung bzw. dasselbe Belegfoto im Eingang). */
   vorhanden: number;
+  /** Belege im Eingang am PC, die als erledigt vermerkt wurden, weil das Handy sie inzwischen als Kosten gesendet hat. */
+  eingangErledigt: number;
   /** Gleiche Kennung, anderer Inhalt: der Eintrag am PC bleibt. */
   abweichungen: string[];
   /** Andere Kennung, sieht aus wie ein vorhandener Eintrag: hinzugefügt, bitte prüfen. */
@@ -184,7 +189,7 @@ const kennzeichen = (plate: string) => plate.replace(/[\s-]+/g, "").toLowerCase(
  * ctx liefert Kennung und Zeit für den Protokolleintrag; `nutzer` steht dort als Bearbeiter.
  */
 export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: string; at: string; nutzer?: string }): Uebernahme {
-  const bericht: UebernahmeBericht = { neu: { trips: 0, expenses: 0, receiptInbox: 0 }, vorhanden: 0, abweichungen: [], doppelt: [], fahrzeugeNeu: [], hinweise: [], geschlosseneMonate: [], belege: {} };
+  const bericht: UebernahmeBericht = { neu: { trips: 0, expenses: 0, receiptInbox: 0 }, vorhanden: 0, eingangErledigt: 0, abweichungen: [], doppelt: [], fahrzeugeNeu: [], hinweise: [], geschlosseneMonate: [], belege: {} };
 
   // Fahrzeuge: Kennung → Kennzeichen → Name + Art → neu
   const vehicles = [...(local.settings.vehicles || [])];
@@ -213,7 +218,8 @@ export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: stri
       if (felder.length) bericht.abweichungen.push(`${reiseName(da)}: weicht ab (${felder.join(", ")}) – der vorhandene Eintrag bleibt.`);
       continue;
     }
-    if (trip.status !== "storniert" && local.trips.some((other) => other.status !== "storniert" && duplicateKey(other) === duplicateKey(trip))) bericht.doppelt.push(`${reiseName(trip)}: sieht aus wie eine vorhandene Reise – bitte prüfen.`);
+    // gegen den wachsenden Bestand: auch zwei gleiche Reisen in derselben Datei werden gemeldet
+    if (trip.status !== "storniert" && trips.some((other) => other.status !== "storniert" && duplicateKey(other) === duplicateKey(trip))) bericht.doppelt.push(`${reiseName(trip)}: sieht aus wie eine vorhandene Reise – bitte prüfen.`);
     if (trip.vehicleId && !vehicles.some((v) => v.id === trip.vehicleId)) bericht.hinweise.push(`${reiseName(trip)}: Das Fahrzeug ist am PC nicht bekannt – bitte in der Reise wählen.`);
     const neu = ankunft(trip);
     trips.push(neu); tripById.set(neu.id, neu); bericht.neu.trips++;
@@ -236,7 +242,8 @@ export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: stri
       bericht.hinweise.push(`${kostenName(expense)}: Die zugeordnete Reise ist am PC nicht vorhanden – die Zuordnung wurde gelöst.`);
       const { tripId: _geloest, ...ohne } = expense; expense = ohne as Expense;
     }
-    if (expense.status !== "storniert" && (duplicateExpense(local.expenses.filter((e) => e.status !== "storniert"), expense) || similarExpense(local.expenses.filter((e) => e.status !== "storniert"), expense)))
+    const aktiv = expenses.filter((e) => e.status !== "storniert");   // wachsender Bestand, siehe Reisen
+    if (expense.status !== "storniert" && (duplicateExpense(aktiv, expense) || similarExpense(aktiv, expense)))
       bericht.doppelt.push(`${kostenName(expense)}: sieht aus wie ein vorhandener Beleg – bitte prüfen.`);
     const neu = ankunft(expense);
     expenses.push(neu); expenseById.set(neu.id, neu); bericht.neu.expenses++;
@@ -245,14 +252,27 @@ export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: stri
 
   // Beleg-Eingang: gleiche Kennung oder dasselbe Foto (Fingerabdruck) ist schon da
   const receiptInbox = [...local.receiptInbox];
-  const inboxIds = new Set(receiptInbox.map((item) => item.id));
   const fotos = new Set([...receiptInbox.map((item) => item.receipt.hash), ...expenses.map((expense) => expense.receipt?.hash)].filter(Boolean));
   for (const item of eingang.receiptInbox) {
-    if (inboxIds.has(item.id) || (item.receipt.hash && fotos.has(item.receipt.hash))) { bericht.vorhanden++; continue; }
+    const index = receiptInbox.findIndex((other) => other.id === item.id);
+    if (index >= 0) {
+      // Gleiche Kennung: Wurde der Beleg auf dem Handy inzwischen zu einer Kostenposition, die jetzt am PC ist, gilt er auch
+      // hier als erledigt – sonst läge dasselbe Foto am PC weiter zur Bearbeitung im Eingang und würde doppelt erfasst.
+      const da = receiptInbox[index];
+      bericht.vorhanden++;
+      if (item.expenseId && expenseById.has(item.expenseId) && da.expenseId !== item.expenseId) {
+        if (!da.expenseId && (da.status === "neu" || da.status === "erkannt")) {
+          receiptInbox[index] = { ...da, expenseId: item.expenseId, status: item.status === "archiviert" ? "archiviert" : "zugeordnet", ...(item.tripId && tripById.has(item.tripId) ? { tripId: item.tripId } : {}) };
+          bericht.eingangErledigt++;
+        } else bericht.abweichungen.push(`Beleg im Eingang „${da.receipt.name}“: auf dem Handy und am PC unterschiedlich verarbeitet – der Stand am PC bleibt. Bitte auf doppelte Kosten prüfen.`);
+      }
+      continue;
+    }
+    if (item.receipt.hash && fotos.has(item.receipt.hash)) { bericht.vorhanden++; continue; }
     const { tripId, expenseId, ...rest } = item;
     // Verweise auf Reise/Kosten nur behalten, wenn es sie am PC gibt
     const neu: ReceiptInboxItem = { ...rest, ...(tripId && tripById.has(tripId) ? { tripId } : {}), ...(expenseId && expenseById.has(expenseId) ? { expenseId } : {}) };
-    receiptInbox.push(neu); inboxIds.add(neu.id); if (neu.receipt.hash) fotos.add(neu.receipt.hash); bericht.neu.receiptInbox++;
+    receiptInbox.push(neu); if (neu.receipt.hash) fotos.add(neu.receipt.hash); bericht.neu.receiptInbox++;
     if (neu.receipt.fileId) neueBelege.add(neu.receipt.fileId);
   }
 
@@ -263,15 +283,24 @@ export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: stri
 
   // Abgeschlossene Monate, die neue Einträge bekommen haben
   const monate = new Set<string>();
-  for (const trip of trips.slice(local.trips.length)) { monate.add(trip.date.slice(0, 7)); if (trip.endDate) monate.add(trip.endDate.slice(0, 7)); }
+  // jede berührte Monatsabrechnung, auch die Monate zwischen Abfahrt und Rückkehr einer langen Reise
+  for (const trip of trips.slice(local.trips.length)) {
+    const ende = (trip.endDate && trip.endDate > trip.date ? trip.endDate : trip.date).slice(0, 7);
+    for (let [jahr, monat] = trip.date.slice(0, 7).split("-").map(Number), schritt = 0; schritt < 120; schritt++) {
+      const month = `${jahr}-${String(monat).padStart(2, "0")}`;
+      monate.add(month);
+      if (month >= ende) break;
+      if (++monat > 12) { monat = 1; jahr++; }
+    }
+  }
   for (const expense of expenses.slice(local.expenses.length)) monate.add(expense.date.slice(0, 7));
   bericht.geschlosseneMonate = [...monate].filter((month) => { const snapshot = latestStatement(local, month); return !!snapshot && isClosedStatement(snapshot); }).sort();
 
   const anzahlNeu = bericht.neu.trips + bericht.neu.expenses + bericht.neu.receiptInbox;
-  const geaendert = anzahlNeu > 0 || bericht.fahrzeugeNeu.length > 0;
+  const geaendert = anzahlNeu > 0 || bericht.fahrzeugeNeu.length > 0 || bericht.eingangErledigt > 0;
   if (!geaendert) return { state: local, bericht, geaendert };
   const eintrag: ChangeLog = { id: ctx.id, entityType: "settings", entityId: "uebergabe", field: "Vom Handy übernommen", oldValue: null,
-    newValue: { ...bericht.neu, vorhanden: bericht.vorhanden, abweichungen: bericht.abweichungen.length, fahrzeugeNeu: bericht.fahrzeugeNeu.map((v) => v.name), geraet: eingang.geraet, erstellt: eingang.erstellt },
+    newValue: { ...bericht.neu, vorhanden: bericht.vorhanden, eingangErledigt: bericht.eingangErledigt, abweichungen: bericht.abweichungen.length, fahrzeugeNeu: bericht.fahrzeugeNeu.map((v) => v.name), geraet: eingang.geraet, erstellt: eingang.erstellt },
     reason: berichtKurz(bericht), user: ctx.nutzer || local.settings.profileName || "", changedAt: ctx.at };
   return { geaendert, bericht,
     state: { ...local, trips, expenses, receiptInbox, settings: bericht.fahrzeugeNeu.length ? { ...local.settings, vehicles } : local.settings, changes: [eintrag, ...local.changes] } };
@@ -284,5 +313,6 @@ export function berichtKurz(bericht: UebernahmeBericht) {
     bericht.neu.receiptInbox && mehrzahl(bericht.neu.receiptInbox, "Beleg im Eingang", "Belege im Eingang")].filter(Boolean) as string[];
   const neu = teile.length ? `Vom Handy übernommen: ${teile.join(", ")}.` : "Nichts Neues – alle Einträge sind schon am PC.";
   return [neu, bericht.vorhanden ? `${mehrzahl(bericht.vorhanden, "Eintrag war", "Einträge waren")} schon vorhanden.` : "",
+    bericht.eingangErledigt ? `${mehrzahl(bericht.eingangErledigt, "Beleg im Eingang", "Belege im Eingang")} als erledigt vermerkt.` : "",
     bericht.abweichungen.length ? `${mehrzahl(bericht.abweichungen.length, "Abweichung", "Abweichungen")} – der Stand am PC bleibt.` : ""].filter(Boolean).join(" ");
 }

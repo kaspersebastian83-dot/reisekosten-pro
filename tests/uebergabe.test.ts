@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { buildStatement } from '../lib/calculations';
 import { emptyState } from '../lib/config';
 import { demoState } from '../lib/demo';
+import { receiptFileId } from '../lib/receipt-images';
 import { normalizeState } from '../lib/storage';
 import { alsGesendetVermerken, anzahl, belegeDerAuswahl, berichtKurz, fingerabdruck, offeneEintraege, uebergabeDateiname, uebergabeLesen, uebergabeText, uebernehmen, UebergabeFehler, type Uebergabe } from '../lib/uebergabe';
 import type { AppState, Expense, ReceiptInboxItem, Trip, VehicleProfile } from '../lib/types';
 
 // Übergabe Handy → PC: Das Handy sendet Reisen, Kosten und Belege; der PC fügt hinzu und ersetzt nichts.
-const FOTO = 'a'.repeat(64) + '.jpg', FOTO2 = 'b'.repeat(64) + '.jpg';
 const bild = (inhalt: string) => 'data:image/jpeg;base64,' + btoa(inhalt);
+// echte Fingerabdrücke: Die Übergabe nimmt ein Bild nur an, wenn sein Inhalt zum Verweis passt
+const FOTO = receiptFileId(bild('parken'))!, FOTO2 = receiptFileId(bild('foto'))!;
 let n = 0;
 const reise = (o: Partial<Trip> = {}): Trip => ({ ...demoState().trips[0], id: `r${++n}`, date: '2026-11-10', endDate: '2026-11-10', startTime: '07:00', endTime: '17:00', startPlace: 'Würselen',
   destination: 'Köln', purpose: 'Ortstermin', order: '26.0123 Köln', businessKm: 140, privateKm: 0, tripType: 'dienstlich', status: 'geprüft', absenceConfirmed: true, overnight: false,
@@ -43,7 +45,7 @@ describe('Handy: offen, gesendet, geändert', () => {
   });
   it('Dateiname in Ortszeit, Belegbilder der Auswahl ohne Doppelte', () => {
     expect(uebergabeDateiname(new Date(2026, 10, 5, 9, 7))).toBe('SpesenKit-Uebergabe_2026-11-05_0907.txt');
-    expect(belegeDerAuswahl({ trips: [], expenses: [kosten(), kosten()], receiptInbox: [eingang()] }).sort()).toEqual([FOTO, FOTO2]);
+    expect(belegeDerAuswahl({ trips: [], expenses: [kosten(), kosten()], receiptInbox: [eingang()] }).sort()).toEqual([FOTO, FOTO2].sort());
   });
 });
 
@@ -150,7 +152,55 @@ describe('PC: übernehmen', () => {
     const { state, bericht } = uebernehmen(bestand(), datei(bestand({ expenses: [kosten()] }), {}), ctx);
     expect(state.expenses).toHaveLength(1);
     expect(bericht.belege).toEqual({});
-    expect(bericht.hinweise[0]).toMatch(/Ein Belegbild fehlt in der Übergabe \(aaaaaaaa…\)\. Bitte auf dem Handy „Alles erneut senden“\./);
+    expect(bericht.hinweise[0]).toBe(`Ein Belegbild fehlt in der Übergabe (${FOTO.slice(0, 8)}…). Bitte auf dem Handy „Alles erneut senden“.`);
+  });
+});
+
+describe('PC: Fälle aus der Durchsicht', () => {
+  it('Bild, dessen Inhalt nicht zum Fingerabdruck passt, wird nicht angenommen – der Beleg bekommt kein fremdes Bild', () => {
+    const handy = bestand({ expenses: [kosten()] });
+    const gelesen = datei(handy, { [FOTO]: bild('ein ganz anderes Bild') });
+    expect(gelesen.belege).toEqual({});
+    const { bericht } = uebernehmen(bestand(), gelesen, ctx);
+    expect([bericht.belege, bericht.hinweise.length]).toEqual([{}, 1]);
+  });
+  it('Beleg erst als Foto gesendet, dann auf dem Handy zu Kosten gemacht: am PC ist der Eingang danach erledigt', () => {
+    const foto = eingang();
+    const pc = uebernehmen(bestand(), datei(bestand({ receiptInbox: [foto] })), ctx).state;
+    expect(pc.receiptInbox[0].status).toBe('neu');
+    const ausFoto = kosten({ receipt: { ...foto.receipt } });
+    const handy = bestand({ expenses: [ausFoto], receiptInbox: [{ ...foto, status: 'zugeordnet', expenseId: ausFoto.id }] });
+    const { state, bericht, geaendert } = uebernehmen(pc, datei(handy), { ...ctx, id: 'protokoll-2' });
+    expect(geaendert).toBe(true);
+    expect(state.expenses.map((e) => e.id)).toEqual([ausFoto.id]);
+    expect(state.receiptInbox).toEqual([{ ...pc.receiptInbox[0], status: 'zugeordnet', expenseId: ausFoto.id }]);
+    expect([bericht.eingangErledigt, bericht.abweichungen, bericht.doppelt]).toEqual([1, [], []]);
+    expect(berichtKurz(bericht)).toBe('Vom Handy übernommen: 1 Kostenposition. 1 Eintrag war schon vorhanden. 1 Beleg im Eingang als erledigt vermerkt.');
+  });
+  it('derselbe Beleg am PC schon anders verarbeitet: Stand am PC bleibt, Abweichung und möglicher Doppelter werden gemeldet', () => {
+    const foto = eingang();
+    const amPc = kosten({ receipt: { ...foto.receipt } });
+    const pc = bestand({ expenses: [amPc], receiptInbox: [{ ...foto, status: 'zugeordnet', expenseId: amPc.id }] });
+    const vomHandy = kosten({ receipt: { ...foto.receipt } });
+    const handy = bestand({ expenses: [vomHandy], receiptInbox: [{ ...foto, status: 'zugeordnet', expenseId: vomHandy.id }] });
+    const { state, bericht } = uebernehmen(pc, datei(handy), ctx);
+    expect(state.receiptInbox).toEqual(pc.receiptInbox);
+    expect(bericht.eingangErledigt).toBe(0);
+    expect(bericht.abweichungen).toEqual(['Beleg im Eingang „foto.jpg“: auf dem Handy und am PC unterschiedlich verarbeitet – der Stand am PC bleibt. Bitte auf doppelte Kosten prüfen.']);
+    expect(bericht.doppelt).toHaveLength(1);
+  });
+  it('zwei gleiche Einträge in derselben Datei werden auch ohne Bestand am PC als mögliche Doppelte gemeldet', () => {
+    const handy = bestand({ trips: [reise(), reise()], expenses: [kosten({ invoiceNumber: 'R-9', merchant: 'Hotel' }), kosten({ invoiceNumber: 'R-9', merchant: 'Hotel', receipt: undefined })] });
+    const { state, bericht } = uebernehmen(bestand(), datei(handy), ctx);
+    expect([state.trips.length, state.expenses.length, bericht.doppelt.length]).toEqual([2, 2, 2]);
+  });
+  it('Reise über drei Monate: auch der abgeschlossene Monat dazwischen wird genannt', () => {
+    const pc = bestand();
+    pc.statements = [{ id: 's11', month: '2026-11', number: 'RK-2026-11', createdAt: '2026-12-02T08:00:00Z', status: 'freigegeben', version: 1, locked: true, data: buildStatement(pc, '2026-11') }];
+    const lang = reise({ date: '2026-10-28', endDate: '2026-12-03', overnight: true });
+    expect(uebernehmen(pc, datei(bestand({ trips: [lang] })), ctx).bericht.geschlosseneMonate).toEqual(['2026-11']);
+    const jahreswechsel = reise({ date: '2026-12-30', endDate: '2027-01-02', overnight: true });
+    expect(uebernehmen(pc, datei(bestand({ trips: [jahreswechsel] })), ctx).bericht.geschlosseneMonate).toEqual([]);
   });
 });
 
