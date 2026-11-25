@@ -3170,3 +3170,20 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
   .modal-body > .modal-actions button { min-height: 48px; flex: 1 1 auto; justify-content: center; }
   .modal-body > .modal-actions button.primary { flex-basis: 100%; }
 }
+
+/* ---------- Übergabe Handy → PC (ab 1.18.0, app/uebergabe.tsx) ---------- */
+.folder-banner.handoff-done { border-color: var(--line); background: var(--mint); color: var(--ink); }
+.folder-banner.backup-reminder button.primary { display: inline-flex; align-items: center; gap: 6px; }
+.handoff-card .handoff-status { margin: 4px 0 12px; }
+.handoff-card .link { display: block; margin: 10px auto 0; min-height: 44px; }
+.handoff-card small { display: block; margin-top: 8px; line-height: 1.4; }
+.handoff-preview { width: min(640px, 100%); }
+.handoff-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.handoff-counts div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--paper); }
+.handoff-counts dt { font-size: 12px; color: var(--muted); font-weight: 700; }
+.handoff-counts dd { margin: 2px 0 0; font-size: 22px; font-weight: 800; }
+.handoff-list { margin: 12px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); }
+.handoff-list.warn { border-color: #f0d49c; background: var(--yellow-bg); color: #5d3d07; }
+.handoff-list ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.5; }
+.handoff-list li { overflow-wrap: anywhere; }
+.handoff-closing-hint { margin-top: 8px; }

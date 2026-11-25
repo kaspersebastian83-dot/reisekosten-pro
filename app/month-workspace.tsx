@@ -1,3 +1,4 @@
+import { touchDevice } from "../lib/device-settings";
 import { useMemo, type ReactNode } from 'react';
 import { Camera, Import, Inbox, Plus } from 'lucide-react';
 import type { AppState, StatementData } from '../lib/types';
@@ -38,6 +39,7 @@ export function MonthWorkspace({state, month, statement, startEntry, openCapture
     </ol>
     <button className="primary" onClick={openStatement}>{existing ? existing.locked ? 'Abrechnung ansehen' : 'Abrechnung fortsetzen' : 'Spesenabrechnung erstellen'}</button>
     <p className="muted">{existing ? `Version ${existing.version} · ${existing.status}. Prüfung und Freigabe erfolgen in der bestehenden Abrechnung.` : 'Der Entwurf entsteht erst auf Knopfdruck. Freigabe und Abschluss erfolgen anschließend separat.'}</p>
+    {touchDevice() && <p className="muted handoff-closing-hint">Abschluss am PC – dort liegen alle Einträge. Vorher „An den PC senden“.</p>}
     {changes}
   </section>;
   return <section className="card month-entry-workspace" aria-label="Monatsarbeitsbereich">

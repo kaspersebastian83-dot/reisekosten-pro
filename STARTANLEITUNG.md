@@ -66,6 +66,25 @@ Alles passiert in der **Monatsübersicht**.
 Freigabe und Auszahlung sind getrennt: SpesenKit gibt nichts automatisch frei
 und zahlt nichts aus.
 
+## Unterwegs auf dem Handy erfassen, am PC abrechnen
+
+Auf dem Handy liegen die Spesen nur im Browser des Handys. So kommen sie zum PC:
+
+**Auf dem Handy**
+1. Reisen, Kosten und Belegfotos wie gewohnt erfassen (unten: **Belegfoto** und **Neue Reise**).
+2. Oben steht, wie viele Einträge noch nicht gesendet sind. **Senden** antippen (oder Datensicherung →
+   **An den PC senden**) und im Teilen-Menü zum Beispiel **OneDrive** oder Mail an sich selbst wählen.
+3. Die Einträge bleiben auf dem Handy und gelten als gesendet. Später geänderte Einträge erscheinen wieder als offen.
+
+**Am PC**
+1. Datensicherung → **Vom Handy übernehmen** → die Datei `SpesenKit-Uebergabe_…txt` wählen.
+2. Die Vorschau zeigt, was dazukommt. **Übernehmen** fügt hinzu – der Bestand am PC wird nicht ersetzt.
+3. Neue Einträge kommen als „ungeprüft“ an: wie gewohnt prüfen und den Monat **am PC** abschließen.
+
+Gut zu wissen: Dieselbe Datei zweimal zu übernehmen schadet nicht. Weicht ein Eintrag ab, bleibt der Stand am PC und die
+Vorschau nennt die Abweichung. Auf dem Handy gelöschte Einträge werden am PC nicht gelöscht. **Nicht** verwechseln mit
+„Sicherung wiederherstellen“ – das ersetzt den ganzen Bestand.
+
 ## Bürokasse (Kassenbuch der Büro-Barkasse)
 
 Nur für die Person, die die Bürokasse führt. Auf dem **Handy** (Chrome) einrichten:

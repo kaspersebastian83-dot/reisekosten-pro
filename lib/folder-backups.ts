@@ -9,14 +9,15 @@ import type { AppState } from "./types";
  *   spesenkit_abschluss_<Monat>_V<n>_<…>.json     nach jedem Monatsabschluss (wird nie automatisch gelöscht)
  *   spesenkit_manuell_<…>.json                    „Jetzt sichern“
  *   spesenkit_vor_wiederherstellung_<…>.json      Stand vor einer Wiederherstellung
+ *   spesenkit_vor_uebernahme_<…>.json             Stand vor „Vom Handy übernehmen“
  *   spesenkit_browserstand_/ordnerstand_/ungueltig_  aus Konflikten bzw. unlesbarer Datei (3.3a)
  *   spesenkit_speicherkandidat_/vor_speichern_    je Speichervorgang; beim nächsten eigenen Speichern gelöscht, wenn die
  *                                                Datei noch genau diesen Stand hat, sonst nach 7 Tagen (copiesToPrune)
  * Automatisch gelöscht werden nur Tagessicherungen mit genau diesem Namensmuster und die Kopien je Speichervorgang.
  */
-export type BackupKind = "auto" | "abschluss" | "manuell" | "vor_wiederherstellung" | "browserstand" | "ordnerstand" | "speicherkandidat" | "vor_speichern" | "ungueltig" | "sonstige";
+export type BackupKind = "auto" | "abschluss" | "manuell" | "vor_wiederherstellung" | "vor_uebernahme" | "browserstand" | "ordnerstand" | "speicherkandidat" | "vor_speichern" | "ungueltig" | "sonstige";
 export const backupKindLabels: Record<BackupKind, string> = {
-  auto: "Tagessicherung", abschluss: "Monatsabschluss", manuell: "Manuell", vor_wiederherstellung: "Vor Wiederherstellung",
+  auto: "Tagessicherung", abschluss: "Monatsabschluss", manuell: "Manuell", vor_wiederherstellung: "Vor Wiederherstellung", vor_uebernahme: "Vor Übernahme vom Handy",
   browserstand: "Konflikt: Browserstand", ordnerstand: "Konflikt: Ordnerstand", ungueltig: "Unlesbare Datei", sonstige: "Sonstige",
   speicherkandidat: "Speicherkandidat", vor_speichern: "Vor dem Speichern",
 };
@@ -34,7 +35,7 @@ export function parseBackupName(name: string): Omit<BackupEntry, "size"> | null 
   const match = NAME.exec(name);
   if (!match) return null;
   const [, label, date, hh, mm, ss] = match;
-  const known = (["auto", "manuell", "vor_wiederherstellung", "browserstand", "ordnerstand", "speicherkandidat", "vor_speichern", "ungueltig"] as const).find((kind) => label === kind);
+  const known = (["auto", "manuell", "vor_wiederherstellung", "vor_uebernahme", "browserstand", "ordnerstand", "speicherkandidat", "vor_speichern", "ungueltig"] as const).find((kind) => label === kind);
   const kind: BackupKind = known || (label.startsWith("abschluss_") ? "abschluss" : "sonstige");
   if (kind === "auto" && !AUTO.test(name)) return null;
   const detail = kind === "abschluss" ? label.slice("abschluss_".length).replace("_", " ") : "";
