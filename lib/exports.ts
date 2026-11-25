@@ -256,10 +256,12 @@ export function exportCsv(data: StatementData, state: AppState, bookingList = fa
   );
 }
 
-/** JSON-Sicherung: alle Belegbilder eingebettet – die Datei ist für sich allein vollständig. */
-export async function exportBackup(state: AppState) {
+/** JSON-Sicherung: alle Belegbilder eingebettet – die Datei ist für sich allein vollständig.
+ *  download: true = immer auf dieses Gerät herunterladen, auch wenn Exporte sonst geteilt werden – für die Notfall-Sicherung
+ *  bei einem Speicherfehler („JSON-Sicherung herunterladen“): Dort soll die Kopie sicher lokal liegen, nicht in einem Teilen-Menü. */
+export async function exportBackup(state: AppState, options: { download?: boolean } = {}) {
   state = await withAllReceiptImages(state);
-  deliver(
+  (options.download ? download : deliver)(
     new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
     `Reisekosten_Backup_${new Date().toISOString().slice(0, 10)}.json`,
   );

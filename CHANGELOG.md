@@ -10,6 +10,8 @@ Rückmeldung aus dem Einsatz: Der Export vom Handy (an den Laptop, per Mail) war
 - **Was ein Gerät nicht teilt, wird wie bisher heruntergeladen** (mit Hinweis) – welche Dateiarten das Teilen-Menü annimmt,
   entscheidet der Browser je Datei. Dauert das Erstellen länger (große PDF oder ZIP mit Belegen), verlangt der Browser
   einen zweiten Fingertipp: Dann erscheint **„Datei ist fertig“** mit „Teilen“ und „Herunterladen“.
+- **Notfall-Sicherung bleibt ein Download:** „JSON-Sicherung herunterladen“ in der Meldung bei einem Speicherfehler lädt
+  immer auf das Gerät, auch wenn Exporte sonst geteilt werden.
 - **Am PC ändert sich nichts** (Maus: weiterhin Download, keine neue Wahl). Ein Empfänger lässt sich nicht vorbelegen –
   das Teilen-Menü gehört dem Gerät.
 - **Abgeschlossene Abrechnung: „Abrechnung weitergeben“ steht direkt unter dem Kopf** statt am Ende der Seite (auf dem

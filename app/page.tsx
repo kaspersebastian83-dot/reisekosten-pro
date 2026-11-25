@@ -464,7 +464,7 @@ export default function Home() {
         <UpdateNotice canUpdate={canUpdate} prepare={setUpdatePreparing} />
         {saveError && <div className="error-box" role="alert">
           <p>{saveError}</p>
-          <button onClick={() => void exportBackup(state).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "JSON-Sicherung konnte nicht erstellt werden."))}>JSON-Sicherung herunterladen</button>
+          <button onClick={() => void exportBackup(state, { download: true }).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "JSON-Sicherung konnte nicht erstellt werden."))}>JSON-Sicherung herunterladen</button>
           <button onClick={() => setSaveRetry((n) => n + 1)}>Speichern erneut versuchen</button>
         </div>}
         {/* Der Hinweis gilt dem persönlichen SpesenKit-Ordner – in der Bürokasse hat sie ihre eigene Sicherung. */}

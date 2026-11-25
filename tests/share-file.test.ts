@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { exportCsv, setExportDelivery } from '../lib/exports';
+import { exportBackup, exportCsv, setExportDelivery } from '../lib/exports';
+import { emptyState } from '../lib/config';
 import { buildStatement } from '../lib/calculations';
 import { demoState } from '../lib/demo';
 import { canShareFile, shareFile, shareSupported, shareableFile } from '../lib/share-file';
@@ -54,6 +55,17 @@ describe('Exporte laufen über eine umschaltbare Übergabe', () => {
     expect(geteilt.map((f) => f.name)).toEqual(['Reisekosten_2026-07_V01.csv']);
     expect(geteilt[0].blob.size).toBeGreaterThan(100);
     expect(click).not.toHaveBeenCalled();
+  });
+  it('Notfall-Sicherung bei Speicherfehler bleibt ein Download, auch wenn Exporte sonst geteilt werden', async () => {
+    const geteilt: string[] = [], geladen: string[] = [];
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:x'); vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    vi.stubGlobal('document', { createElement: () => ({ href: '', download: '', click() { geladen.push(this.download); } }) });
+    setExportDelivery((_blob, name) => geteilt.push(name));
+    await exportBackup(structuredClone(emptyState), { download: true });
+    expect([geteilt, geladen.length]).toEqual([[], 1]);
+    expect(geladen[0]).toMatch(/^Reisekosten_Backup_\d{4}-\d{2}-\d{2}\.json$/);
+    await exportBackup(structuredClone(emptyState));   // „Sicherung teilen“ unter Datensicherung folgt weiter der Wahl
+    expect([geteilt.length, geladen.length]).toEqual([1, 1]);
   });
   it('zurückgesetzt: wieder Download', () => {
     const namen: string[] = [];
