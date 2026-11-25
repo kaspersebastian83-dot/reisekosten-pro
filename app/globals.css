@@ -3102,3 +3102,41 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .export-ready-file { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 28px; overflow-wrap: anywhere; }
 .export-ready-file small { color: var(--muted, #5b6b7b); }
 .export-ready .modal-actions button { min-height: 48px; flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* ---------- Handy (ab 1.16.0): schlanke Kopfzeile, Formularfelder in Handygröße ---------- */
+.modus-kopf { display: contents; }
+/* Die Hülle steht zwischen Arbeitsbereich und Monatsfeld – der feste Abstand von .modus-chip + .top-actions gilt deshalb hier. */
+.modus-kopf + .top-actions { margin-left: 16px; }
+.modus-inhalt { display: none; }
+@media (max-width: 760px) {
+  /* Kopfzeile: eine Zeile (Menü · Titel · Monat), deckend – vorher rund ein Viertel des Bildschirms und durchscheinend. */
+  .topbar { min-height: 56px; padding: 6px 12px; flex-wrap: nowrap; gap: 8px; background: var(--white); backdrop-filter: none; }
+  .topbar > div:not(.top-actions) { min-width: 0; flex: 1 1 auto; }
+  .topbar .eyebrow { display: none; }
+  .topbar h1 { font-size: 17px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar > .icon { min-width: 44px; min-height: 44px; flex: none; }
+  .topbar .modus-kopf + .top-actions, .topbar .top-actions { width: auto; flex: none; gap: 6px; margin-left: auto; }
+  .topbar .month-picker { font-size: 0; gap: 0; }   /* Beschriftung bleibt für Vorlesehilfen, braucht aber keine eigene Zeile */
+  .topbar .month-picker input { font-size: 16px; min-height: 44px; width: auto; max-width: 168px; padding: 0 2px; }
+  .topbar .quality { display: none; }   /* nur noch ein Symbol ohne Text – der Weg zur Monatsübersicht steht im Menü */
+  .modus-kopf { display: none; }
+  .modus-inhalt { display: block; margin: 0 0 12px; }
+  .modus-inhalt .modus-chip { display: flex; width: 100%; margin: 0; }
+
+  /* Formularfelder: 16 px Schrift (darunter zoomt das iPhone beim Antippen in die Seite) und 48 px Höhe für den Finger –
+     dieselben Maße wie in der Bürokasse. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+  select,
+  textarea { font-size: 16px; }
+  .modal .modal-body input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+  .modal .modal-body select,
+  .receipt-capture input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+  .receipt-capture select { min-height: 48px; }
+  .modal label, .receipt-capture label { font-size: 14px; }
+}
+@media (max-width: 380px) {
+  /* schmale Handys: Titel und längster Monatsname („September 2026“) passen nebeneinander */
+  .topbar { padding: 6px 8px; gap: 4px; }
+  .topbar h1 { font-size: 16px; }
+  .topbar .month-picker input { max-width: 156px; padding: 0; }
+}

@@ -3,7 +3,7 @@
 Dienstreisen · Spesen · Abrechnungen
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
-1.15.0 (Release-Version aus [package.json](package.json), Änderungen in
+1.16.0 (Release-Version aus [package.json](package.json), Änderungen in
 [CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
 
 Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
@@ -20,8 +20,10 @@ Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV- und ZIP-Exporte sowie eine Buchungsliste (CSV).
 
-## Aktueller Stand in Kürze (1.15.0)
+## Aktueller Stand in Kürze (1.16.0)
 
+- **1.16.0 – Handy:** Kopfzeile in einer Zeile und deckend, Arbeitsbereich im Inhalt statt in der mitlaufenden Kopfzeile,
+  Formularfelder mit 16 px Schrift und 48 px Höhe (kein Hineinzoomen auf dem iPhone). Am PC unverändert.
 - **1.15.0 – Exporte teilen (Handy, Tablet):** Wahl „Teilen / Herunterladen“ in „Abrechnung weitergeben“ und bei der
   JSON-Sicherung; „Teilen“ übergibt die Datei an das Teilen-Menü des Geräts (Mail, OneDrive …), nicht teilbare Dateiarten
   werden heruntergeladen. Am PC unverändert Download. Bei abgeschlossenen Abrechnungen steht „Abrechnung weitergeben“

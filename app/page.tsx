@@ -481,7 +481,7 @@ export default function Home() {
             <p className="eyebrow">{kasse.modus === "buerokasse" ? "Kassenbuch" : "Reisekostenabrechnung"}</p>
             <h1>{kasse.modus === "buerokasse" ? "Bürokasse" : tab}</h1>
           </div>
-          <ModusChip staffRole={state.settings.staffRole} modus={kasse.modus} kasse={kasse.sichtbar} onWahl={wahleModus} />
+          <span className="modus-kopf"><ModusChip staffRole={state.settings.staffRole} modus={kasse.modus} kasse={kasse.sichtbar} onWahl={wahleModus} /></span>
           {kasse.modus !== "buerokasse" && <div className="top-actions">
             <label className="month-picker">
               Abrechnungsmonat
@@ -499,6 +499,8 @@ export default function Home() {
           </div>}
         </header>
         <div className="content">
+          {/* Handy: Der Arbeitsbereich steht einmal oben im Inhalt statt dauerhaft in der mitlaufenden Kopfzeile. */}
+          <div className="modus-inhalt"><ModusChip staffRole={state.settings.staffRole} modus={kasse.modus} kasse={kasse.sichtbar} onWahl={wahleModus} /></div>
           {kasse.modus === "buerokasse" ? <Buerokasse appVersion={appRelease.version} notify={notify} uebernahme={kostenFuerKasse} /> : <>
           {tab === "Fahrten importieren" && (
             <ImportWizard

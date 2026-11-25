@@ -1,5 +1,17 @@
 # Release Notes
 
+## 1.16.0 – 25. November 2026
+
+Bedienung auf dem Handy (bis 760 px Breite); am PC ist alles unverändert.
+- **Schlanke Kopfzeile:** eine Zeile mit Menü, Titel und Abrechnungsmonat (rund 56 px statt 206 px – vorher ein Viertel des
+  Bildschirms) und deckend statt durchscheinend. Die Beschriftung „Abrechnungsmonat“ bleibt für Vorlesehilfen erhalten.
+- **Arbeitsbereich (Außendienst · Innendienst · Bürokasse)** steht auf dem Handy einmal oben im Inhalt und läuft nicht mehr
+  mit. Das Status-Symbol neben dem Monat entfällt dort (nur ein Symbol ohne Text; der Weg zur Monatsübersicht steht im Menü).
+- **Formularfelder in Handygröße:** 16 px Schrift und 48 px Höhe in Reise-, Kosten- und Belegfenstern – dieselben Maße wie
+  in der Bürokasse. Unter 16 px zoomt das iPhone beim Antippen eines Felds in die Seite; das entfällt damit.
+- Nur Darstellung (`app/globals.css`, Abschnitt „Handy“), zwei zusätzliche Hüllen um den Arbeitsbereich in `app/page.tsx`.
+- Tests: Browserprüfung `handy-kopf-browser-check.mjs` (390 und 360 px, PC unverändert).
+
 ## 1.15.0 – 25. November 2026
 
 Rückmeldung aus dem Einsatz: Der Export vom Handy (an den Laptop, per Mail) war umständlich.
