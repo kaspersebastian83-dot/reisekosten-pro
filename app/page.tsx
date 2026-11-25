@@ -2247,6 +2247,9 @@ function Expenses({
               <input
                 type="number"
                 step="0.01"
+                inputMode="decimal"
+                // Vorbelegte 0 beim Antippen markieren: Die erste Ziffer ersetzt sie (auf dem Handy musste man sie erst löschen).
+                onFocus={(e) => { const field = e.currentTarget; requestAnimationFrame(() => { if (document.activeElement === field && Number(field.value) === 0) field.select(); }); }}
                 value={editing.gross}
                 onChange={(e) => {
                   const gross = Number(e.target.value);

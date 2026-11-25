@@ -1,5 +1,14 @@
 # Release Notes
 
+## 1.17.1 – 25. November 2026
+
+Erfassungsfenster auf dem Handy (bis 760 px Breite); am PC unverändert.
+- **Speicherleiste bündig:** „Abbrechen“, „Speichern & nächste“ und „Speichern & fertig“ schließen am unteren Fensterrand
+  ab. Vorher blieb darunter ein Streifen, in dem der Fensterinhalt durchlief, und das Fenster stand 8 px über (die Höhe des
+  Fensterkopfs war fest mit 65 px angenommen). Knöpfe 48 px hoch, Abstand für die Gestenleiste des Handys.
+- **Brutto:** Die vorbelegte 0 wird beim Antippen markiert – die erste Ziffer ersetzt sie; Zifferntastatur mit Komma.
+- Tests: `handy-kopf-browser-check.mjs` ergänzt.
+
 ## 1.17.0 – 25. November 2026
 
 Bedienung auf dem Handy; am PC ist alles unverändert.

@@ -3,7 +3,7 @@
 Dienstreisen · Spesen · Abrechnungen
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
-1.17.0 (Release-Version aus [package.json](package.json), Änderungen in
+1.17.1 (Release-Version aus [package.json](package.json), Änderungen in
 [CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
 
 Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
@@ -20,8 +20,10 @@ Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV- und ZIP-Exporte sowie eine Buchungsliste (CSV).
 
-## Aktueller Stand in Kürze (1.17.0)
+## Aktueller Stand in Kürze (1.17.1)
 
+- **1.17.1 – Handy:** Speicherleiste der Erfassungsfenster bündig am unteren Rand; vorbelegte 0 bei „Brutto“ wird beim
+  Antippen ersetzt.
 - **1.17.0 – Handy:** Schnellleiste unten in der Monatsübersicht (Belegfoto, Neue Reise); ohne Ordner eine Zeile
   „nur auf diesem Gerät · Letzte Sicherung …“ mit „Sichern“ statt des großen Ordner-Hinweises. Am PC unverändert.
 - **1.16.0 – Handy:** Kopfzeile in einer Zeile und deckend, Arbeitsbereich im Inhalt statt in der mitlaufenden Kopfzeile,
