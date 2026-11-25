@@ -1,6 +1,6 @@
 // Übergabe Handy → PC im echten Browser (seit 1.18.0): Das Handy sendet seine Einträge als Datei („An den PC senden“), der PC
 // fügt sie hinzu („Vom Handy übernehmen“) und ersetzt nichts. Das Teilen-Menü ist nachgebildet und fängt die Datei ab.
-// Geprüft: Zähler und Vermerk auf dem Handy, abgebrochenes Teilen vermerkt nichts, Vorschau und Übernahme am PC samt
+// Geprüft: Zähler, Vermerk und Marken an den Zeilen auf dem Handy, abgebrochenes Teilen vermerkt nichts, Vorschau und Übernahme am PC samt
 // Belegbild, zweite Übernahme ändert nichts, geänderter Eintrag meldet die Abweichung, fremde Dateien werden abgelehnt.
 // npm run build && node tests/uebergabe-browser-check.mjs
 import assert from 'node:assert/strict';
@@ -107,6 +107,9 @@ try {
   });
   await check('Handy: eine Reise geändert → genau 1 Eintrag wieder offen; gesendet wird nur dieser', async () => {
     await handy.nav('Monatsübersicht'); await hp.getByRole('button', { name: /^Jul/ }).click();
+    // Zeitleiste: nach dem Senden trägt jede Zeile „gesendet“
+    const marken = () => hp.locator('.month-timeline .timeline-sent').allInnerTexts();
+    assert.ok((await marken()).length >= 10 && (await marken()).every((text) => text === 'gesendet'), 'alle Zeilen gesendet');
     await hp.locator('.month-timeline').getByRole('button', { name: /Bonn/ }).first().click();
     const km = hp.locator('.modal').getByLabel(/Dienstliche Kilometer|Kilometer \(dienstlich\)|Dienstlich gefahren/).first();
     if (!(await km.count())) await hp.locator('.modal').getByText('Weitere Angaben', { exact: false }).click();
@@ -115,10 +118,14 @@ try {
     await hp.locator('.modal').getByRole('button', { name: /Speichern & fertig|Änderungen speichern|Speichern/ }).last().click();
     await until(async () => (await stored(hp)).trips.some((t) => t.destination === 'Bonn-Beuel'), 'Reise geändert');
     await until(async () => /1 Eintrag noch nicht gesendet/.test(await zeile.innerText()), 'Zeile: 1 Eintrag offen');
+    assert.deepEqual((await marken()).filter((text) => text !== 'gesendet'), ['geändert – noch nicht gesendet']);
+    assert.match(await hp.locator('.month-timeline').getByRole('button', { name: /Bonn-Beuel/ }).innerText(), /geändert – noch nicht gesendet/);
+    assert.equal(await hp.evaluate(() => document.documentElement.scrollWidth), 390, 'nichts ragt seitlich heraus');
     await zeile.getByRole('button', { name: 'Senden', exact: true }).click();
     await until(async () => (await geteilt()).length === 2, 'zweite Datei');
     const zweite = JSON.parse((await geteilt())[1].text);
     assert.deepEqual([zweite.trips.length, zweite.expenses.length, zweite.receiptInbox.length, zweite.trips[0].destination], [1, 0, 0, 'Bonn-Beuel']);
+    await until(async () => (await marken()).every((text) => text === 'gesendet'), 'wieder alles gesendet');
   });
   await check('Handy: Hinweis im Abschlussbereich – abgeschlossen wird am PC', async () => {
     assert.match(await hp.locator('.month-entry-workspace').innerText(), /Abschluss am PC – dort liegen alle Einträge\./);
@@ -136,6 +143,7 @@ try {
 
   await check('PC: Datensicherung zeigt „Vom Handy übernehmen“; kein Abschluss-Hinweis, kein „An den PC senden“', async () => {
     assert.doesNotMatch(await pp.locator('.month-entry-workspace').innerText(), /Abschluss am PC/);
+    assert.equal(await pp.locator('.timeline-sent').count(), 0, 'am PC keine Sende-Marken');
     // eigener Bestand am PC: eine Reise, die erhalten bleiben muss
     await pp.locator('.month-entry-workspace').getByRole('button', { name: 'Dienstreise erfassen', exact: true }).click();
     const m = pp.locator('.modal');

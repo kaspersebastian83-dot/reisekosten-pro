@@ -92,7 +92,7 @@ import { RECEIPT_ROTATIONS, TURNED_ONLY, UPRIGHT_ONLY, applyMerchantRule, readin
 import { readAllDirections, setReadAllDirections } from "../lib/device-settings";
 import { isEmptyState } from "../lib/folder-store";
 import { CurrencyFields } from "./currency-fields";
-import { HandoffImportCard, HandoffSendCard, useHandoff, type Handoff } from "./uebergabe";
+import { HandoffImportCard, HandoffSendCard, useHandoff, type Handoff, type SendStatus } from "./uebergabe";
 import { ExportDeliveryChoice, ExportReadySheet, useExportShare, type ExportShare } from "./export-share";
 import {
   exportBackup,
@@ -529,6 +529,7 @@ export default function Home() {
               commitCorrection={commitCorrection}
               folder={folder}
               share={exportShare}
+              sendStatus={handoff.phone ? handoff.status : undefined}
               openImport={() => {setWorkspaceEntry({month}); setTab("Fahrten importieren");}}
               startInbox={startInbox}
               editClosingIssue={target => {
@@ -2466,9 +2467,10 @@ function Statements({
   update,
   notify,
   startEntry, openCapture, viewRules,
-  commitClosing, editClosingIssue, commitCorrection, folder, openImport, startInbox, share,
+  commitClosing, editClosingIssue, commitCorrection, folder, openImport, startInbox, share, sendStatus,
 }: {
   share: ExportShare;
+  sendStatus?: (id: string) => SendStatus | undefined;
   openImport?: () => void;
   startInbox?: () => void;
   state: AppState;
@@ -2657,7 +2659,7 @@ function Statements({
         comparison={comparison}
         changes={<StatementChanges comparison={comparison} creating={correctionSaving} error={correctionError} create={() => void correct()} resume={openVersion} />}
         openImport={openImport} inboxCount={openInboxItems(state).length} startInbox={startInbox}
-        timeline={<MonthTimeline state={state} month={month} statement={currentStatement} edit={editClosingIssue} startTrip={() => startEntry('trip')} filter={timelineFilter} setFilter={setTimelineFilter} />}
+        timeline={<MonthTimeline state={state} month={month} statement={currentStatement} edit={editClosingIssue} startTrip={() => startEntry('trip')} sendStatus={sendStatus} filter={timelineFilter} setFilter={setTimelineFilter} />}
         checks={<MonthChecks state={state} month={month} update={update} notify={notify} viewRules={viewRules} startInbox={startInbox ?? (() => undefined)}
           showIssues={filter => { setTimelineFilter(filter); requestAnimationFrame(() => document.querySelector('.month-timeline')?.scrollIntoView({behavior: 'smooth', block: 'start'})); }} />} />
       {reviewMonth === month && <>

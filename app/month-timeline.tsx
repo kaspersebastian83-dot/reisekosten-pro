@@ -4,13 +4,16 @@ import type { AppState, StatementData } from '../lib/types';
 import { filterTimeline, monthTimeline, timelineFilterLabels, type TimelineEntry, type TimelineFilter } from '../lib/month-timeline';
 import { DayDetails } from './calculation-details';
 import { paymentLabel, withoutTripNeeded } from '../lib/receipt-linking';
+import { sendStatusLabel, type SendStatus } from './uebergabe';
 
 const euro = (value: number) => value.toLocaleString('de-DE', {style: 'currency', currency: 'EUR'});
 const dayLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('de-DE', {weekday: 'short', day: '2-digit', month: '2-digit'});
 const short = (date: string) => `${date.slice(8, 10)}.${date.slice(5, 7)}.`;
 
 /** Kompakte Monatsansicht: je Tag eine Zeile mit Verpflegung, darunter je Reise/Kostenposition eine Zeile. Klick bearbeitet. */
-export function MonthTimeline({state, month, statement, edit, startTrip, filter = null, setFilter}: {
+export function MonthTimeline({state, month, statement, edit, startTrip, filter = null, setFilter, sendStatus}: {
+  /** Handy: Stand der Übergabe an den PC je Eintrag (app/uebergabe.tsx); am PC nicht gesetzt. */
+  sendStatus?: (id: string) => SendStatus | undefined;
   state: AppState; month: string; statement: StatementData;
   edit: (target: {kind: 'trip' | 'expense'; id: string}) => void;
   /** Leerer Monat: direkter Einstieg. */
@@ -22,6 +25,8 @@ export function MonthTimeline({state, month, statement, edit, startTrip, filter 
   const days = useMemo(() => filterTimeline(allDays, filter), [allDays, filter]);
   const rows = useMemo(() => new Map(statement.rows.map(row => [row.date, row])), [statement]);
   const counts = allDays.flatMap(d => d.entries).reduce((n, e) => e.kind === 'trip' ? (e.continued ? n : {...n, trips: n.trips + 1}) : {...n, expenses: n.expenses + 1}, {trips: 0, expenses: 0});
+  // In der Detailzeile, nicht als eigenes Element: Neben Titel, Hinweis und Betrag ist auf dem Handy kein Platz für eine weitere Marke.
+  const sent = (id: string) => { const s = sendStatus?.(id); return s ? <> · <span className={`timeline-sent ${s}`}>{sendStatusLabel[s]}</span></> : null; };
   const row = (entry: TimelineEntry) => {
     if (entry.kind === 'trip') {
       const t = entry.trip; const warnings = [...new Set(t.warnings)];
@@ -29,7 +34,7 @@ export function MonthTimeline({state, month, statement, edit, startTrip, filter 
       const detail = entry.continued ? 'Fortsetzung der mehrtägigen Reise' : [t.purpose, t.order, t.businessKm ? `${t.businessKm.toLocaleString('de-DE')} km` : ''].filter(Boolean).join(' · ');
       return <button type="button" className={`timeline-entry trip${entry.continued ? ' continued' : ''}`} onClick={() => edit({kind: 'trip', id: t.id})} aria-label={`Dienstreise ${title} bearbeiten`}>
         <Car size={16} aria-hidden="true" />
-        <span className="timeline-main"><b>{title}</b><small>{detail}</small></span>
+        <span className="timeline-main"><b>{title}</b><small>{detail}{!entry.continued && sent(t.id)}</small></span>
         {warnings.length > 0 && <span className="timeline-flag" title={warnings.join(' · ')}><AlertTriangle size={14} aria-hidden="true" />{warnings.length === 1 ? 'Hinweis' : `${warnings.length} Hinweise`}</span>}
         {t.status === 'ungeprüft' || t.status === 'importiert' ? <span className="timeline-state">ungeprüft</span> : null}
       </button>;
@@ -38,7 +43,7 @@ export function MonthTimeline({state, month, statement, edit, startTrip, filter 
     const warnings = [...new Set(e.warnings)].filter(w => w !== 'Beleg fehlt');
     return <button type="button" className="timeline-entry expense" onClick={() => edit({kind: 'expense', id: e.id})} aria-label={`${e.category} ${e.description} bearbeiten`}>
       <ReceiptText size={16} aria-hidden="true" />
-      <span className="timeline-main"><b>{e.category}{e.description ? ` · ${e.description}` : ''}</b><small>{[paymentLabel(e.paymentType), trip ? `Reise ${trip.destination || short(trip.date)}` : withoutTripNeeded(e, state.settings) ? (state.settings.staffRole === 'innendienst' ? '' : 'ohne Reise') : 'keiner Reise zugeordnet'].filter(Boolean).join(' · ')}</small></span>
+      <span className="timeline-main"><b>{e.category}{e.description ? ` · ${e.description}` : ''}</b><small>{[paymentLabel(e.paymentType), trip ? `Reise ${trip.destination || short(trip.date)}` : withoutTripNeeded(e, state.settings) ? (state.settings.staffRole === 'innendienst' ? '' : 'ohne Reise') : 'keiner Reise zugeordnet'].filter(Boolean).join(' · ')}{sent(e.id)}</small></span>
       {!e.receipt && <span className="timeline-flag">Beleg fehlt</span>}
       {warnings.length > 0 && <span className="timeline-flag" title={warnings.join(' · ')}><AlertTriangle size={14} aria-hidden="true" />{warnings.length === 1 ? 'Hinweis' : `${warnings.length} Hinweise`}</span>}
       <span className="timeline-amount">{e.currency && e.currency !== 'EUR' ? `${e.gross.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${e.currency}` : euro(e.gross)}</span>

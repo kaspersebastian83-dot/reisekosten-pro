@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.18.1 – 25. November 2026
+
+- **Zeitleiste auf dem Handy:** Jede Reise und Kostenposition nennt in ihrer Detailzeile den Stand der Übergabe an den PC –
+  „gesendet“, „geändert – noch nicht gesendet“ oder „noch nicht gesendet“ (in 1.18.0 noch offen). Am PC erscheint das nicht.
+- Tests: `uebergabe-browser-check.mjs` ergänzt.
+
 ## 1.18.0 – 25. November 2026
 
 Handy und PC nebeneinander nutzen: Bisher führte der einzige Weg vom Handy zum PC über die vollständige JSON-Sicherung,
