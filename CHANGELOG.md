@@ -1,5 +1,13 @@
 # Release Notes
 
+## 1.18.3 – 25. November 2026
+
+Nur intern, keine Änderung an Bedienung, Darstellung oder Berechnung.
+- **`app/page.tsx` aufgeteilt** (3.662 → 513 Zeilen): Jede Seite und jedes Fenster liegt in einer eigenen Datei –
+  `statements.tsx` (Abrechnung, Prüfen), `trips.tsx`, `expenses.tsx`, `receipt-capture.tsx`, `import-wizard.tsx`,
+  `settings-panel.tsx`, `backup.tsx`, `reports.tsx`; gemeinsame Hilfen (`Modal`, `uid`, `blankTrip` …) in `shared.tsx`.
+  Der Code ist unverändert verschoben; `page.tsx` enthält nur noch den Rahmen (Navigation, Zustand, Speichern).
+
 ## 1.18.2 – 25. November 2026
 
 Aufräumen aus der Durchsicht vom 25.11.2026; keine Änderung an der Berechnung.
