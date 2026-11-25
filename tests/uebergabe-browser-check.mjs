@@ -120,6 +120,9 @@ try {
     await until(async () => /1 Eintrag noch nicht gesendet/.test(await zeile.innerText()), 'Zeile: 1 Eintrag offen');
     assert.deepEqual((await marken()).filter((text) => text !== 'gesendet'), ['geändert – noch nicht gesendet']);
     assert.match(await hp.locator('.month-timeline').getByRole('button', { name: /Bonn-Beuel/ }).innerText(), /geändert – noch nicht gesendet/);
+    // auch im Namen des Knopfs (Vorlesehilfe), nicht nur sichtbar
+    assert.match(await hp.locator('.month-timeline').getByRole('button', { name: /Bonn-Beuel/ }).getAttribute('aria-label'), /bearbeiten, geändert – noch nicht gesendet$/);
+    assert.ok((await hp.locator('.month-timeline .timeline-entry.expense').first().getAttribute('aria-label')).endsWith('bearbeiten, gesendet'));
     assert.equal(await hp.evaluate(() => document.documentElement.scrollWidth), 390, 'nichts ragt seitlich heraus');
     await zeile.getByRole('button', { name: 'Senden', exact: true }).click();
     await until(async () => (await geteilt()).length === 2, 'zweite Datei');
