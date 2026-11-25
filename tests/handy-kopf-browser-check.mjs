@@ -75,5 +75,8 @@ try {
     assert.equal(k.hoehe, 94);
     assert.deepEqual([k.chipImKopf, k.chipImInhalt], [true, false]);
     assert.equal(await page.getByRole('radiogroup', { name: 'Arbeitsbereich' }).count(), 1);
+    // Fester Abstand zwischen Arbeitsbereich und Monatsfeld wie vor 1.16.0 (16 px), nicht zwei gleich große Lücken.
+    const abstand = await page.evaluate(() => Math.round(document.querySelector('.topbar .top-actions').getBoundingClientRect().left - document.querySelector('.topbar .modus-chip').getBoundingClientRect().right));
+    assert.equal(abstand, 16 + 16, 'Abstand Arbeitsbereich → Monatsfeld (16 px Rand + 16 px Lücke der Kopfzeile)');
   });
 } finally { await browser.close(); server.close(); }

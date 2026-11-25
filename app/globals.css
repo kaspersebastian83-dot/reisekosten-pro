@@ -3105,6 +3105,8 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 
 /* ---------- Handy (ab 1.16.0): schlanke Kopfzeile, Formularfelder in Handygröße ---------- */
 .modus-kopf { display: contents; }
+/* Die Hülle steht zwischen Arbeitsbereich und Monatsfeld – der feste Abstand von .modus-chip + .top-actions gilt deshalb hier. */
+.modus-kopf + .top-actions { margin-left: 16px; }
 .modus-inhalt { display: none; }
 @media (max-width: 760px) {
   /* Kopfzeile: eine Zeile (Menü · Titel · Monat), deckend – vorher rund ein Viertel des Bildschirms und durchscheinend. */
@@ -3113,7 +3115,7 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
   .topbar .eyebrow { display: none; }
   .topbar h1 { font-size: 17px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .topbar > .icon { min-width: 44px; min-height: 44px; flex: none; }
-  .topbar .top-actions { width: auto; flex: none; gap: 6px; margin-left: auto; }
+  .topbar .modus-kopf + .top-actions, .topbar .top-actions { width: auto; flex: none; gap: 6px; margin-left: auto; }
   .topbar .month-picker { font-size: 0; gap: 0; }   /* Beschriftung bleibt für Vorlesehilfen, braucht aber keine eigene Zeile */
   .topbar .month-picker input { font-size: 16px; min-height: 44px; width: auto; max-width: 168px; padding: 0 2px; }
   .topbar .quality { display: none; }   /* nur noch ein Symbol ohne Text – der Weg zur Monatsübersicht steht im Menü */
