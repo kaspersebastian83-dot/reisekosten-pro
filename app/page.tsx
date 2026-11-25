@@ -91,6 +91,7 @@ import { slimChangeLog } from "../lib/change-log";
 import { RECEIPT_ROTATIONS, TURNED_ONLY, UPRIGHT_ONLY, applyMerchantRule, readingIncomplete, recognizeReceiptLocally } from "../lib/receipt-ocr";
 import { readAllDirections, setReadAllDirections } from "../lib/device-settings";
 import { CurrencyFields } from "./currency-fields";
+import { ExportDeliveryChoice, ExportReadySheet, useExportShare, type ExportShare } from "./export-share";
 import {
   exportBackup,
   exportCsv,
@@ -347,6 +348,7 @@ export default function Home() {
     notify: useCallback((text: string) => notifyRef.current(text), []),
   });
   const notifyRef = useRef(notify); notifyRef.current = notify;
+  const exportShare = useExportShare(notify);
   // Belegbilder nie ins Änderungsprotokoll kopieren (siehe lib/change-log.ts).
   // Neu erfasste Belegbilder werden sofort herausgelöst: im Bestand steht nur der Verweis (lib/receipt-images.ts).
   const update = (fn: (s: AppState) => AppState) =>
@@ -521,6 +523,7 @@ export default function Home() {
               commitClosing={commitClosing}
               commitCorrection={commitCorrection}
               folder={folder}
+              share={exportShare}
               openImport={() => {setWorkspaceEntry({month}); setTab("Fahrten importieren");}}
               startInbox={startInbox}
               editClosingIssue={target => {
@@ -546,7 +549,7 @@ export default function Home() {
             <SettingsPanel state={state} update={update} notify={notify} kasse={kasse} />
           )}
           {tab === "Datensicherung" && (
-            <Backup state={state} setState={setState} notify={notify} folder={folder} />
+            <Backup state={state} setState={setState} notify={notify} folder={folder} share={exportShare} />
           )}
           </>}
         </div>
@@ -572,6 +575,7 @@ export default function Home() {
           close={() => setReceiptCaptureOpen(false)}
         />
       )}
+      <ExportReadySheet share={exportShare} />
       {toast && (
         <div className="toast">
           <Check size={18} />
@@ -2447,8 +2451,9 @@ function Statements({
   update,
   notify,
   startEntry, openCapture, viewRules,
-  commitClosing, editClosingIssue, commitCorrection, folder, openImport, startInbox,
+  commitClosing, editClosingIssue, commitCorrection, folder, openImport, startInbox, share,
 }: {
+  share: ExportShare;
   openImport?: () => void;
   startInbox?: () => void;
   state: AppState;
@@ -2502,6 +2507,50 @@ function Statements({
     catch (error) { notify(error instanceof MissingReceiptImageError ? error.message : "Die PDF konnte nicht erstellt werden. Bitte erneut versuchen; die Abrechnung bleibt gespeichert."); }
     finally { pdfBusy.current = false; setPdfWorking(false); }
   };
+  // Abgeschlossene Abrechnung: „Abrechnung weitergeben“ steht direkt unter dem Kopf statt am Seitenende (auf dem Handy lag
+  // sie rund neun Bildschirme tiefer). Entwürfe behalten die bisherige Reihenfolge.
+  const exportFirst = !!existing && isClosedStatement(existing);
+  const exportCard = (
+      <section className="card export-card">
+        <div>
+          <p className="eyebrow">Export</p>
+          <h3>Abrechnung weitergeben</h3>
+          <ExportDeliveryChoice share={share} />
+          <p>
+            PDF für Unterschrift, Tabellen für Buchhaltung oder Komplettpaket
+            mit Belegen.
+          </p>
+          <p>Die Buchungsliste (CSV) nennt je Tag Datum, Text, Betrag und Kostenstelle – zum Abtippen oder Weiterverarbeiten, kein DATEV-Buchungsstapel.</p>
+          <p>Tabellen enthalten den vollständigen ausgewählten Abrechnungsstand. Die bestehende Spalte „OffenerBetrag“ bezeichnet dessen rechnerischen Erstattungsbetrag, keine tatsächliche Restzahlung.</p>
+          {exportContext?.correction && <p className="correction-payment-note">{correctionExportNotice} CSV-Exporte und Buchungsliste vor einer Übernahme mit der Buchhaltung abstimmen; frühere Versionen nicht zusätzlich buchen.</p>}
+        </div>
+        <div className="export-buttons">
+          <button disabled={pdfWorking} onClick={() => void makePdf()}>
+            <FileDown />
+            {pdfWorking ? 'PDF wird erstellt …' : 'PDF'}
+          </button>
+          <button onClick={() => exportExcel(statement, exportState, exportContext)}>
+            <FileSpreadsheet />
+            Excel
+          </button>
+          <button onClick={() => exportCsv(statement, exportState, false, exportContext)}>
+            <Download />
+            CSV
+          </button>
+          <button onClick={() => {
+            if (exportContext?.correction && !window.confirm(`${correctionExportNotice}\n\nDiese Buchungsliste ist keine zusätzliche Differenzbuchung. Vor einer Übernahme frühere Buchungen und Zahlungen gesondert abstimmen. Vollständigen ausgewählten Stand trotzdem exportieren?`)) return;
+            exportCsv(statement, exportState, true, exportContext);
+          }}>
+            <FileSpreadsheet />
+            Buchungsliste (CSV)
+          </button>
+          <button onClick={() => void exportZip(statement, exportState, number, exportContext).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "Das ZIP konnte nicht erstellt werden. Bitte erneut versuchen."))}>
+            <Archive />
+            ZIP + Belege
+          </button>
+        </div>
+      </section>
+  );
   const usedVehicles = [
     ...new Map([
       ...statement.rows.flatMap((row) =>
@@ -2678,6 +2727,7 @@ function Statements({
           <span>Version {existing.version}</span>
         </div>
       )}
+      {exportFirst && exportCard}
       <section className="card">
         <div className="card-head">
           <div>
@@ -2767,44 +2817,7 @@ function Statements({
           <b>{euro(statement.totals.openAmount)}</b>
         </div>
       </section>
-      <section className="card export-card">
-        <div>
-          <p className="eyebrow">Export</p>
-          <h3>Abrechnung weitergeben</h3>
-          <p>
-            PDF für Unterschrift, Tabellen für Buchhaltung oder Komplettpaket
-            mit Belegen.
-          </p>
-          <p>Die Buchungsliste (CSV) nennt je Tag Datum, Text, Betrag und Kostenstelle – zum Abtippen oder Weiterverarbeiten, kein DATEV-Buchungsstapel.</p>
-          <p>Tabellen enthalten den vollständigen ausgewählten Abrechnungsstand. Die bestehende Spalte „OffenerBetrag“ bezeichnet dessen rechnerischen Erstattungsbetrag, keine tatsächliche Restzahlung.</p>
-          {exportContext?.correction && <p className="correction-payment-note">{correctionExportNotice} CSV-Exporte und Buchungsliste vor einer Übernahme mit der Buchhaltung abstimmen; frühere Versionen nicht zusätzlich buchen.</p>}
-        </div>
-        <div className="export-buttons">
-          <button disabled={pdfWorking} onClick={() => void makePdf()}>
-            <FileDown />
-            {pdfWorking ? 'PDF wird erstellt …' : 'PDF'}
-          </button>
-          <button onClick={() => exportExcel(statement, exportState, exportContext)}>
-            <FileSpreadsheet />
-            Excel
-          </button>
-          <button onClick={() => exportCsv(statement, exportState, false, exportContext)}>
-            <Download />
-            CSV
-          </button>
-          <button onClick={() => {
-            if (exportContext?.correction && !window.confirm(`${correctionExportNotice}\n\nDiese Buchungsliste ist keine zusätzliche Differenzbuchung. Vor einer Übernahme frühere Buchungen und Zahlungen gesondert abstimmen. Vollständigen ausgewählten Stand trotzdem exportieren?`)) return;
-            exportCsv(statement, exportState, true, exportContext);
-          }}>
-            <FileSpreadsheet />
-            Buchungsliste (CSV)
-          </button>
-          <button onClick={() => void exportZip(statement, exportState, number, exportContext).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "Das ZIP konnte nicht erstellt werden. Bitte erneut versuchen."))}>
-            <Archive />
-            ZIP + Belege
-          </button>
-        </div>
-      </section>
+      {!exportFirst && exportCard}
       {existing && isClosedStatement(existing) && <StatementFiling folder={folder} snapshot={existing} label={`${monthLabel(month)} (Version ${existing.version})`} print={() => void makePdf(true)} />}
       </>}
     </>
@@ -3368,11 +3381,13 @@ function Backup({
   setState,
   notify,
   folder,
+  share,
 }: {
   state: AppState;
   setState: (s: AppState) => void;
   notify: (s: string) => void;
   folder: FolderStorage;
+  share: ExportShare;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [restoring, setRestoring] = useState(false);
@@ -3418,9 +3433,10 @@ function Backup({
           Exportiert Fahrten, Kosten, Belege, Regeln, Importprofile und
           abgeschlossene Abrechnungen als JSON.
         </p>
+        <ExportDeliveryChoice share={share} />
         <button className="primary" onClick={() => void exportBackup(state).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "JSON-Sicherung konnte nicht erstellt werden."))}>
           <Download size={18} />
-          Sicherung herunterladen
+          {share.offered && share.sharing ? "Sicherung teilen" : "Sicherung herunterladen"}
         </button>
       </section>
       <section className="card backup-card">

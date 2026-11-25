@@ -3,7 +3,7 @@
 Dienstreisen · Spesen · Abrechnungen
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
-1.14.0 (Release-Version aus [package.json](package.json), Änderungen in
+1.15.0 (Release-Version aus [package.json](package.json), Änderungen in
 [CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
 
 Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
@@ -20,8 +20,12 @@ Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV- und ZIP-Exporte sowie eine Buchungsliste (CSV).
 
-## Aktueller Stand in Kürze (1.14.0)
+## Aktueller Stand in Kürze (1.15.0)
 
+- **1.15.0 – Exporte teilen (Handy, Tablet):** Wahl „Teilen / Herunterladen“ in „Abrechnung weitergeben“ und bei der
+  JSON-Sicherung; „Teilen“ übergibt die Datei an das Teilen-Menü des Geräts (Mail, OneDrive …), nicht teilbare Dateiarten
+  werden heruntergeladen. Am PC unverändert Download. Bei abgeschlossenen Abrechnungen steht „Abrechnung weitergeben“
+  direkt unter dem Kopf. Siehe `lib/share-file.ts`, `app/export-share.tsx`.
 - **1.14.0:** „DATEV-CSV“ heißt „Buchungsliste (CSV)“ (kein DATEV-Buchungsstapel). Mehrtägige Reisen ohne bestätigte
   Übernachtung sperren den Abschluss, bis die Übernachtung bestätigt oder die Reise aufgeteilt ist (Berechnung unverändert,
   `overnightUnconfirmed`). Die Belegerkennung lädt nichts mehr von cdn.jsdelivr.net: ihre Dateien liegen unter

@@ -73,13 +73,19 @@ const vehicleLabel = (
   vehicle: ReturnType<typeof vehiclesForStatement>[number],
 ) => `${vehicle.name} · ${vehicle.type} · ${vehicle.plate}`;
 
-function download(blob: Blob, name: string) {
+export function download(blob: Blob, name: string) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+/** Wohin fertige Exportdateien gehen. Vorgabe: Download. Auf Geräten mit Teilen-Menü setzt die App das Teilen
+ *  (app/export-share.tsx); Dateinamen und Inhalte sind in beiden Fällen dieselben. */
+type ExportDelivery = (blob: Blob, name: string) => void;
+let deliver: ExportDelivery = download;
+export function setExportDelivery(next?: ExportDelivery) { deliver = next || download; }
 
 /** Bestehende synchrone Dokument-API; Datei-Exporte ergänzen Original-PDF-Belege. */
 export const buildPdfDocument = buildStatementPdf;
@@ -101,7 +107,7 @@ export async function printPdf(data: StatementData, state: AppState, number: str
 
 export async function exportPdf(data: StatementData, state: AppState, number: string, context?: StatementExportContext) {
   const file = await pdfFile(data, state, number, context);
-  download(file.blob, file.name);
+  deliver(file.blob, file.name);
 }
 
 const MONEY_COLUMNS = new Set(["SpesenVorKürzung", "Frühstückskürzung", "Mittagessenkürzung", "Abendessenkürzung", "SpesenNachKürzung", "Kilometererstattung", "Tankkosten", "Übernachtung", "SonstigeKosten", "OffenerBetrag"]);
@@ -146,7 +152,7 @@ const rowsForExport = (data: StatementData, state: AppState) =>
 
 export async function exportExcel(data: StatementData, state: AppState, context?: StatementExportContext) {
   const file = await excelFile(data, state, context);
-  download(file.blob, file.name);
+  deliver(file.blob, file.name);
 }
 
 /** Dieselbe Excel-Datei wie „Excel“-Export, ohne Download. */
@@ -244,7 +250,7 @@ export function exportCsv(data: StatementData, state: AppState, bookingList = fa
       }))
     : (rowsForExport(data, state) as Record<string, unknown>[]);
   const csv = Papa.unparse(rows, { delimiter: ";" });
-  download(
+  deliver(
     new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }),
     statementExportFilename(data.month, 'csv', context, bookingList),
   );
@@ -253,7 +259,7 @@ export function exportCsv(data: StatementData, state: AppState, bookingList = fa
 /** JSON-Sicherung: alle Belegbilder eingebettet – die Datei ist für sich allein vollständig. */
 export async function exportBackup(state: AppState) {
   state = await withAllReceiptImages(state);
-  download(
+  deliver(
     new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
     `Reisekosten_Backup_${new Date().toISOString().slice(0, 10)}.json`,
   );
@@ -266,7 +272,7 @@ export async function exportZip(
   context?: StatementExportContext,
 ) {
   const file = await zipFile(data, state, number, context);
-  download(file.blob, file.name);
+  deliver(file.blob, file.name);
 }
 
 /** Dasselbe Paket wie „ZIP + Belege“, ohne Download. */
