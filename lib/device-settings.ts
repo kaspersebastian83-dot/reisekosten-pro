@@ -28,3 +28,12 @@ export function setShareExports(value: boolean) {
 export function touchDevice() {
   try { return typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches; } catch { return false; }
 }
+
+const LETZTE_SICHERUNG = "spesenkit-letzte-sicherung";
+/** Tag (JJJJ-MM-TT), an dem auf diesem Gerät zuletzt eine JSON-Sicherung erstellt wurde – für den Hinweis auf dem Handy. */
+export function lastBackupDay() {
+  try { const day = localStorage.getItem(LETZTE_SICHERUNG); return day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null; } catch { return null; }
+}
+export function markBackupDay(day: string) {
+  try { localStorage.setItem(LETZTE_SICHERUNG, day); } catch { /* nur Bequemlichkeit */ }
+}

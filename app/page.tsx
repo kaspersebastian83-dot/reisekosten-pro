@@ -468,7 +468,7 @@ export default function Home() {
           <button onClick={() => setSaveRetry((n) => n + 1)}>Speichern erneut versuchen</button>
         </div>}
         {/* Der Hinweis gilt dem persönlichen SpesenKit-Ordner – in der Bürokasse hat sie ihre eigene Sicherung. */}
-        {kasse.modus !== "buerokasse" && <FolderBanner folder={folder} openBackup={() => navigate("Datensicherung")} />}
+        {kasse.modus !== "buerokasse" && <FolderBanner folder={folder} openBackup={() => navigate("Datensicherung")} hasData={state.trips.length + state.expenses.length + state.receiptInbox.length > 0} />}
         <header className="topbar">
           <button
             className="icon mobile-only"
@@ -568,6 +568,13 @@ export default function Home() {
           initial={structuredClone(item)} close={() => setInboxQueue(null)} onDone={advance}
           position={`Beleg ${inboxQueue.total - inboxQueue.ids.length + 1} von ${inboxQueue.total}`} />;
       })()}
+      {/* Handy: die zwei häufigsten Handgriffe immer in Daumenreichweite (nur bis 760 px sichtbar, siehe globals.css). */}
+      {tab === "Monatsübersicht" && kasse.modus !== "buerokasse" && !editingTrip && !inlineExpense && !receiptCaptureOpen && !inboxQueue && (
+        <nav className="quick-bar" aria-label="Schnell erfassen">
+          <button type="button" className="primary" onClick={() => setReceiptCaptureOpen(true)}><Camera size={20} />Belegfoto</button>
+          <button type="button" onClick={() => startMonthEntry("trip")}><Plus size={20} />Neue Reise</button>
+        </nav>
+      )}
       {receiptCaptureOpen && tab !== "Auswertungen" && (
         <ReceiptCapture
           state={state}

@@ -1,3 +1,4 @@
+import { lastBackupDay, touchDevice } from "../lib/device-settings";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FolderOpen, HardDrive, Printer, RefreshCw } from "lucide-react";
 import {
@@ -433,8 +434,19 @@ export function FolderStatusLine({ folder, open }: { folder: FolderStorage; open
 }
 
 /** Hinweis über dem Inhalt, nur wenn etwas zu tun ist. */
-export function FolderBanner({ folder, openBackup }: { folder: FolderStorage; openBackup: () => void }) {
+export function FolderBanner({ folder, openBackup, hasData = true }: { folder: FolderStorage; openBackup: () => void; hasData?: boolean }) {
   const { status, busy } = folder;
+  // Handy/Tablet ohne verbundenen Ordner: Der Mitarbeiterordner auf dem Bürolaufwerk ist dort nicht das Thema. Statt des großen
+  // Hinweises (bzw. gar keinem, wenn der Browser keine Ordner kann – iPhone) eine Zeile zur Sicherung; der Ordner bleibt
+  // unter „Datensicherung“ einrichtbar, wo der Browser das kann.
+  if ((status.kind === "none" || status.kind === "unsupported") && touchDevice()) {
+    if (!hasData) return null;
+    const day = lastBackupDay();
+    return <div className="folder-banner backup-reminder" role="status">
+      <div><b>Ihre Spesen liegen nur auf diesem Gerät.</b><p>{day ? `Letzte Sicherung: ${day.split("-").reverse().join(".")}` : "Noch keine Sicherung erstellt."}</p></div>
+      <button className="ghost" onClick={openBackup}>Sichern</button>
+    </div>;
+  }
   if (status.kind === "none") return <div className="folder-banner warn" role="status">
     <AlertTriangle size={20} aria-hidden="true" />
     <div><b>Ihre Spesen liegen bisher nur in diesem Browser.</b><p>Beim Abmelden oder an einem anderen Terminalserver können sie fehlen. Richten Sie Ihren persönlichen SpesenKit-Ordner ein, dann wird jede Änderung dort gespeichert.</p></div>

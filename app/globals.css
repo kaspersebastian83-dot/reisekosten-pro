@@ -3140,3 +3140,21 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
   .topbar h1 { font-size: 16px; }
   .topbar .month-picker input { max-width: 156px; padding: 0; }
 }
+
+/* ---------- Handy (ab 1.17.0): Schnellleiste unten, Sicherungshinweis in einer Zeile ---------- */
+.quick-bar { display: none; }
+.folder-banner.backup-reminder { padding: 8px 12px; gap: 10px; }
+.folder-banner.backup-reminder b { font-size: 13px; }
+.folder-banner.backup-reminder p { margin: 0; font-size: 12px; }
+.folder-banner.backup-reminder button { min-height: 44px; flex: none; }
+@media (max-width: 760px) {
+  .folder-banner.backup-reminder { margin: 8px 12px 0; flex-direction: row; flex-wrap: nowrap; align-items: center; }
+  .folder-banner.backup-reminder button { width: auto; padding: 0 16px; }
+  .quick-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 18;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--white); border-top: 1px solid var(--line); box-shadow: 0 -2px 10px rgba(40, 72, 116, 0.08); }
+  .quick-bar button { min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; font-weight: 800; font-size: 16px; border: 1px solid var(--line); background: var(--white); color: var(--ink); }
+  .quick-bar button.primary { background: var(--green); color: #fff; border-color: var(--green); }
+  /* Platz für die Leiste: Inhalt endet darüber, Meldungen erscheinen darüber. */
+  body:has(.quick-bar) .content { padding-bottom: 110px; }
+  body:has(.quick-bar) .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+}

@@ -1,3 +1,4 @@
+import { markBackupDay } from "./device-settings";
 import JSZip from "jszip";
 import Papa from "papaparse";
 import type { AppState, StatementData } from "./types";
@@ -265,6 +266,7 @@ export async function exportBackup(state: AppState, options: { download?: boolea
     new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
     `Reisekosten_Backup_${new Date().toISOString().slice(0, 10)}.json`,
   );
+  markBackupDay(new Date().toLocaleDateString("sv-SE"));
 }
 
 export async function exportZip(
