@@ -11,7 +11,9 @@ const euro = (n: number) =>
   n.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 
 const versionSuffix = (context?: StatementExportContext) => context ? `V${String(context.version).padStart(2, '0')}` : 'Entwurf';
-export const statementExportFilename = (month: string, extension: string, context?: StatementExportContext, datev = false) => `${datev ? 'DATEV_' : ''}Reisekosten_${month}_${versionSuffix(context)}.${extension}`;
+/** bookingList = „Buchungsliste (CSV)“: eine Zeile je Tag mit Betrag. Bis 1.13.0 hieß sie „DATEV-CSV“ (Dateiname DATEV_…),
+ *  ist aber kein DATEV-Buchungsstapel (kein EXTF-Kopf, keine Konten) und lässt sich dort nicht einlesen. */
+export const statementExportFilename = (month: string, extension: string, context?: StatementExportContext, bookingList = false) => `${bookingList ? 'Buchungsliste_' : ''}Reisekosten_${month}_${versionSuffix(context)}.${extension}`;
 
 function vehicleDetails(
   state: AppState,
@@ -223,19 +225,19 @@ export async function excelFile(data: StatementData, state: AppState, context?: 
   };
 }
 
-function datevText(r: StatementData["rows"][number], state: AppState) {
+function bookingText(r: StatementData["rows"][number], state: AppState) {
   const vehicles = [...new Set(r.trips.map((trip) => vehicleDetails(state, trip).name).filter(Boolean))];
   const categories = [...new Set((r.contributions?.expenses || []).filter((e) => e.openAmount > 0).map((e) => e.category))];
   const what = r.trips.length ? `Reisekosten ${r.destinations.join(", ")}`.trim() : `Auslagen ${categories.join(", ")}`.trim();
   return [what, vehicles.join(", ")].filter(Boolean).join(" · ");
 }
 
-export function exportCsv(data: StatementData, state: AppState, datev = false, context?: StatementExportContext) {
-  // DATEV: nur Tage mit einem Betrag (keine 0,00-Zeilen); Buchungstext ohne leere Teile.
-  const rows: Record<string, unknown>[] = datev
+export function exportCsv(data: StatementData, state: AppState, bookingList = false, context?: StatementExportContext) {
+  // Buchungsliste: nur Tage mit einem Betrag (keine 0,00-Zeilen); Buchungstext ohne leere Teile.
+  const rows: Record<string, unknown>[] = bookingList
     ? data.rows.filter((r) => r.openAmount !== 0).map((r) => ({
         Belegdatum: r.date.replaceAll("-", ""),
-        Buchungstext: datevText(r, state),
+        Buchungstext: bookingText(r, state),
         Betrag: r.openAmount.toFixed(2).replace(".", ","),
         Währung: "EUR",
         Kostenstelle: r.trips[0]?.costCenter || "",
@@ -244,7 +246,7 @@ export function exportCsv(data: StatementData, state: AppState, datev = false, c
   const csv = Papa.unparse(rows, { delimiter: ";" });
   download(
     new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }),
-    statementExportFilename(data.month, 'csv', context, datev),
+    statementExportFilename(data.month, 'csv', context, bookingList),
   );
 }
 

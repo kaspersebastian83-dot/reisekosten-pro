@@ -16,6 +16,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     if (!pathname.startsWith('/reisekosten-pro/')) throw Error();
+    if (pathname.includes('/tesseract/')) throw Error();   // Belegerkennung liegt seit 1.14.0 in der App selbst; hier bewusst nicht ausgeliefert (wie ohne Netz): geprüft wird die Eingabe von Hand
     const file = path.resolve(root, pathname.slice('/reisekosten-pro/'.length) || 'index.html');
     if (!file.startsWith(root + '/')) throw Error();
     const body = await readFile(file);

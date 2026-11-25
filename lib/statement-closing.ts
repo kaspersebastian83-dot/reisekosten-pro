@@ -1,8 +1,8 @@
-import { buildStatement, duplicateKey, validateTrip } from './calculations';
+import { buildStatement, duplicateKey, overnightUnconfirmed, validateTrip } from './calculations';
 import { manualTripInterval } from './manual-trip';
 import { isMonth, latestStatement } from './month-navigation';
 import { duplicateExpense, linkingErrors, projectNumber, similarExpense, validDate, withoutTripNeeded } from './receipt-linking';
-import type { AppState, ChangeLog, ReviewStatus, StatementSnapshot } from './types';
+import type { AppState, ChangeLog, ReviewStatus, StatementSnapshot, Trip } from './types';
 import { compareSnapshotWithCurrent, relatedTripsForSnapshot } from './statement-comparison';
 import { zwischenhalte, zwischenhaltText } from './zwischenhalt';
 
@@ -34,6 +34,14 @@ function finiteNumbers(value: unknown): boolean {
   return !value || typeof value !== 'object' || Object.values(value).every(finiteNumbers);
 }
 const monthExpenses = (state: AppState, month: string) => state.expenses.filter(e => e.date.startsWith(month));
+
+/** Hinweistext zu overnightUnconfirmed (ohne Tagesdatum: eine Meldung je Reise, nicht je Reisetag). */
+export function overnightUnconfirmedText(trip: Pick<Trip, 'date' | 'endDate' | 'manualAbsenceMinutes'>) {
+  const oneNight = !!trip.endDate && Date.parse(trip.endDate) - Date.parse(trip.date) === 86_400_000;
+  return `Mehrtägige Reise ohne bestätigte auswärtige Übernachtung – berechnet sind trotzdem An- und Abreisetag${oneNight ? '' : ' (und volle Zwischentage)'}, die es nur mit Übernachtung gibt. In der Dienstreise die Übernachtung bestätigen, wenn auswärts übernachtet wurde. ${oneNight && trip.manualAbsenceMinutes != null
+    ? 'Ohne Übernachtung die „Manuelle Abwesenheit (Min.)“ entfernen: Dann gilt eine Tagespauschale für die ganze Reise.'
+    : 'Ohne Übernachtung die Reise in einzelne Tage aufteilen.'}`;
+}
 
 /** Read-only review. Calculation and reimbursement rules stay in buildStatement. */
 export function checkStatementForClosing(state: AppState, month: string, snapshot?: StatementSnapshot): ClosingCheck {
@@ -108,6 +116,8 @@ export function checkStatementForClosing(state: AppState, month: string, snapsho
       for (const row of current.rows) {
         for (const trip of row.trips) {
           if (!trip.absenceConfirmed && row.allowanceBefore > 0) issue(errors, 'absence', `Reise ${trip.date} · ${trip.destination || trip.id}: Die für die Verpflegungsberechnung benötigte Abwesenheitsdauer ist nicht bestätigt.`, { kind: 'trip', id: trip.id });
+          // Mehrtägig ohne bestätigte Übernachtung: An-/Abreisetag stehen nur mit Übernachtung zu. Nur Prüfung – buildStatement bleibt unverändert.
+          if (row.allowanceBefore > 0 && overnightUnconfirmed(trip)) issue(errors, 'overnight', `Reise ${trip.date} · ${trip.destination || trip.id}: ${overnightUnconfirmedText(trip)}`, { kind: 'trip', id: trip.id });
         }
         // C18 (Audit Lauf 3): Zwischenhalt im Büro/zu Hause → Hinweis und Abschluss erst nach ausdrücklicher Angabe der Abwesenheit
         // („Manuelle Abwesenheit (Min.)“). Nur Prüfung – buildStatement und gespeicherte Abrechnungen bleiben unverändert.

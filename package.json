@@ -1,6 +1,6 @@
 {
   "name": "reisekosten-pro",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -30,6 +30,8 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.2.1",
+    "@tesseract.js-data/deu": "1.0.0",
+    "@tesseract.js-data/eng": "1.0.0",
     "@types/node": "22.19.19",
     "@types/papaparse": "^5.5.2",
     "@types/react": "19.2.14",

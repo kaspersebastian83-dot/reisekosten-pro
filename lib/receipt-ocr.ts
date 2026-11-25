@@ -264,7 +264,14 @@ export async function recognizeReceiptLocally(
 ) {
   const { createWorker } = await import("tesseract.js");
   let phase = "";
+  // Arbeitsskript, Rechenkern und Sprachdateien aus der App selbst (./tesseract/, siehe vite.config.ts) – ohne diese
+  // Angaben lädt tesseract.js sie von cdn.jsdelivr.net. Der Service Worker hält sie für die Nutzung ohne Netz vor.
+  const ocrBase = new URL("tesseract/", document.baseURI).href;
   const worker = await createWorker(["deu", "eng"], 1, {
+    workerPath: `${ocrBase}worker.min.js`,
+    workerBlobURL: false,
+    corePath: ocrBase,
+    langPath: ocrBase,
     logger: (message) =>
       onProgress?.(
         Math.round((message.progress || 0) * 100),

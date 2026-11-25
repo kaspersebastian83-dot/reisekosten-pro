@@ -128,6 +128,18 @@ export function midnightWithoutOvernight(trip: Trip) {
   return { before, after, total: before + after, day: after > before ? trip.endDate : trip.date, tie: after === before };
 }
 
+/**
+ * Mehrtägige Reise, für die calculateDay An-/Abreisetag (und volle Zwischentage) ansetzt, obwohl keine auswärtige
+ * Übernachtung bestätigt ist. An- und Abreisetag gibt es nur mit Übernachtung (§ 9 Abs. 4a Satz 3 Nr. 2 EStG).
+ * Betrifft: zwei und mehr Datumswechsel ohne Haken „Übernachtung“ sowie einen Datumswechsel, bei dem die Regel
+ * „über Mitternacht ohne Übernachtung“ nicht greift (manuelle Abwesenheit eingetragen oder Uhrzeit fehlt).
+ * Nur Prüfung für den Abschluss – die Berechnung bleibt unverändert.
+ */
+export function overnightUnconfirmed(trip: Trip) {
+  return trip.status !== "storniert" && trip.tripType === "dienstlich" && !trip.overnight
+    && !!trip.endDate && trip.endDate > trip.date && !midnightWithoutOvernight(trip);
+}
+
 export function calculateDay(
   date: string,
   trips: Trip[],

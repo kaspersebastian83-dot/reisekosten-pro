@@ -1,5 +1,27 @@
 # Release Notes
 
+## 1.14.0 – 25. November 2026
+
+- **„DATEV-CSV“ heißt jetzt „Buchungsliste (CSV)“** (Dateiname `Buchungsliste_Reisekosten_<Monat>_<Version>.csv` statt
+  `DATEV_…`). Inhalt und Spalten sind unverändert (Belegdatum, Buchungstext, Betrag, Währung, Kostenstelle). Der alte Name
+  versprach zu viel: Die Datei ist kein DATEV-Buchungsstapel (kein EXTF-Kopf, keine Konten/Gegenkonten) und lässt sich in
+  DATEV nicht einlesen. Ein echter Buchungsstapel bräuchte Berater-/Mandantennummer und Konten vom Steuerbüro.
+- **Mehrtägige Reise ohne bestätigte Übernachtung:** Für jede Reise mit Rückkehr an einem späteren Tag setzt die Berechnung
+  An- und Abreisetag (und volle Zwischentage) an – auch ohne den Haken „Auswärtige Übernachtung … tatsächlich erfolgt“. Diese
+  Pauschalen gibt es nur mit Übernachtung (§ 9 Abs. 4a Satz 3 Nr. 2 EStG). SpesenKit nennt das jetzt in „Weg zum Abschluss“
+  und im Abschluss; abschließen geht erst, wenn die Übernachtung bestätigt oder die Reise in einzelne Tage aufgeteilt ist.
+  Betrifft zwei und mehr Datumswechsel sowie einen Datumswechsel mit eingetragener „Manueller Abwesenheit (Min.)“ (dort
+  greift die Regel „über Mitternacht ohne Übernachtung“ nicht). **Die Berechnung selbst ist unverändert;** gespeicherte und
+  abgeschlossene Abrechnungen ändern sich nicht. Kein neues Datenfeld (`overnightUnconfirmed` in `lib/calculations.ts`).
+- **Belegerkennung ohne fremden Server:** Arbeitsskript, Rechenkern und Sprachdateien (Deutsch, Englisch) der Texterkennung
+  liegen jetzt in der App selbst unter `./tesseract/` (rund 12 MB, aus den npm-Paketen beim Build kopiert) und werden nicht
+  mehr von cdn.jsdelivr.net geladen. Der Service Worker merkt sie sich beim ersten Lesen eines Belegs in einem eigenen
+  Cache, der App-Updates übersteht (wechselt nur mit einer neuen tesseract-Version); danach liest die App Belege auch
+  ohne Netz. Fremde Server ruft SpesenKit damit nur noch für den Fremdwährungskurs auf (EZB, frankfurter.dev).
+- Tests: `tests/uebernachtung.test.ts`, `tests/service-worker.test.ts` (OCR-Cache), Build-Prüfung (`dist/tesseract/`),
+  neue Browserprüfung `ocr-lokal-browser-check.mjs` (liest einen Bon bei gesperrten fremden Adressen). Die Browserprüfungen,
+  die eine ausgefallene Texterkennung brauchen, liefern `./tesseract/` in ihrem Testserver bewusst nicht aus.
+
 ## 1.13.0 – 20. November 2026
 
 Audit Lauf 3 (Spektron-Büro-Apps), C18 Teil 1 und C19.

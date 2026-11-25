@@ -2775,8 +2775,9 @@ function Statements({
             PDF für Unterschrift, Tabellen für Buchhaltung oder Komplettpaket
             mit Belegen.
           </p>
+          <p>Die Buchungsliste (CSV) nennt je Tag Datum, Text, Betrag und Kostenstelle – zum Abtippen oder Weiterverarbeiten, kein DATEV-Buchungsstapel.</p>
           <p>Tabellen enthalten den vollständigen ausgewählten Abrechnungsstand. Die bestehende Spalte „OffenerBetrag“ bezeichnet dessen rechnerischen Erstattungsbetrag, keine tatsächliche Restzahlung.</p>
-          {exportContext?.correction && <p className="correction-payment-note">{correctionExportNotice} CSV-/DATEV-Exporte vor einer Übernahme mit der Buchhaltung abstimmen; frühere Versionen nicht zusätzlich buchen.</p>}
+          {exportContext?.correction && <p className="correction-payment-note">{correctionExportNotice} CSV-Exporte und Buchungsliste vor einer Übernahme mit der Buchhaltung abstimmen; frühere Versionen nicht zusätzlich buchen.</p>}
         </div>
         <div className="export-buttons">
           <button disabled={pdfWorking} onClick={() => void makePdf()}>
@@ -2792,11 +2793,11 @@ function Statements({
             CSV
           </button>
           <button onClick={() => {
-            if (exportContext?.correction && !window.confirm(`${correctionExportNotice}\n\nDiese DATEV-CSV ist keine zusätzliche Differenzbuchung. Vor einer Übernahme frühere Buchungen und Zahlungen gesondert abstimmen. Vollständigen ausgewählten Stand trotzdem exportieren?`)) return;
+            if (exportContext?.correction && !window.confirm(`${correctionExportNotice}\n\nDiese Buchungsliste ist keine zusätzliche Differenzbuchung. Vor einer Übernahme frühere Buchungen und Zahlungen gesondert abstimmen. Vollständigen ausgewählten Stand trotzdem exportieren?`)) return;
             exportCsv(statement, exportState, true, exportContext);
           }}>
             <FileSpreadsheet />
-            DATEV-CSV
+            Buchungsliste (CSV)
           </button>
           <button onClick={() => void exportZip(statement, exportState, number, exportContext).catch((error) => notify(error instanceof MissingReceiptImageError ? error.message : "Das ZIP konnte nicht erstellt werden. Bitte erneut versuchen."))}>
             <Archive />

@@ -3,7 +3,7 @@
 Dienstreisen · Spesen · Abrechnungen
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
-1.13.0 (Release-Version aus [package.json](package.json), Änderungen in
+1.14.0 (Release-Version aus [package.json](package.json), Änderungen in
 [CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
 
 Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
@@ -18,9 +18,14 @@ Spesenabrechnungen. Dienstreisen werden manuell erfasst und mit Kosten und
 Belegen zur Monatsabrechnung ergänzt. Optional verarbeitet die App weiterhin
 Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
-Kosten und Belege und erzeugt PDF-, Excel-, CSV-, DATEV-CSV- und ZIP-Exporte.
+Kosten und Belege und erzeugt PDF-, Excel-, CSV- und ZIP-Exporte sowie eine Buchungsliste (CSV).
 
-## Aktueller Stand in Kürze (1.13.0)
+## Aktueller Stand in Kürze (1.14.0)
+
+- **1.14.0:** „DATEV-CSV“ heißt „Buchungsliste (CSV)“ (kein DATEV-Buchungsstapel). Mehrtägige Reisen ohne bestätigte
+  Übernachtung sperren den Abschluss, bis die Übernachtung bestätigt oder die Reise aufgeteilt ist (Berechnung unverändert,
+  `overnightUnconfirmed`). Die Belegerkennung lädt nichts mehr von cdn.jsdelivr.net: ihre Dateien liegen unter
+  `./tesseract/`, eigener Service-Worker-Cache `…:ocr:<Kennung>`.
 
 - **Zwischenhalt im Büro oder zu Hause (1.13.0):** Abschlussprüfung nennt eintägige Tage mit Zwischenhalt an der ersten
   Tätigkeitsstätte bzw. zu Hause und verlangt „Manuelle Abwesenheit (Min.)“; die Berechnung ist unverändert
@@ -139,7 +144,7 @@ das volle Protokoll (`protokoll.txt`) und Bildschirmfotos aller Seiten, die beim
 - Dienst- und Privatwagen mit fahrzeugbezogener Erstattungslogik
 - Kamera-/Dateierfassung, Beleg-Eingang und lokale OCR-Vorschläge
 - PDF-Abrechnung mit nummerierten Belegen, Bildanhängen und mehrseitigen Original-PDFs
-- PDF-, Excel-, CSV-, DATEV-CSV-, ZIP- und JSON-Export
+- PDF-, Excel-, CSV-, ZIP- und JSON-Export, Buchungsliste (CSV; kein DATEV-Buchungsstapel)
 - lokale IndexedDB-Speicherung und PWA-Offlinenutzung
 
 ## PDF für die Buchhaltung
@@ -539,8 +544,8 @@ Duplikat-Prüfhinweis. Neu fotografierte/anders beschnittene Rechnungen ohne ver
 Rechnungsnummer können nicht sicher dedupliziert werden und bleiben manuell zu prüfen.
 Die Erkennung extrahiert eine Projektnummer nur bei eindeutigem Textvorkommen.
 Aufenthaltszeitraum und Frühstück werden nicht aus unsicheren OCR-Textstellen abgeleitet.
-Die bestehende lokale OCR lädt ggf. Laufzeit-/Sprachdateien herunter; Beleginhalte
-werden nicht an einen OCR-Dienst übertragen. Langsame Erkennung überschreibt keine
+Die lokale OCR lud bis 1.13.0 Laufzeit-/Sprachdateien von cdn.jsdelivr.net; seit 1.14.0 liegen sie in der App selbst
+(`./tesseract/`). Beleginhalte werden nicht an einen OCR-Dienst übertragen. Langsame Erkennung überschreibt keine
 inzwischen manuell korrigierten Felder; überholte Dateilesungen/Erkennung werden verworfen.
 
 Gezielte Prüfungen: `tests/receipt-linking.test.ts` (Zuordnung, Duplikate, Zahlungen,
