@@ -2,6 +2,7 @@
 // fügt sie hinzu („Vom Handy übernehmen“) und ersetzt nichts. Das Teilen-Menü ist nachgebildet und fängt die Datei ab.
 // Geprüft: Zähler, Vermerk und Marken an den Zeilen auf dem Handy, abgebrochenes Teilen vermerkt nichts, Vorschau und Übernahme am PC samt
 // Belegbild, zweite Übernahme ändert nichts, geänderter Eintrag meldet die Abweichung, fremde Dateien werden abgelehnt.
+// Seit 1.19.0: Die vollständige JSON-Sicherung des Handys wird am PC genauso übernommen (hinzugefügt, nichts ersetzt).
 // npm run build && node tests/uebergabe-browser-check.mjs
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -133,8 +134,21 @@ try {
   await check('Handy: Hinweis im Abschlussbereich – abgeschlossen wird am PC', async () => {
     assert.match(await hp.locator('.month-entry-workspace').innerText(), /Abschluss am PC – dort liegen alle Einträge\./);
   });
+  let sicherungHandy;
+  await check('Handy: die vollständige JSON-Sicherung enthält alle Einträge und die Belegbilder', async () => {
+    await handy.nav('Datensicherung');
+    const sicherung = hp.locator('.backup-card', { hasText: 'Vollständige Datensicherung' });
+    await sicherung.getByRole('button', { name: 'Teilen', exact: true }).click();
+    await sicherung.getByRole('button', { name: 'Sicherung teilen', exact: true }).click();
+    sicherungHandy = await until(async () => (await geteilt()).find((datei) => datei.name.endsWith('.json')), 'Sicherung geteilt');
+    assert.match(sicherungHandy.name, /^Reisekosten_Backup_2026-10-18\.json$/);
+    const inhalt = JSON.parse(sicherungHandy.text);
+    assert.equal(inhalt.format, undefined);
+    assert.deepEqual([inhalt.trips.length, inhalt.expenses.length, inhalt.receiptInbox.length], [bestandHandy.trips.length, bestandHandy.expenses.length, 1]);
+    assert.match(inhalt.receiptInbox[0].receipt.dataUrl, /^data:image\/png;base64,/, 'Belegbild ist eingebettet');
+  });
   assert.deepEqual(handy.errors, []);
-  const dateien = await geteilt();
+  const dateien = (await geteilt()).filter((datei) => datei.name.endsWith('.txt'));
   await handyContext.close();
 
   /* ---------- PC ---------- */
@@ -160,8 +174,9 @@ try {
   await check('PC: fremde Dateien werden mit verständlicher Meldung abgelehnt', async () => {
     await waehlen('irgendwas.txt', 'kein json');
     await pp.getByText('Die Datei ist keine SpesenKit-Übergabe (kein lesbarer Inhalt).', { exact: false }).waitFor();
-    await waehlen('sicherung.json', JSON.stringify(await stored(pp)));
-    await pp.getByText('Das ist eine vollständige JSON-Sicherung, keine Übergabe vom Handy.', { exact: false }).waitFor();
+    // die Datei aus dem SpesenKit-Ordner (spesenkit.json) ist keine Sicherung zum Übernehmen: sie enthält keine Bilder
+    await waehlen('spesenkit.json', JSON.stringify({ format: 'spesenkit-daten', revision: 1, state: await stored(pp) }));
+    await pp.getByText('Die Datei ist keine SpesenKit-Übergabe.', { exact: true }).waitFor();
     assert.equal(await dialog.count(), 0);
   });
   await check('PC: Vorschau nennt, was dazukommt; Abbrechen ändert nichts', async () => {
@@ -203,5 +218,107 @@ try {
     await dialog.getByRole('button', { name: 'Schließen', exact: true }).last().click();
     assert.equal((await stored(pp)).trips.some((t) => t.destination === 'Bonn-Beuel'), false);
   });
+  await check('PC: JSON-Sicherung des Handys nach der Übergabe → nichts doppelt, nur die bekannte Abweichung', async () => {
+    const vorher = await stored(pp);
+    await waehlen(sicherungHandy.name, sicherungHandy.text);
+    await dialog.waitFor();
+    const text = await dialog.innerText();
+    assert.match(text, /Das ist eine vollständige JSON-Sicherung\./);
+    assert.match(text, /Nichts Neues\./);
+    assert.match(text, /Bonn: weicht ab \(Reiseziel\) – der vorhandene Eintrag bleibt\./);
+    assert.equal(await dialog.getByRole('button', { name: 'Übernehmen', exact: true }).count(), 0);
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).last().click();
+    assert.deepEqual(await stored(pp), vorher);
+  });
   assert.deepEqual(pc.errors, []);
+
+  /* ---------- zweiter PC: nur die JSON-Sicherung des Handys liegt vor (kein „An den PC senden“) ---------- */
+  const pc2 = await offen(await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: 'Europe/Berlin' }));
+  const p2 = pc2.page;
+  const karte2 = p2.getByRole('region', { name: 'Vom Handy übernehmen' });
+  const dialog2 = p2.getByRole('dialog', { name: 'Vom Handy übernehmen' });
+  const waehlen2 = async (name, text) => { const wahl = p2.waitForEvent('filechooser'); await karte2.getByRole('button', { name: 'Datei vom Handy wählen', exact: true }).click(); await (await wahl).setFiles({ name, mimeType: 'application/json', buffer: Buffer.from(text, 'utf8') }); };
+  await check('PC: Karten sagen, dass eine JSON-Sicherung auch hinzugefügt werden kann', async () => {
+    await p2.locator('.month-entry-workspace').getByRole('button', { name: 'Dienstreise erfassen', exact: true }).click();
+    const m = p2.locator('.modal');
+    await m.getByLabel('Projekt *', { exact: false }).fill('26.0999 Aachen'); await m.getByLabel('Reisegrund *', { exact: false }).fill('PC-Reise'); await m.getByLabel('Reiseziel *', { exact: false }).fill('Aachen');
+    await m.getByRole('button', { name: 'Speichern & fertig', exact: true }).click();
+    await until(async () => (await stored(p2))?.trips?.length === 1, 'PC-Reise gespeichert');
+    await pc2.nav('Datensicherung'); await karte2.waitFor();
+    assert.match(await karte2.innerText(), /Geht auch mit der JSON-Sicherung des Handys/);
+    assert.match(await p2.locator('.backup-card', { hasText: 'Sicherung wiederherstellen' }).innerText(), /Nur hinzufügen statt ersetzen: „Vom Handy übernehmen“ nimmt auch eine JSON-Sicherung an\./);
+  });
+  await check('PC: JSON-Sicherung des Handys → Vorschau nennt, was dazukommt und was außen vor bleibt; Abbrechen ändert nichts', async () => {
+    await waehlen2(sicherungHandy.name, sicherungHandy.text);
+    await dialog2.waitFor();
+    const text = (await dialog2.innerText()).replace(/\s+/g, ' ');
+    assert.match(text, /Das ist eine vollständige JSON-Sicherung\. Übernommen werden nur Reisen, Kosten und Belege – sie kommen dazu, ersetzt wird nichts\. Einstellungen, Tarife und Abrechnungen aus der Sicherung bleiben außen vor\./);
+    assert.match(text, new RegExp(`Reisen ${bestandHandy.trips.length} Kosten ${bestandHandy.expenses.length} Belege im Eingang 1`));
+    await dialog2.getByRole('button', { name: 'Abbrechen', exact: true }).click();
+    assert.equal((await stored(p2)).trips.length, 1);
+  });
+  await check('PC: „Übernehmen“ fügt die Sicherung hinzu – eigene Reise und Einstellungen bleiben, Belegbild ist gespeichert', async () => {
+    const vorher = await stored(p2);
+    await waehlen2(sicherungHandy.name, sicherungHandy.text);
+    await dialog2.getByRole('button', { name: 'Übernehmen', exact: true }).click();
+    const danach = await until(async () => { const s = await stored(p2); return s.trips.length === bestandHandy.trips.length + 1 ? s : null; }, 'Sicherung übernommen');
+    assert.ok(danach.trips.some((t) => t.purpose === 'PC-Reise'), 'Reise vom PC bleibt');
+    assert.ok(danach.trips.some((t) => t.destination === 'Bonn-Beuel'), 'Stand des Handys zum Zeitpunkt der Sicherung');
+    assert.deepEqual([danach.expenses.length, danach.receiptInbox.length], [bestandHandy.expenses.length, 1]);
+    assert.ok(danach.trips.filter((t) => t.purpose !== 'PC-Reise').every((t) => t.status === 'ungeprüft' || t.status === 'storniert'));
+    assert.deepEqual([danach.settings, danach.statements], [vorher.settings, vorher.statements], 'Einstellungen und Abrechnungen des PCs unverändert');
+    assert.equal(danach.receiptInbox[0].receipt.dataUrl, '', 'im Bestand nur der Verweis');
+    assert.equal(danach.changes[0].newValue.quelle, 'JSON-Sicherung');
+    const fileId = danach.receiptInbox[0].receipt.fileId;
+    await until(async () => (await bilder(p2)).includes(fileId), 'Belegbild gespeichert');
+    // das Bild ist nach dem Neuladen noch da und wird angezeigt (kein Verweis ins Leere)
+    await p2.reload(); await p2.getByRole('heading', { name: 'Monatsübersicht', exact: true }).waitFor();
+    assert.match(await p2.locator('.workspace-inbox').innerText(), /1 Beleg wartet auf Zuordnung/);
+  });
+  await check('PC: dieselbe Sicherung noch einmal → „Nichts Neues“', async () => {
+    await pc2.nav('Datensicherung'); await karte2.waitFor();
+    const vorher = await stored(p2);
+    await waehlen2(sicherungHandy.name, sicherungHandy.text);
+    await dialog2.waitFor();
+    assert.match(await dialog2.innerText(), /Nichts Neues\.\s*Alle Einträge dieser Datei sind schon hier\./);
+    await dialog2.getByRole('button', { name: 'Schließen', exact: true }).last().click();
+    assert.deepEqual(await stored(p2), vorher);
+  });
+  assert.deepEqual(pc2.errors, []);
+
+  /* ---------- dritter PC: erste Sicherung ohne das Belegbild, die vollständige trägt es nach ---------- */
+  const pc3 = await offen(await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: 'Europe/Berlin' }));
+  const p3 = pc3.page;
+  const karte3 = p3.getByRole('region', { name: 'Vom Handy übernehmen' });
+  const dialog3 = p3.getByRole('dialog', { name: 'Vom Handy übernehmen' });
+  const waehlen3 = async (name, text) => { const wahl = p3.waitForEvent('filechooser'); await karte3.getByRole('button', { name: 'Datei vom Handy wählen', exact: true }).click(); await (await wahl).setFiles({ name, mimeType: 'application/json', buffer: Buffer.from(text, 'utf8') }); };
+  await check('PC: Sicherung ohne Belegbild → Hinweis; die vollständige Sicherung danach trägt das Bild nach', async () => {
+    await pc3.nav('Datensicherung'); await karte3.waitFor();
+    const ohneBild = JSON.parse(sicherungHandy.text);
+    const fileId = (await stored(p2)).receiptInbox[0].receipt.fileId;
+    ohneBild.receiptInbox[0].receipt = { ...ohneBild.receiptInbox[0].receipt, dataUrl: '', fileId };
+    await waehlen3('ohne-bild.json', JSON.stringify(ohneBild));
+    await dialog3.waitFor();
+    assert.match(await dialog3.innerText(), /Ein Belegbild fehlt in der Sicherung/);
+    await dialog3.getByRole('button', { name: 'Übernehmen', exact: true }).click();
+    await until(async () => (await stored(p3))?.receiptInbox?.length === 1, 'ohne Bild übernommen');
+    assert.equal((await bilder(p3)).includes(fileId), false, 'Bild fehlt am PC');
+    const vorher = await stored(p3);
+    await waehlen3(sicherungHandy.name, sicherungHandy.text);
+    await dialog3.waitFor();
+    const text = await dialog3.innerText();
+    assert.match(text, /1 Belegbild fehlte hier und wird aus dieser Datei nachgetragen\./);
+    assert.doesNotMatch(text, /Nichts Neues|kommen als „ungeprüft“ an/);
+    await dialog3.getByRole('button', { name: 'Übernehmen', exact: true }).click();
+    await p3.locator('.toast').getByText('1 fehlendes Belegbild nachgetragen.', { exact: false }).waitFor();
+    await until(async () => (await bilder(p3)).includes(fileId), 'Belegbild nachgetragen');
+    const danach = await stored(p3);
+    assert.deepEqual([danach.trips, danach.expenses, danach.receiptInbox], [vorher.trips, vorher.expenses, vorher.receiptInbox], 'Einträge unverändert');
+    // jetzt fehlt nichts mehr: dieselbe Datei noch einmal ist „Nichts Neues“
+    await waehlen3(sicherungHandy.name, sicherungHandy.text);
+    await dialog3.waitFor();
+    assert.match(await dialog3.innerText(), /Nichts Neues\./);
+    await dialog3.getByRole('button', { name: 'Schließen', exact: true }).last().click();
+  });
+  assert.deepEqual(pc3.errors, []);
 } finally { await browser.close(); server.close(); }

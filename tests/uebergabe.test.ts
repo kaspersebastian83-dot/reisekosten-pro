@@ -69,7 +69,7 @@ describe('Datei schreiben und lesen', () => {
     const lesen = (value: unknown) => () => uebergabeLesen(typeof value === 'string' ? value : JSON.stringify(value));
     expect(lesen('kein json')).toThrow(/kein lesbarer Inhalt/);
     expect(lesen({ format: 'spesenkit-buerokasse-sicherung', version: 1, records: [] })).toThrow(/Bürokasse/);
-    expect(lesen(structuredClone(emptyState))).toThrow(/vollständige JSON-Sicherung.*ersetzt den Bestand/);
+    expect(lesen({ format: 'spesenkit-daten', revision: 3, state: structuredClone(emptyState) })).toThrow(/keine SpesenKit-Übergabe/);   // Datei aus dem SpesenKit-Ordner
     expect(lesen({ ...gut, version: 2 })).toThrow(/neueren SpesenKit-Version/);
     expect(lesen({ ...gut, expenses: undefined })).toThrow(/unvollständig/);
     expect(lesen({ ...gut, trips: [{ ...gut.trips[0], businessKm: 'viel' }] })).toThrow(/ungültigen Eintrag/);
@@ -236,6 +236,110 @@ describe('PC: Fahrzeuge zuordnen – die Kilometererstattung darf sich nicht sti
     const { state, bericht } = uebernehmen(pc, datei(bestand({ trips: [reise()] })), ctx);
     expect(erstattung(state)).toBe(0);
     expect(bericht.hinweise[0]).toMatch(/^Fahrzeug „Mein Privatwagen“ ist am PC anders eingestellt \(Privatwagen, Erstattung: tatsächliche Kosten\) als auf dem Handy \(Privatwagen, pauschale\)\. Es gilt die Einstellung am PC/);
+  });
+});
+
+describe('PC: vollständige JSON-Sicherung des Handys übernehmen (seit 1.19.0)', () => {
+  // wie „Sicherung herunterladen“: der ganze Bestand als JSON, Belegbilder eingebettet
+  const sicherung = (handy: AppState, bilder: Record<string, string> = { [FOTO]: bild('parken'), [FOTO2]: bild('foto') }) => {
+    const mitBild = <T extends { receipt?: { fileId?: string; dataUrl: string } }>(item: T): T => item.receipt?.fileId && bilder[item.receipt.fileId] ? { ...item, receipt: { ...item.receipt, dataUrl: bilder[item.receipt.fileId] } } : item;
+    return JSON.stringify({ ...handy, expenses: handy.expenses.map(mitBild), receiptInbox: handy.receiptInbox.map(mitBild) }, null, 2);
+  };
+  it('wird wie eine Übergabe gelesen: Einträge, Bilder nach Fingerabdruck, nur genutzte Fahrzeuge – keine Einstellungen', () => {
+    const fahrt = reise(), handy = bestand({ trips: [fahrt], expenses: [kosten({ tripId: fahrt.id })], receiptInbox: [eingang()] });
+    handy.settings.profileName = 'Max Mustermann';
+    handy.settings.vehicles = [...handy.settings.vehicles, { id: 'ungenutzt', name: 'Zweitwagen', plate: 'AC-X 1', ownership: 'privatwagen', reimbursementMethod: 'pauschale', active: true }];
+    const gelesen = uebergabeLesen(sicherung(handy));
+    expect(gelesen.sicherung).toEqual({ abrechnungen: 0 });
+    expect([gelesen.trips, gelesen.expenses, gelesen.receiptInbox]).toEqual([handy.trips, handy.expenses, handy.receiptInbox]);   // Verweise, keine eingebetteten Bilder
+    expect(gelesen.belege).toEqual({ [FOTO]: bild('parken'), [FOTO2]: bild('foto') });
+    expect(gelesen.vehicles.map((v) => v.id)).toEqual(['vehicle-private-default']);
+    expect(JSON.stringify({ ...gelesen, belege: {} })).not.toMatch(/Max Mustermann|tariffs|base64/);
+  });
+  it('kommt dazu statt zu ersetzen: Bestand, Einstellungen und abgeschlossene Abrechnung am PC bleiben; Abrechnungen der Sicherung bleiben außen vor', () => {
+    const eigene = reise({ date: '2026-10-06', endDate: '2026-10-06', destination: 'Aachen' });
+    const pc = bestand({ trips: [eigene] });
+    pc.settings.profileName = 'Dr. Muster';
+    pc.statements = [{ id: 's1', month: '2026-10', number: 'RK-2026-10', createdAt: '2026-11-02T08:00:00Z', status: 'freigegeben', version: 1, locked: true, data: buildStatement(pc, '2026-10') }];
+    const fahrt = reise(), handy = bestand({ trips: [fahrt, reise({ date: '2026-10-20', endDate: '2026-10-20' })], expenses: [kosten({ tripId: fahrt.id })], receiptInbox: [eingang()] });
+    handy.settings.profileName = 'Handy-Name';
+    handy.statements = [{ id: 'h1', month: '2026-11', number: 'RK-2026-11', createdAt: '2026-11-26T08:00:00Z', status: 'vollständig', version: 1, locked: false, data: buildStatement(handy, '2026-11') }];
+    const vorher = structuredClone(pc);
+    const gelesen = uebergabeLesen(sicherung(handy));
+    expect(gelesen.sicherung).toEqual({ abrechnungen: 1 });
+    const { state, bericht, geaendert } = uebernehmen(pc, gelesen, ctx);
+    expect(pc).toEqual(vorher);
+    expect(geaendert).toBe(true);
+    expect(bericht.neu).toEqual({ trips: 2, expenses: 1, receiptInbox: 1 });
+    expect(bericht.geschlosseneMonate).toEqual(['2026-10']);
+    expect(state.trips.map((t) => [t.id, t.status])).toEqual([[eigene.id, 'geprüft'], [fahrt.id, 'ungeprüft'], [handy.trips[1].id, 'ungeprüft']]);
+    expect(state.expenses[0]).toMatchObject({ tripId: fahrt.id, status: 'ungeprüft', receipt: { fileId: FOTO, dataUrl: '' } });
+    expect([state.settings, state.statements]).toEqual([pc.settings, pc.statements]);
+    expect(bericht.belege).toEqual({ [FOTO]: bild('parken'), [FOTO2]: bild('foto') });
+    expect(state.changes[0]).toMatchObject({ field: 'Vom Handy übernommen', newValue: { quelle: 'JSON-Sicherung' } });
+    expect(JSON.stringify(state.changes[0])).not.toMatch(/base64/);
+  });
+  it('dieselbe Sicherung noch einmal: nichts Neues; Sicherung nach einer Übergabe derselben Einträge: ebenfalls nichts Neues', () => {
+    const handy = bestand({ trips: [reise()], expenses: [kosten()], receiptInbox: [eingang()] });
+    const einmal = uebernehmen(bestand(), uebergabeLesen(sicherung(handy)), ctx).state;
+    const nochmal = uebernehmen(einmal, uebergabeLesen(sicherung(handy)), ctx);
+    expect([nochmal.geaendert, nochmal.bericht.vorhanden, nochmal.bericht.abweichungen, nochmal.state]).toEqual([false, 3, [], einmal]);
+    const perUebergabe = uebernehmen(bestand(), datei(handy), ctx).state;
+    const danach = uebernehmen(perUebergabe, uebergabeLesen(sicherung(handy)), ctx);
+    expect([danach.geaendert, danach.bericht.vorhanden, danach.bericht.abweichungen]).toEqual([false, 3, []]);
+  });
+  it('Fahrzeug der Sicherung, das der PC nicht kennt, wird angelegt; ältere Sicherung ohne Beleg-Eingang wird gelesen', () => {
+    const eigenes: VehicleProfile = { id: 'handy-auto', name: 'Kombi', plate: 'AC-SK 77', ownership: 'privatwagen', reimbursementMethod: 'pauschale', active: true };
+    const handy = bestand({ trips: [reise({ vehicleId: eigenes.id })] });
+    handy.settings.vehicles = [...handy.settings.vehicles, eigenes];
+    const { receiptInbox: _ohne, ...alt } = JSON.parse(sicherung(handy));
+    const gelesen = uebergabeLesen(JSON.stringify(alt));
+    expect(gelesen.vehicles).toEqual([eigenes]);
+    const { state, bericht } = uebernehmen(bestand(), gelesen, ctx);
+    expect(bericht.fahrzeugeNeu).toEqual([eigenes]);
+    expect(state.settings.vehicles.some((v) => v.id === eigenes.id)).toBe(true);
+  });
+  it('Sicherung ohne Bild zu einem Beleg: Eintrag kommt an, der Hinweis nennt die Sicherung; kaputte Sicherung wird abgelehnt', () => {
+    const handy = bestand({ expenses: [kosten()] });
+    const { bericht } = uebernehmen(bestand(), uebergabeLesen(sicherung(handy, {})), ctx);
+    expect(bericht.neu.expenses).toBe(1);
+    expect(bericht.hinweise).toEqual([expect.stringMatching(/Belegbild fehlt in der Sicherung.*erneut sichern/)]);
+    const roh = JSON.parse(sicherung(bestand({ trips: [reise()] })));
+    const lesen = (value: unknown) => () => uebergabeLesen(JSON.stringify(value));
+    expect(lesen({ ...roh, trips: [{ ...roh.trips[0], businessKm: 'viel' }] })).toThrow(/Sicherung enthält einen ungültigen Eintrag/);
+    expect(lesen({ ...roh, trips: [roh.trips[0], roh.trips[0]] })).toThrow(/Sicherung enthält einen ungültigen Eintrag/);
+    expect(lesen({ ...roh, expenses: 'keine Liste' })).toThrow(/Sicherung enthält einen ungültigen Eintrag/);
+    expect(lesen({ ...roh, settings: { ...roh.settings, vehicles: [{ id: 'x' }] } })).toThrow(/Sicherung enthält einen ungültigen Eintrag/);
+  });
+});
+
+describe('PC: fehlendes Belegbild wird aus einer späteren Datei nachgetragen', () => {
+  const sicherung = (handy: AppState, bilder: Record<string, string>) => JSON.stringify({ ...handy,
+    expenses: handy.expenses.map((e) => e.receipt?.fileId && bilder[e.receipt.fileId] ? { ...e, receipt: { ...e.receipt, dataUrl: bilder[e.receipt.fileId] } } : e) });
+  it('Sicherung ohne Bild, dann vollständige Sicherung: das Bild kommt nach, der Eintrag bleibt einmal vorhanden', () => {
+    const handy = bestand({ expenses: [kosten()] });
+    const erste = uebernehmen(bestand(), uebergabeLesen(sicherung(handy, {})), ctx);
+    expect(erste.bericht.belege).toEqual({});
+    // der Aufrufer stellt fest: Bild FOTO ist am PC nicht gespeichert
+    const zweite = uebernehmen(erste.state, uebergabeLesen(sicherung(handy, { [FOTO]: bild('parken') })), { ...ctx, id: 'protokoll-2', fehlendeBilder: [FOTO] });
+    expect([zweite.geaendert, zweite.bericht.neu, zweite.bericht.vorhanden, zweite.bericht.bilderNachgetragen]).toEqual([true, { trips: 0, expenses: 0, receiptInbox: 0 }, 1, 1]);
+    expect(zweite.bericht.belege).toEqual({ [FOTO]: bild('parken') });
+    expect([zweite.state.expenses, zweite.state.trips]).toEqual([erste.state.expenses, erste.state.trips]);
+    expect(zweite.state.changes[0]).toMatchObject({ id: 'protokoll-2', newValue: { bilderNachgetragen: 1 } });
+    expect(berichtKurz(zweite.bericht)).toBe('Vom Handy übernommen: keine neuen Einträge. 1 Eintrag war schon vorhanden. 1 fehlendes Belegbild nachgetragen.');
+  });
+  it('auch über „Alles erneut senden“ (Übergabe); ohne fehlendes Bild oder ohne Bild in der Datei bleibt es bei „Nichts Neues“', () => {
+    const handy = bestand({ expenses: [kosten()], receiptInbox: [eingang()] });
+    const pc = uebernehmen(bestand(), datei(handy, {}), ctx).state;
+    const nach = uebernehmen(pc, datei(handy), { ...ctx, fehlendeBilder: new Set([FOTO, FOTO2]) });
+    expect([nach.geaendert, nach.bericht.bilderNachgetragen, Object.keys(nach.bericht.belege).sort()]).toEqual([true, 2, [FOTO, FOTO2].sort()]);
+    expect(uebernehmen(pc, datei(handy), ctx).geaendert).toBe(false);                                         // nichts fehlt
+    expect(uebernehmen(pc, datei(handy, {}), { ...ctx, fehlendeBilder: [FOTO] }).geaendert).toBe(false);       // Datei hat das Bild nicht
+    expect(uebernehmen(bestand(), datei(bestand({ trips: [reise()] })), { ...ctx, fehlendeBilder: [FOTO] }).bericht.bilderNachgetragen).toBe(0);   // kein Eintrag verweist darauf
+  });
+  it('neuer Eintrag mit Bild zählt nicht als nachgetragen', () => {
+    const { bericht } = uebernehmen(bestand(), datei(bestand({ expenses: [kosten()] })), { ...ctx, fehlendeBilder: [FOTO] });
+    expect([bericht.neu.expenses, bericht.bilderNachgetragen, Object.keys(bericht.belege)]).toEqual([1, 0, [FOTO]]);
   });
 });
 

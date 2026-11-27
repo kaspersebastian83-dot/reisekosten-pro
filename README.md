@@ -3,7 +3,7 @@
 Dienstreisen · Spesen · Abrechnungen
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
-1.18.3 (Release-Version aus [package.json](package.json), Änderungen in
+1.19.0 (Release-Version aus [package.json](package.json), Änderungen in
 [CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
 
 Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
@@ -20,8 +20,12 @@ Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV- und ZIP-Exporte sowie eine Buchungsliste (CSV).
 
-## Aktueller Stand in Kürze (1.18.3)
+## Aktueller Stand in Kürze (1.19.0)
 
+- **1.19.0 – JSON-Sicherung des Handys hinzufügen:** PC „Vom Handy übernehmen“ nimmt neben der Übergabe-Datei auch die
+  vollständige JSON-Sicherung an (`Reisekosten_Backup_….json`, Belegfotos sind darin enthalten) und fügt Reisen, Kosten und
+  Belege hinzu, ohne etwas zu ersetzen. Einstellungen, Tarife und Abrechnungen der Sicherung bleiben außen vor
+  (`sicherungLesen` in `lib/uebergabe.ts`). „Sicherung wiederherstellen“ ersetzt weiterhin den ganzen Bestand.
 - **Aufbau der Oberfläche (seit 1.18.3):** `app/page.tsx` ist nur noch der Rahmen (Navigation, Zustand, Speichern).
   Seiten und Fenster: `app/statements.tsx` (Abrechnung, Prüfen), `trips.tsx`, `expenses.tsx`, `receipt-capture.tsx`,
   `import-wizard.tsx`, `settings-panel.tsx`, `backup.tsx`, `reports.tsx`; gemeinsame Hilfen in `shared.tsx`. Daneben wie

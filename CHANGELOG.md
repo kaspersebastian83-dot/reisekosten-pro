@@ -1,5 +1,27 @@
 # Release Notes
 
+## 1.19.0 – 27. November 2026
+
+Wer vom Handy nur die JSON-Sicherung auf den PC bekommen hat, musste bisher „Sicherung wiederherstellen“ nehmen – das
+**ersetzt** den Bestand am PC. „Vom Handy übernehmen“ lehnte eine Sicherung ab.
+- **PC – „Vom Handy übernehmen“ nimmt auch die JSON-Sicherung des Handys an** (`Reisekosten_Backup_<Datum>.json` aus
+  „Sicherung herunterladen“ bzw. „Sicherung teilen“). Reisen, Kosten, Belege im Eingang und die in der Sicherung enthaltenen
+  Belegfotos werden **hinzugefügt, nichts wird ersetzt** – nach denselben Regeln wie bei „An den PC senden“: neue Einträge
+  kommen als „ungeprüft“ an, vorhandene werden übersprungen, Abweichungen und mögliche Doppelte werden genannt, Fahrzeuge
+  zugeordnet oder angelegt, abgeschlossene Monate bleiben eingefroren. Eine Extra-Datei für die Belegfotos ist nicht nötig.
+- **Nicht übernommen** werden Einstellungen, Tarife, Abrechnungen, Regeln und das Protokoll der Sicherung; die Vorschau sagt
+  das und nennt, wie viele Abrechnungsversionen die Sicherung enthält. Auf dem Handy abgeschlossene Monate werden am PC neu
+  geprüft und abgeschlossen. Wer den Bestand ersetzen will, nimmt weiterhin „Sicherung wiederherstellen“.
+- **Fehlendes Belegbild nachtragen:** Fehlte in einer Datei ein Belegbild, kam der Eintrag ohne Bild an – und eine zweite,
+  vollständige Datei half nicht, weil der Eintrag dann „schon vorhanden“ war. Jetzt trägt „Vom Handy übernehmen“ ein Bild
+  nach, das am PC fehlt (weder im Browser noch im SpesenKit-Ordner), auch wenn der Eintrag schon da ist; die Vorschau nennt
+  es. Gilt für die JSON-Sicherung und für „Alles erneut senden“.
+- Hinweis an beiden Karten unter Datensicherung (PC). Die Datei aus dem SpesenKit-Ordner (`spesenkit.json`) wird weiter
+  abgelehnt: sie enthält keine Belegbilder.
+- `spesenkit.json` und das Format der Übergabe bleiben unverändert. Regeln in `lib/uebergabe.ts` (`sicherungLesen`).
+- Tests: `tests/uebergabe.test.ts` (8 Fälle), Browserprüfung `uebergabe-browser-check.mjs` (Sicherung vom Handy, zweiter PC
+  übernimmt samt Belegbild, zweites Übernehmen „Nichts Neues“, dritter PC: Bild wird nachgetragen).
+
 ## 1.18.3 – 25. November 2026
 
 Nur intern, keine Änderung an Bedienung, Darstellung oder Berechnung.
