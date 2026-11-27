@@ -313,6 +313,36 @@ describe('PC: vollständige JSON-Sicherung des Handys übernehmen (seit 1.19.0)'
   });
 });
 
+describe('PC: fehlendes Belegbild wird aus einer späteren Datei nachgetragen', () => {
+  const sicherung = (handy: AppState, bilder: Record<string, string>) => JSON.stringify({ ...handy,
+    expenses: handy.expenses.map((e) => e.receipt?.fileId && bilder[e.receipt.fileId] ? { ...e, receipt: { ...e.receipt, dataUrl: bilder[e.receipt.fileId] } } : e) });
+  it('Sicherung ohne Bild, dann vollständige Sicherung: das Bild kommt nach, der Eintrag bleibt einmal vorhanden', () => {
+    const handy = bestand({ expenses: [kosten()] });
+    const erste = uebernehmen(bestand(), uebergabeLesen(sicherung(handy, {})), ctx);
+    expect(erste.bericht.belege).toEqual({});
+    // der Aufrufer stellt fest: Bild FOTO ist am PC nicht gespeichert
+    const zweite = uebernehmen(erste.state, uebergabeLesen(sicherung(handy, { [FOTO]: bild('parken') })), { ...ctx, id: 'protokoll-2', fehlendeBilder: [FOTO] });
+    expect([zweite.geaendert, zweite.bericht.neu, zweite.bericht.vorhanden, zweite.bericht.bilderNachgetragen]).toEqual([true, { trips: 0, expenses: 0, receiptInbox: 0 }, 1, 1]);
+    expect(zweite.bericht.belege).toEqual({ [FOTO]: bild('parken') });
+    expect([zweite.state.expenses, zweite.state.trips]).toEqual([erste.state.expenses, erste.state.trips]);
+    expect(zweite.state.changes[0]).toMatchObject({ id: 'protokoll-2', newValue: { bilderNachgetragen: 1 } });
+    expect(berichtKurz(zweite.bericht)).toBe('Vom Handy übernommen: keine neuen Einträge. 1 Eintrag war schon vorhanden. 1 fehlendes Belegbild nachgetragen.');
+  });
+  it('auch über „Alles erneut senden“ (Übergabe); ohne fehlendes Bild oder ohne Bild in der Datei bleibt es bei „Nichts Neues“', () => {
+    const handy = bestand({ expenses: [kosten()], receiptInbox: [eingang()] });
+    const pc = uebernehmen(bestand(), datei(handy, {}), ctx).state;
+    const nach = uebernehmen(pc, datei(handy), { ...ctx, fehlendeBilder: new Set([FOTO, FOTO2]) });
+    expect([nach.geaendert, nach.bericht.bilderNachgetragen, Object.keys(nach.bericht.belege).sort()]).toEqual([true, 2, [FOTO, FOTO2].sort()]);
+    expect(uebernehmen(pc, datei(handy), ctx).geaendert).toBe(false);                                         // nichts fehlt
+    expect(uebernehmen(pc, datei(handy, {}), { ...ctx, fehlendeBilder: [FOTO] }).geaendert).toBe(false);       // Datei hat das Bild nicht
+    expect(uebernehmen(bestand(), datei(bestand({ trips: [reise()] })), { ...ctx, fehlendeBilder: [FOTO] }).bericht.bilderNachgetragen).toBe(0);   // kein Eintrag verweist darauf
+  });
+  it('neuer Eintrag mit Bild zählt nicht als nachgetragen', () => {
+    const { bericht } = uebernehmen(bestand(), datei(bestand({ expenses: [kosten()] })), { ...ctx, fehlendeBilder: [FOTO] });
+    expect([bericht.neu.expenses, bericht.bilderNachgetragen, Object.keys(bericht.belege)]).toEqual([1, 0, [FOTO]]);
+  });
+});
+
 describe('PC: abgeschlossene Monate bleiben eingefroren', () => {
   it('neuer Eintrag in einem abgeschlossenen Monat: übernommen, Abrechnung unverändert, Monat im Bericht genannt', () => {
     const pc = bestand({ trips: [reise({ date: '2026-10-06', endDate: '2026-10-06' })] });

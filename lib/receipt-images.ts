@@ -179,6 +179,24 @@ async function localImage(fileId: string) {
 }
 export const localReceiptImage = localImage;
 
+/**
+ * Welche dieser Bilder sind auf diesem Gerät nicht gespeichert – weder im Browser noch im erreichbaren SpesenKit-Ordner?
+ * Die Bilder der laufenden Sitzung zählen bewusst nicht: Sie sind nach dem Neuladen weg, solange kein Speichern sie ablegt.
+ */
+export async function missingStoredImages(fileIds: Iterable<string>) {
+  const database = await imageDb().catch(() => null);
+  if (!database) return new Set<string>();
+  const known = await persistedIds(database).catch(() => null);
+  if (!known) return new Set<string>();
+  const missing = new Set<string>();
+  for (const id of new Set(fileIds)) {
+    if (!FILE_ID.test(id) || known.has(id)) continue;
+    const fromFolder = folderSource ? await folderSource(id).catch(() => null) : null;
+    if (!fromFolder) missing.add(id);
+  }
+  return missing;
+}
+
 /** Liefert ein Bild aus dem SpesenKit-Ordner (wird von der Ordneranbindung gesetzt, solange er erreichbar ist). */
 type FolderSource = (fileId: string, type?: string) => Promise<string | null>;
 let folderSource: FolderSource | null = null;

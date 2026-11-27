@@ -14,6 +14,8 @@
  *   Beleg-Eingang, auf dem Handy inzwischen zu Kosten geworden → am PC als erledigt vermerkt (einzige Änderung an Vorhandenem)
  *   Fahrzeuge                       → Zuordnung über Kennung, dann Kennzeichen, dann Name + Art; sonst neu angelegt
  *   Löschungen                      → werden nicht übertragen
+ *   Belegbild fehlt am PC           → wird aus der Datei nachgetragen, auch wenn der Eintrag selbst schon vorhanden ist
+ *                                     (so heilt „Alles erneut senden“ bzw. eine neue Sicherung ein früher fehlendes Bild)
  * Abgeschlossene Monate bleiben eingefroren; betroffene Monate werden genannt (Korrektur über eine neue Version).
  *
  * Nicht übertragen werden Einstellungen, Tarife, Abrechnungen, Regeln und das Änderungsprotokoll – gerechnet und
@@ -206,8 +208,10 @@ export interface UebernahmeBericht {
   hinweise: string[];
   /** Monate, die am PC abgeschlossen sind und neue Einträge bekommen haben. */
   geschlosseneMonate: string[];
-  /** Belegbilder aus der Datei, die zu neuen Einträgen gehören (Fingerabdruck → Daten-URL) – vom Aufrufer zu speichern. */
+  /** Belegbilder aus der Datei, die zu neuen Einträgen gehören oder am PC fehlten (Fingerabdruck → Daten-URL) – vom Aufrufer zu speichern. */
   belege: Record<string, string>;
+  /** Davon: Bilder zu schon vorhandenen Einträgen, die am PC fehlten und jetzt nachgetragen werden. */
+  bilderNachgetragen: number;
 }
 export interface Uebernahme { state: AppState; bericht: UebernahmeBericht; geaendert: boolean }
 
@@ -234,9 +238,11 @@ const kennzeichen = (plate: string) => plate.replace(/[\s-]+/g, "").toLowerCase(
 /**
  * Fügt eine Übergabe in den Bestand am PC ein. Reine Funktion: ändert weder `local` noch `eingang`.
  * ctx liefert Kennung und Zeit für den Protokolleintrag; `nutzer` steht dort als Bearbeiter.
+ * `fehlendeBilder`: Fingerabdrücke von Belegbildern, auf die der Bestand am PC verweist, die dort aber nicht gespeichert sind
+ * (der Aufrufer prüft das – diese Funktion kennt den Bildspeicher nicht). Liefert die Datei ein solches Bild, wird es nachgetragen.
  */
-export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: string; at: string; nutzer?: string }): Uebernahme {
-  const bericht: UebernahmeBericht = { neu: { trips: 0, expenses: 0, receiptInbox: 0 }, vorhanden: 0, eingangErledigt: 0, abweichungen: [], doppelt: [], fahrzeugeNeu: [], hinweise: [], geschlosseneMonate: [], belege: {} };
+export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: string; at: string; nutzer?: string; fehlendeBilder?: Iterable<string> }): Uebernahme {
+  const bericht: UebernahmeBericht = { neu: { trips: 0, expenses: 0, receiptInbox: 0 }, vorhanden: 0, eingangErledigt: 0, abweichungen: [], doppelt: [], fahrzeugeNeu: [], hinweise: [], geschlosseneMonate: [], belege: {}, bilderNachgetragen: 0 };
 
   // Fahrzeuge: Kennung → Kennzeichen → Name + Art → neu
   const vehicles = [...(local.settings.vehicles || [])];
@@ -330,6 +336,10 @@ export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: stri
       : `Ein Belegbild fehlt in der Übergabe (${fileId.slice(0, 8)}…). Bitte auf dem Handy „Alles erneut senden“.`);
   }
 
+  // Bilder, die am PC fehlen, obwohl der Eintrag schon da ist (frühere Datei ohne dieses Bild): aus dieser Datei nachtragen.
+  const verwiesen = new Set([...expenses, ...receiptInbox].map((item) => item.receipt?.fileId).filter(Boolean));
+  for (const fileId of ctx.fehlendeBilder || []) if (verwiesen.has(fileId) && eingang.belege[fileId] && !bericht.belege[fileId]) { bericht.belege[fileId] = eingang.belege[fileId]; bericht.bilderNachgetragen++; }
+
   // Abgeschlossene Monate, die neue Einträge bekommen haben
   const monate = new Set<string>();
   // jede berührte Monatsabrechnung, auch die Monate zwischen Abfahrt und Rückkehr einer langen Reise
@@ -346,10 +356,10 @@ export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: stri
   bericht.geschlosseneMonate = [...monate].filter((month) => { const snapshot = latestStatement(local, month); return !!snapshot && isClosedStatement(snapshot); }).sort();
 
   const anzahlNeu = bericht.neu.trips + bericht.neu.expenses + bericht.neu.receiptInbox;
-  const geaendert = anzahlNeu > 0 || bericht.fahrzeugeNeu.length > 0 || bericht.eingangErledigt > 0;
+  const geaendert = anzahlNeu > 0 || bericht.fahrzeugeNeu.length > 0 || bericht.eingangErledigt > 0 || bericht.bilderNachgetragen > 0;
   if (!geaendert) return { state: local, bericht, geaendert };
   const eintrag: ChangeLog = { id: ctx.id, entityType: "settings", entityId: "uebergabe", field: "Vom Handy übernommen", oldValue: null,
-    newValue: { ...bericht.neu, vorhanden: bericht.vorhanden, eingangErledigt: bericht.eingangErledigt, abweichungen: bericht.abweichungen.length, fahrzeugeNeu: bericht.fahrzeugeNeu.map((v) => v.name), geraet: eingang.geraet, erstellt: eingang.erstellt, ...(eingang.sicherung ? { quelle: "JSON-Sicherung" } : {}) },
+    newValue: { ...bericht.neu, vorhanden: bericht.vorhanden, eingangErledigt: bericht.eingangErledigt, abweichungen: bericht.abweichungen.length, ...(bericht.bilderNachgetragen ? { bilderNachgetragen: bericht.bilderNachgetragen } : {}), fahrzeugeNeu: bericht.fahrzeugeNeu.map((v) => v.name), geraet: eingang.geraet, erstellt: eingang.erstellt, ...(eingang.sicherung ? { quelle: "JSON-Sicherung" } : {}) },
     reason: berichtKurz(bericht), user: ctx.nutzer || local.settings.profileName || "", changedAt: ctx.at };
   return { geaendert, bericht,
     state: { ...local, trips, expenses, receiptInbox, settings: bericht.fahrzeugeNeu.length ? { ...local.settings, vehicles } : local.settings, changes: [eintrag, ...local.changes] } };
@@ -360,8 +370,9 @@ const mehrzahl = (n: number, eins: string, viele: string) => `${n} ${n === 1 ? e
 export function berichtKurz(bericht: UebernahmeBericht) {
   const teile = [bericht.neu.trips && mehrzahl(bericht.neu.trips, "Reise", "Reisen"), bericht.neu.expenses && mehrzahl(bericht.neu.expenses, "Kostenposition", "Kostenpositionen"),
     bericht.neu.receiptInbox && mehrzahl(bericht.neu.receiptInbox, "Beleg im Eingang", "Belege im Eingang")].filter(Boolean) as string[];
-  const neu = teile.length ? `Vom Handy übernommen: ${teile.join(", ")}.` : "Nichts Neues – alle Einträge sind schon am PC.";
+  const neu = teile.length ? `Vom Handy übernommen: ${teile.join(", ")}.` : bericht.bilderNachgetragen ? "Vom Handy übernommen: keine neuen Einträge." : "Nichts Neues – alle Einträge sind schon am PC.";
   return [neu, bericht.vorhanden ? `${mehrzahl(bericht.vorhanden, "Eintrag war", "Einträge waren")} schon vorhanden.` : "",
     bericht.eingangErledigt ? `${mehrzahl(bericht.eingangErledigt, "Beleg im Eingang", "Belege im Eingang")} als erledigt vermerkt.` : "",
+    bericht.bilderNachgetragen ? `${mehrzahl(bericht.bilderNachgetragen, "fehlendes Belegbild", "fehlende Belegbilder")} nachgetragen.` : "",
     bericht.abweichungen.length ? `${mehrzahl(bericht.abweichungen.length, "Abweichung", "Abweichungen")} – der Stand am PC bleibt.` : ""].filter(Boolean).join(" ");
 }

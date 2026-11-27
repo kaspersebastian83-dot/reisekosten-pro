@@ -285,4 +285,40 @@ try {
     assert.deepEqual(await stored(p2), vorher);
   });
   assert.deepEqual(pc2.errors, []);
+
+  /* ---------- dritter PC: erste Sicherung ohne das Belegbild, die vollständige trägt es nach ---------- */
+  const pc3 = await offen(await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: 'Europe/Berlin' }));
+  const p3 = pc3.page;
+  const karte3 = p3.getByRole('region', { name: 'Vom Handy übernehmen' });
+  const dialog3 = p3.getByRole('dialog', { name: 'Vom Handy übernehmen' });
+  const waehlen3 = async (name, text) => { const wahl = p3.waitForEvent('filechooser'); await karte3.getByRole('button', { name: 'Datei vom Handy wählen', exact: true }).click(); await (await wahl).setFiles({ name, mimeType: 'application/json', buffer: Buffer.from(text, 'utf8') }); };
+  await check('PC: Sicherung ohne Belegbild → Hinweis; die vollständige Sicherung danach trägt das Bild nach', async () => {
+    await pc3.nav('Datensicherung'); await karte3.waitFor();
+    const ohneBild = JSON.parse(sicherungHandy.text);
+    const fileId = (await stored(p2)).receiptInbox[0].receipt.fileId;
+    ohneBild.receiptInbox[0].receipt = { ...ohneBild.receiptInbox[0].receipt, dataUrl: '', fileId };
+    await waehlen3('ohne-bild.json', JSON.stringify(ohneBild));
+    await dialog3.waitFor();
+    assert.match(await dialog3.innerText(), /Ein Belegbild fehlt in der Sicherung/);
+    await dialog3.getByRole('button', { name: 'Übernehmen', exact: true }).click();
+    await until(async () => (await stored(p3))?.receiptInbox?.length === 1, 'ohne Bild übernommen');
+    assert.equal((await bilder(p3)).includes(fileId), false, 'Bild fehlt am PC');
+    const vorher = await stored(p3);
+    await waehlen3(sicherungHandy.name, sicherungHandy.text);
+    await dialog3.waitFor();
+    const text = await dialog3.innerText();
+    assert.match(text, /1 Belegbild fehlte hier und wird aus dieser Datei nachgetragen\./);
+    assert.doesNotMatch(text, /Nichts Neues|kommen als „ungeprüft“ an/);
+    await dialog3.getByRole('button', { name: 'Übernehmen', exact: true }).click();
+    await p3.locator('.toast').getByText('1 fehlendes Belegbild nachgetragen.', { exact: false }).waitFor();
+    await until(async () => (await bilder(p3)).includes(fileId), 'Belegbild nachgetragen');
+    const danach = await stored(p3);
+    assert.deepEqual([danach.trips, danach.expenses, danach.receiptInbox], [vorher.trips, vorher.expenses, vorher.receiptInbox], 'Einträge unverändert');
+    // jetzt fehlt nichts mehr: dieselbe Datei noch einmal ist „Nichts Neues“
+    await waehlen3(sicherungHandy.name, sicherungHandy.text);
+    await dialog3.waitFor();
+    assert.match(await dialog3.innerText(), /Nichts Neues\./);
+    await dialog3.getByRole('button', { name: 'Schließen', exact: true }).last().click();
+  });
+  assert.deepEqual(pc3.errors, []);
 } finally { await browser.close(); server.close(); }

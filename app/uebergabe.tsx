@@ -1,7 +1,7 @@
 import { Send, Smartphone, Upload, X } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { deviceId, lastHandoff, sentRecords, setSentRecords, touchDevice } from "../lib/device-settings";
-import { localReceiptImage, rememberReceiptImage } from "../lib/receipt-images";
+import { localReceiptImage, missingStoredImages, rememberReceiptImage } from "../lib/receipt-images";
 import { alsGesendetVermerken, anzahl, belegeDerAuswahl, berichtKurz, fingerabdruck, offeneEintraege, uebergabeDateiname, uebergabeLesen, uebergabeText, uebernehmen, UebergabeFehler, type Uebergabe, type UebergabeAuswahl, type Uebernahme } from "../lib/uebergabe";
 import type { AppState } from "../lib/types";
 import type { ExportShare } from "./export-share";
@@ -126,8 +126,11 @@ export function HandoffImportCard({ state, setState, notify, folder }: { state: 
     if (!file) return;
     try {
       const eingang = uebergabeLesen(await file.text());
+      // Bilder, auf die der Bestand hier verweist, die aber nicht gespeichert sind (frühere Datei ohne dieses Bild): Liefert
+      // diese Datei sie, werden sie nachgetragen. Geprüft werden nur die Bilder, die in der Datei liegen.
+      const fehlendeBilder = await missingStoredImages(Object.keys(eingang.belege)).catch(() => new Set<string>());
       // Vorschau = dieselbe Rechnung wie die Übernahme, nur ohne zu speichern.
-      setVorschau({ name: file.name, eingang, ausgang: state, ergebnis: uebernehmen(state, eingang, { id: crypto.randomUUID(), at: new Date().toISOString() }) });
+      setVorschau({ name: file.name, eingang, ausgang: state, ergebnis: uebernehmen(state, eingang, { id: crypto.randomUUID(), at: new Date().toISOString(), fehlendeBilder }) });
     } catch (error) { notify(error instanceof UebergabeFehler ? error.message : "Die Datei konnte nicht gelesen werden."); }
   };
   // Dateiauswahl ohne dauerhaftes Eingabefeld: Unter „Datensicherung“ bleibt „Sicherung wiederherstellen“ das einzige Dateifeld.
@@ -178,7 +181,8 @@ export function HandoffImportCard({ state, setState, notify, folder }: { state: 
                 <div><dt>Belege im Eingang</dt><dd>{bericht.neu.receiptInbox}</dd></div>
               </dl>
             : <div className="notice" role="status"><div><b>Nichts Neues.</b><p>{bericht.abweichungen.length ? "Die Einträge dieser Datei sind schon hier – einige weichen ab (siehe unten)." : "Alle Einträge dieser Datei sind schon hier."}</p></div></div>}
-          {vorschau.ergebnis.geaendert && <p>Neue Reisen und Kosten kommen als „ungeprüft“ an und erscheinen unter „Prüfen“.</p>}
+          {bericht.neu.trips + bericht.neu.expenses > 0 && <p>Neue Reisen und Kosten kommen als „ungeprüft“ an und erscheinen unter „Prüfen“.</p>}
+          {bericht.bilderNachgetragen > 0 && <p>{bericht.bilderNachgetragen === 1 ? "1 Belegbild fehlte hier und wird" : `${bericht.bilderNachgetragen} Belegbilder fehlten hier und werden`} aus dieser Datei nachgetragen.</p>}
           {bericht.vorhanden > 0 && <p>{eintraege(bericht.vorhanden)} {bericht.vorhanden === 1 ? "ist" : "sind"} schon vorhanden und {bericht.vorhanden === 1 ? "wird" : "werden"} übersprungen.</p>}
           {bericht.eingangErledigt > 0 && <p>{bericht.eingangErledigt === 1 ? "1 Beleg im Eingang wird" : `${bericht.eingangErledigt} Belege im Eingang werden`} als erledigt vermerkt – das Handy hat {bericht.eingangErledigt === 1 ? "ihn" : "sie"} inzwischen als Kosten erfasst.</p>}
           {liste("Abgeschlossene Monate bekommen neue Einträge", bericht.geschlosseneMonate.map((month) => `${month.split("-").reverse().join("/")}: Die abgeschlossene Abrechnung bleibt unverändert. Für eine Korrektur dort eine neue Version erstellen.`), "warn")}
