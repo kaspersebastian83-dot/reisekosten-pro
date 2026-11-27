@@ -5,6 +5,7 @@ import Papa from "papaparse";
 import type { AppState, StatementData } from "./types";
 import { buildStatementPdf, statementPdfBytes } from "./pdf-statement";
 import { receiptIndex } from "./receipt-index";
+import { belegeZip, belegeZipName, belegListe } from "./belege-zip";
 import { withAllReceiptImages, withReceiptImages } from "./receipt-images";
 import { correctionExportNotice, statementAmountLabel, type StatementExportContext } from "./export-context";
 export { correctionExportNotice, statementAmountLabel, type StatementExportContext } from "./export-context";
@@ -268,6 +269,13 @@ export async function exportBackup(state: AppState, options: { download?: boolea
     `Reisekosten_Backup_${today()}.json`,   // Kalendertag des Geräts, nicht UTC (zwischen 0 und 1 bzw. 2 Uhr sonst der Vortag)
   );
   markBackupDay(today());
+}
+
+/** „Belegfotos als ZIP“ unter Datensicherung: alle Belegfotos (oder die eines Monats) als Bilddateien, siehe lib/belege-zip.ts. */
+export async function exportBelegeZip(state: AppState, monat?: string) {
+  const ergebnis = await belegeZip(belegListe(state, monat));
+  deliver(ergebnis.blob, belegeZipName(today(), monat));
+  return ergebnis;
 }
 
 export async function exportZip(

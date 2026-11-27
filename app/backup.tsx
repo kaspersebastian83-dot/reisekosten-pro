@@ -1,6 +1,6 @@
 // Aus app/page.tsx herausgelöst (1.18.3, unverändert verschoben); Übersicht im README unter „Aufbau der Oberfläche“.
 import { useRef, useState } from "react";
-import { Download, RotateCcw, Trash2, Upload } from "lucide-react";
+import { Download, FileArchive, RotateCcw, Trash2, Upload } from "lucide-react";
 import type { AppState } from "../lib/types";
 import { emptyState } from "../lib/config";
 import { normalizeState } from "../lib/storage";
@@ -10,7 +10,9 @@ import { FolderCard, type FolderStorage } from "./folder-storage";
 import { demoErlaubt } from "../lib/demo-switch";
 import { HandoffImportCard, HandoffSendCard, type Handoff } from "./uebergabe";
 import { ExportDeliveryChoice, type ExportShare } from "./export-share";
-import { exportBackup } from "../lib/exports";
+import { exportBackup, exportBelegeZip } from "../lib/exports";
+import { belegListe, belegMonate } from "../lib/belege-zip";
+import { monthLabel } from "../lib/month-navigation";
 
 import { usePendingWork } from "../lib/pending-work";
 
@@ -79,6 +81,7 @@ export function Backup({
           {share.offered && share.sharing ? "Sicherung teilen" : "Sicherung herunterladen"}
         </button>
       </section>
+      <BelegeZipCard state={state} notify={notify} share={share} />
       {/* Übergabe Handy → PC: Das Handy sendet, der PC übernimmt (ersetzt nichts – anders als „Sicherung wiederherstellen“). */}
       {handoff.phone ? <HandoffSendCard handoff={handoff} /> : <HandoffImportCard state={state} setState={setState} notify={notify} folder={folder} />}
       <section className="card backup-card">
@@ -189,3 +192,42 @@ export function Backup({
 }
 
 /** Nach „Speichern & nächste“: Fokus auf das erste Eingabefeld des (neu gerenderten) Formulars. */
+
+/** „Belegfotos als ZIP“ (seit 1.20.0): alle Belegfotos als Bilddateien – zum Kopieren auf den PC oder zum Weitergeben. */
+function BelegeZipCard({ state, notify, share }: { state: AppState; notify: (s: string) => void; share: ExportShare }) {
+  const [monat, setMonat] = useState("");
+  const [busy, setBusy] = useState(false);
+  usePendingWork(busy);
+  const monate = belegMonate(state);
+  const liste = belegListe(state, monat || undefined);
+  const eingang = liste.filter((eintrag) => eintrag.bereich === "Beleg-Eingang").length;
+  const erstellen = async () => {
+    if (busy || !liste.length) return;
+    setBusy(true);
+    try {
+      const { fotos, fehlen } = await exportBelegeZip(state, monat || undefined);
+      notify(`${fotos === 1 ? "1 Belegfoto" : `${fotos} Belegfotos`} in der ZIP-Datei.${fehlen ? ` ${fehlen === 1 ? "1 Bild fehlt" : `${fehlen} Bilder fehlen`} auf diesem Gerät – siehe Belegliste.csv.` : ""}`);
+    } catch { notify("Die ZIP-Datei konnte nicht erstellt werden. Bitte erneut versuchen."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <section className="card backup-card" aria-label="Belegfotos als ZIP">
+      <div className="backup-icon"><FileArchive /></div>
+      <h2>Belegfotos als ZIP</h2>
+      <p>Alle fotografierten Belege als Bilddateien in einer ZIP-Datei – geordnet nach Monat, mit einer Liste (Belegliste.csv). Auch Fotos, die noch im Beleg-Eingang warten. Am Bestand ändert sich nichts.</p>
+      <label className="belege-zip-zeitraum">Zeitraum
+        <select value={monat} onChange={(event) => setMonat(event.target.value)} disabled={busy}>
+          <option value="">Alle Monate</option>
+          {monate.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+        </select>
+      </label>
+      <p className="handoff-status" role="status"><b>{!liste.length ? "Keine Belegfotos." : `${liste.length === 1 ? "1 Belegfoto" : `${liste.length} Belegfotos`}${eingang ? `, davon ${eingang} im Beleg-Eingang` : ""}.`}</b></p>
+      <ExportDeliveryChoice share={share} />
+      <button className="primary" disabled={busy || !liste.length} onClick={() => void erstellen()}>
+        <FileArchive size={18} />
+        {busy ? "ZIP wird erstellt …" : share.offered && share.sharing ? "Belege als ZIP teilen" : "Belege als ZIP herunterladen"}
+      </button>
+      {share.offered && <p className="muted belege-zip-hinweis">Kann das Handy ZIP-Dateien nicht teilen (bei Android oft so), wird die Datei unter „Downloads“ gespeichert.</p>}
+    </section>
+  );
+}
