@@ -18,6 +18,11 @@
  *
  * Nicht übertragen werden Einstellungen, Tarife, Abrechnungen, Regeln und das Änderungsprotokoll – gerechnet und
  * abgeschlossen wird am PC. Das SpesenKit-Speicherformat (spesenkit.json) ändert sich nicht.
+ *
+ * Seit 1.19.0 nimmt „Vom Handy übernehmen“ auch die vollständige JSON-Sicherung des Handys an („Sicherung
+ * herunterladen“/„Sicherung teilen“): Reisen, Kosten, Beleg-Eingang und die eingebetteten Belegbilder werden nach
+ * denselben Regeln hinzugefügt. Einstellungen, Tarife und Abrechnungen der Sicherung bleiben außen vor – wer den
+ * Bestand ersetzen will, nimmt weiterhin „Sicherung wiederherstellen“.
  */
 import { duplicateKey } from "./calculations";
 import { latestStatement } from "./month-navigation";
@@ -44,6 +49,8 @@ export interface Uebergabe {
   vehicles: VehicleProfile[];
   /** Belegbilder: Fingerabdruck → Daten-URL. */
   belege: Record<string, string>;
+  /** Nur bei einer vollständigen JSON-Sicherung statt einer Übergabe: was die Datei außerdem enthält und NICHT übernommen wird. */
+  sicherung?: { abrechnungen: number };
 }
 
 export interface UebergabeAuswahl { trips: Trip[]; expenses: Expense[]; receiptInbox: ReceiptInboxItem[] }
@@ -109,13 +116,24 @@ export function uebergabeText(state: AppState, auswahl: UebergabeAuswahl, belege
 const TAG = /^\d{4}-\d{2}-\d{2}$/;
 const text = (value: unknown): value is string => typeof value === "string";
 
+const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
+const fahrzeugeGueltig = (vehicles: VehicleProfile[]) => vehicles.every((vehicle) => vehicle && text(vehicle.id) && text(vehicle.name) && text(vehicle.plate) && ["dienstwagen", "privatwagen"].includes(vehicle.ownership));
+/** Jede Kennung genau einmal, Datum als JJJJ-MM-TT – sonst ließe sich nicht sicher zuordnen. */
+const eintraegeGueltig = (state: AppState) => {
+  const alle = [...state.trips, ...state.expenses, ...state.receiptInbox];
+  return !alle.some((item) => !text(item.id) || !item.id) && new Set(alle.map((item) => item.id)).size === alle.length
+    && ![...state.trips, ...state.expenses].some((item) => !TAG.test(item.date));
+};
+
+/** Liest eine Übergabe vom Handy – oder eine vollständige JSON-Sicherung, die dann wie eine Übergabe behandelt wird. */
 export function uebergabeLesen(inhalt: string): Uebergabe {
   let value: unknown;
-  try { value = JSON.parse(inhalt.replace(/^﻿/, "")); } catch { throw new UebergabeFehler("Die Datei ist keine SpesenKit-Übergabe (kein lesbarer Inhalt)."); }
+  try { value = JSON.parse(inhalt.replace(/^\uFEFF/, "")); } catch { throw new UebergabeFehler("Die Datei ist keine SpesenKit-Übergabe (kein lesbarer Inhalt)."); }
   const v = value as Record<string, unknown>;
-  if (!v || typeof v !== "object" || Array.isArray(v)) throw new UebergabeFehler("Die Datei ist keine SpesenKit-Übergabe.");
+  if (!record(v)) throw new UebergabeFehler("Die Datei ist keine SpesenKit-Übergabe.");
   if (v.format === "spesenkit-buerokasse-sicherung") throw new UebergabeFehler("Das ist eine Sicherung der Bürokasse. Bitte dort „Vom Handy übernehmen“ verwenden.");
-  if (v.format !== UEBERGABE_FORMAT) throw new UebergabeFehler(Array.isArray(v.trips) && v.settings ? "Das ist eine vollständige JSON-Sicherung, keine Übergabe vom Handy. Eine Sicherung ersetzt den Bestand – bitte nur über „Sicherung wiederherstellen“ einspielen." : "Die Datei ist keine SpesenKit-Übergabe.");
+  if (v.format === undefined && Array.isArray(v.trips) && record(v.settings)) return sicherungLesen(v);
+  if (v.format !== UEBERGABE_FORMAT) throw new UebergabeFehler("Die Datei ist keine SpesenKit-Übergabe.");
   if (typeof v.version !== "number" || v.version > UEBERGABE_VERSION) throw new UebergabeFehler("Die Übergabe stammt aus einer neueren SpesenKit-Version. Bitte SpesenKit am PC aktualisieren und erneut übernehmen.");
   if (v.version !== UEBERGABE_VERSION || !Array.isArray(v.trips) || !Array.isArray(v.expenses) || !Array.isArray(v.receiptInbox)) throw new UebergabeFehler("Die Übergabe ist unvollständig und wurde nicht übernommen.");
   const vehicles = Array.isArray(v.vehicles) ? v.vehicles as VehicleProfile[] : [];
@@ -125,11 +143,7 @@ export function uebergabeLesen(inhalt: string): Uebergabe {
     geprueft = normalizeState({ trips: v.trips as Trip[], expenses: v.expenses as Expense[], receiptInbox: v.receiptInbox as ReceiptInboxItem[],
       settings: { vehicles } as AppState["settings"] });
   } catch { throw new UebergabeFehler("Die Übergabe enthält einen ungültigen Eintrag und wurde nicht übernommen."); }
-  const alle = [...geprueft.trips, ...geprueft.expenses, ...geprueft.receiptInbox];
-  if (alle.some((item) => !text(item.id) || !item.id) || new Set(alle.map((item) => item.id)).size !== alle.length
-    || [...geprueft.trips, ...geprueft.expenses].some((item) => !TAG.test(item.date))
-    || vehicles.some((vehicle) => !vehicle || !text(vehicle.id) || !text(vehicle.name) || !text(vehicle.plate) || !["dienstwagen", "privatwagen"].includes(vehicle.ownership)))
-    throw new UebergabeFehler("Die Übergabe enthält einen ungültigen Eintrag und wurde nicht übernommen.");
+  if (!eintraegeGueltig(geprueft) || !fahrzeugeGueltig(vehicles)) throw new UebergabeFehler("Die Übergabe enthält einen ungültigen Eintrag und wurde nicht übernommen.");
   const belege: Record<string, string> = {};
   if (v.belege && typeof v.belege === "object" && !Array.isArray(v.belege))
     // Nur Bilder, deren Inhalt zum Fingerabdruck passt: Eine beschädigte oder veränderte Datei darf kein fremdes Bild unter
@@ -140,6 +154,38 @@ export function uebergabeLesen(inhalt: string): Uebergabe {
     trips: (v.trips as Trip[]).map((trip, index) => ({ ...geprueft.trips[index], vehicleId: trip.vehicleId })),
     expenses: (v.expenses as Expense[]).map((expense, index) => ({ ...geprueft.expenses[index], vehicleId: expense.vehicleId })),
     receiptInbox: geprueft.receiptInbox, vehicles, belege };
+}
+
+/**
+ * Vollständige JSON-Sicherung („Reisekosten_Backup_….json“) als Übergabe lesen: Reisen, Kosten, Beleg-Eingang, die dabei
+ * genutzten Fahrzeuge und die eingebetteten Belegbilder. Einstellungen, Tarife, Abrechnungen, Regeln und Protokoll der
+ * Sicherung werden nicht gelesen – sie blieben beim Übernehmen ohnehin außen vor.
+ */
+function sicherungLesen(v: Record<string, unknown>): Uebergabe {
+  const ungueltig = () => new UebergabeFehler("Die Sicherung enthält einen ungültigen Eintrag und wurde nicht übernommen.");
+  const liste = (value: unknown) => value === undefined ? [] : Array.isArray(value) ? value : null;
+  const expensesRoh = liste(v.expenses) as Expense[] | null, eingangRoh = liste(v.receiptInbox) as ReceiptInboxItem[] | null;
+  if (!expensesRoh || !eingangRoh) throw ungueltig();
+  const vehicles = (liste((v.settings as Record<string, unknown>).vehicles) || []) as VehicleProfile[];
+  if (!fahrzeugeGueltig(vehicles)) throw ungueltig();
+  let geprueft: AppState;
+  try {
+    // Mit den Fahrzeugen der Sicherung normalisiert: ältere Reisen ohne Fahrzeugkennung bekommen so das Fahrzeug, das sie
+    // auf dem Handy hatten. Eingebettete Bilder werden herausgelöst; im Eintrag bleibt der Verweis (Fingerabdruck).
+    geprueft = normalizeState({ trips: v.trips as Trip[], expenses: expensesRoh, receiptInbox: eingangRoh, settings: { vehicles } as AppState["settings"] });
+  } catch { throw ungueltig(); }
+  if (!eintraegeGueltig(geprueft)) throw ungueltig();
+  // Bilder: der Verweis stammt hier aus dem Bildinhalt selbst (normalizeState), er passt also immer zum Bild.
+  const belege: Record<string, string> = {};
+  const merken = (roh: { receipt?: { dataUrl?: string } }[], fertig: { receipt?: { fileId?: string; dataUrl: string } }[]) => roh.forEach((item, index) => {
+    const url = item.receipt?.dataUrl, receipt = fertig[index].receipt;
+    if (url && receipt?.fileId && !receipt.dataUrl && FILE_ID.test(receipt.fileId)) belege[receipt.fileId] = url;
+  });
+  merken(expensesRoh, geprueft.expenses); merken(eingangRoh, geprueft.receiptInbox);
+  const genutzt = new Set([...geprueft.trips, ...geprueft.expenses].map((item) => item.vehicleId).filter(Boolean));
+  return { erstellt: "", geraet: "", trips: geprueft.trips, expenses: geprueft.expenses, receiptInbox: geprueft.receiptInbox,
+    vehicles: vehicles.filter((vehicle) => genutzt.has(vehicle.id)), belege,
+    sicherung: { abrechnungen: Array.isArray(v.statements) ? v.statements.length : 0 } };
 }
 
 /* ---------- PC: übernehmen ---------- */
@@ -279,7 +325,9 @@ export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: stri
 
   for (const fileId of neueBelege) {
     if (eingang.belege[fileId]) bericht.belege[fileId] = eingang.belege[fileId];
-    else bericht.hinweise.push(`Ein Belegbild fehlt in der Übergabe (${fileId.slice(0, 8)}…). Bitte auf dem Handy „Alles erneut senden“.`);
+    else bericht.hinweise.push(eingang.sicherung
+      ? `Ein Belegbild fehlt in der Sicherung (${fileId.slice(0, 8)}…). Bitte auf dem Handy erneut sichern und die neue Datei übernehmen.`
+      : `Ein Belegbild fehlt in der Übergabe (${fileId.slice(0, 8)}…). Bitte auf dem Handy „Alles erneut senden“.`);
   }
 
   // Abgeschlossene Monate, die neue Einträge bekommen haben
@@ -301,7 +349,7 @@ export function uebernehmen(local: AppState, eingang: Uebergabe, ctx: { id: stri
   const geaendert = anzahlNeu > 0 || bericht.fahrzeugeNeu.length > 0 || bericht.eingangErledigt > 0;
   if (!geaendert) return { state: local, bericht, geaendert };
   const eintrag: ChangeLog = { id: ctx.id, entityType: "settings", entityId: "uebergabe", field: "Vom Handy übernommen", oldValue: null,
-    newValue: { ...bericht.neu, vorhanden: bericht.vorhanden, eingangErledigt: bericht.eingangErledigt, abweichungen: bericht.abweichungen.length, fahrzeugeNeu: bericht.fahrzeugeNeu.map((v) => v.name), geraet: eingang.geraet, erstellt: eingang.erstellt },
+    newValue: { ...bericht.neu, vorhanden: bericht.vorhanden, eingangErledigt: bericht.eingangErledigt, abweichungen: bericht.abweichungen.length, fahrzeugeNeu: bericht.fahrzeugeNeu.map((v) => v.name), geraet: eingang.geraet, erstellt: eingang.erstellt, ...(eingang.sicherung ? { quelle: "JSON-Sicherung" } : {}) },
     reason: berichtKurz(bericht), user: ctx.nutzer || local.settings.profileName || "", changedAt: ctx.at };
   return { geaendert, bericht,
     state: { ...local, trips, expenses, receiptInbox, settings: bericht.fahrzeugeNeu.length ? { ...local.settings, vehicles } : local.settings, changes: [eintrag, ...local.changes] } };

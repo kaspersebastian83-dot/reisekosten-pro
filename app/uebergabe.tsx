@@ -12,6 +12,7 @@ import type { FolderStorage } from "./folder-storage";
  *   Handy:  „An den PC senden“ schreibt die noch nicht gesendeten Reisen, Kosten und Belege in eine Datei und gibt sie an das
  *           Teilen-Menü (oder lädt sie herunter). Die Einträge bleiben auf dem Handy und gelten danach als gesendet.
  *   PC:     „Vom Handy übernehmen“ liest die Datei, zeigt vorab, was geschieht, und fügt hinzu – ersetzt wird nichts.
+ *           Dieselbe Karte nimmt auch die vollständige JSON-Sicherung des Handys an (seit 1.19.0) und behandelt sie genauso.
  */
 /** Kalendertag in Ortszeit: Zeitstempel sind UTC – kurz nach Mitternacht läge der Tag sonst einen zurück. */
 const tagDe = (iso: string) => {
@@ -160,12 +161,16 @@ export function HandoffImportCard({ state, setState, notify, folder }: { state: 
     <div className="backup-icon"><Smartphone /></div>
     <h2>Vom Handy übernehmen</h2>
     <p>Fügt Reisen, Kosten und Belegfotos hinzu, die auf dem Handy mit „An den PC senden“ verschickt wurden. Der Bestand hier wird <b>nicht ersetzt</b>; vor dem Übernehmen sehen Sie, was dazukommt.</p>
+    <p className="muted">Geht auch mit der JSON-Sicherung des Handys („Sicherung herunterladen“): Reisen, Kosten und Belegfotos daraus kommen dazu.</p>
     <button className="ghost" onClick={waehlen}><Upload size={18} />Datei vom Handy wählen</button>
     {vorschau && bericht && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !working) setVorschau(null); }}>
       <div className="modal handoff-preview" role="dialog" aria-modal="true" aria-labelledby="handoff-preview-title">
         <header><h2 id="handoff-preview-title">Vom Handy übernehmen</h2><button className="icon" aria-label="Schließen" disabled={working} onClick={() => setVorschau(null)}><X /></button></header>
         <div className="modal-body">
           <p className="muted">{vorschau.name}{vorschau.eingang.erstellt ? ` · erstellt am ${tagDe(vorschau.eingang.erstellt)}` : ""}</p>
+          {vorschau.eingang.sicherung && <div className="notice handoff-backup-note" role="note"><div><b>Das ist eine vollständige JSON-Sicherung.</b>
+            <p>Übernommen werden nur Reisen, Kosten und Belege – sie kommen dazu, ersetzt wird nichts. Einstellungen, Tarife und Abrechnungen aus der Sicherung bleiben außen vor.</p>
+            {vorschau.eingang.sicherung.abrechnungen > 0 && <p>Die Sicherung enthält {vorschau.eingang.sicherung.abrechnungen === 1 ? "1 Abrechnungsversion" : `${vorschau.eingang.sicherung.abrechnungen} Abrechnungsversionen`}. Auf dem Handy abgeschlossene Monate werden hier neu geprüft und abgeschlossen.</p>}</div></div>}
           {vorschau.ergebnis.geaendert
             ? <dl className="handoff-counts">
                 <div><dt>Reisen</dt><dd>{bericht.neu.trips}</dd></div>

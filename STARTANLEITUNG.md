@@ -1,6 +1,6 @@
 # SpesenKit – Anleitung
 
-Stand: Version 1.12.1. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
+Stand: Version 1.19.0. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
 Büro-Terminal (RDP, eigenes Windows-Profil) in **Edge oder Chrome** genutzt.
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ – oder in der
@@ -80,6 +80,11 @@ Auf dem Handy liegen die Spesen nur im Browser des Handys. So kommen sie zum PC:
 1. Datensicherung → **Vom Handy übernehmen** → die Datei `SpesenKit-Uebergabe_…txt` wählen.
 2. Die Vorschau zeigt, was dazukommt. **Übernehmen** fügt hinzu – der Bestand am PC wird nicht ersetzt.
 3. Neue Einträge kommen als „ungeprüft“ an: wie gewohnt prüfen und den Monat **am PC** abschließen.
+
+**Nur die JSON-Sicherung vom Handy auf dem PC?** (Datensicherung → „Sicherung herunterladen“ bzw. „Sicherung teilen“, Datei
+`Reisekosten_Backup_….json`.) Auch sie geht über **Vom Handy übernehmen**: Reisen, Kosten und Belegfotos daraus kommen dazu,
+ersetzt wird nichts. Die Belegfotos stecken in der Datei – es muss nichts zusätzlich kopiert werden. Einstellungen, Tarife und
+Abrechnungen der Sicherung werden dabei nicht übernommen; ein auf dem Handy abgeschlossener Monat wird am PC neu abgeschlossen.
 
 Gut zu wissen: Dieselbe Datei zweimal zu übernehmen schadet nicht. Weicht ein Eintrag ab, bleibt der Stand am PC und die
 Vorschau nennt die Abweichung. Auf dem Handy gelöschte Einträge werden am PC nicht gelöscht. **Nicht** verwechseln mit

@@ -3186,6 +3186,7 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .handoff-list.warn { border-color: #f0d49c; background: var(--yellow-bg); color: #5d3d07; }
 .handoff-list ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.5; }
 .handoff-list li { overflow-wrap: anywhere; }
+.handoff-backup-note { margin: 0 0 12px; }
 .handoff-closing-hint { margin-top: 8px; }
 .timeline-sent { font-weight: 700; color: var(--muted); }
 .timeline-sent.geaendert, .timeline-sent.offen { color: var(--yellow); }

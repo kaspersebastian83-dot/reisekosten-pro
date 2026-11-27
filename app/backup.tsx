@@ -90,6 +90,7 @@ export function Backup({
           Vor dem Einspielen wird die vorhandene Datenbank ersetzt. Erstellen
           Sie vorher eine aktuelle Sicherung.
         </p>
+        {!handoff.phone && <p className="muted">Nur hinzufügen statt ersetzen: „Vom Handy übernehmen“ nimmt auch eine JSON-Sicherung an.</p>}
         <input
           ref={input}
           hidden
