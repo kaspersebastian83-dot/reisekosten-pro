@@ -3187,6 +3187,8 @@ button.quality:focus-visible { outline: 3px solid var(--green); outline-offset: 
 .handoff-list ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.5; }
 .handoff-list li { overflow-wrap: anywhere; }
 .handoff-backup-note { margin: 0 0 12px; }
+.belege-zip-hinweis { margin-top: 10px; font-size: 13px; }
+.belege-zip-zeitraum { display: grid; gap: 6px; width: min(320px, 100%); margin: 6px auto 0; text-align: left; font-weight: 600; }
 .handoff-closing-hint { margin-top: 8px; }
 .timeline-sent { font-weight: 700; color: var(--muted); }
 .timeline-sent.geaendert, .timeline-sent.offen { color: var(--yellow); }

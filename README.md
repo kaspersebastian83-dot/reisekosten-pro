@@ -3,7 +3,7 @@
 Dienstreisen · Spesen · Abrechnungen
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ · Version
-1.19.0 (Release-Version aus [package.json](package.json), Änderungen in
+1.20.0 (Release-Version aus [package.json](package.json), Änderungen in
 [CHANGELOG.md](CHANGELOG.md)) · **Bedienung:** [STARTANLEITUNG.md](STARTANLEITUNG.md)
 
 Teil der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit,
@@ -20,8 +20,11 @@ Vimcar- und andere Fahrtenbuch-Exporte direkt im Browser. Sie berechnet
 Verpflegungspauschalen, verwaltet Fahrzeuge,
 Kosten und Belege und erzeugt PDF-, Excel-, CSV- und ZIP-Exporte sowie eine Buchungsliste (CSV).
 
-## Aktueller Stand in Kürze (1.19.0)
+## Aktueller Stand in Kürze (1.20.0)
 
+- **1.20.0 – Belegfotos als ZIP:** Datensicherung → „Belegfotos als ZIP“ gibt alle Belegfotos (Kosten und Beleg-Eingang,
+  wahlweise ein Monat) als Bilddateien mit `Belegliste.csv` aus – zum Teilen oder Herunterladen; nur lesend
+  (`lib/belege-zip.ts`).
 - **1.19.0 – JSON-Sicherung des Handys hinzufügen:** PC „Vom Handy übernehmen“ nimmt neben der Übergabe-Datei auch die
   vollständige JSON-Sicherung an (`Reisekosten_Backup_….json`, Belegfotos sind darin enthalten) und fügt Reisen, Kosten und
   Belege hinzu, ohne etwas zu ersetzen. Einstellungen, Tarife und Abrechnungen der Sicherung bleiben außen vor

@@ -1,6 +1,6 @@
 # SpesenKit – Anleitung
 
-Stand: Version 1.19.0. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
+Stand: Version 1.20.0. SpesenKit gehört zur Büro-App-Suite **Spektron** und wird am
 Büro-Terminal (RDP, eigenes Windows-Profil) in **Edge oder Chrome** genutzt.
 
 **App öffnen:** https://kaspersebastian83-dot.github.io/reisekosten-pro/ – oder in der
@@ -113,6 +113,18 @@ Laufwerk, darin entsteht `Bürokasse`). Dann **Vom Handy übernehmen** → die S
 SpesenKit legt alle Einträge, Belege und je abgeschlossenem Monat das Kassenbuch (PDF und CSV) im Ordner ab.
 Gebucht wird nur auf dem Handy; der PC zeigt „Nur Ansicht und Ablage“. Neues Handy: dort **Sicherung einspielen**
 und **Hier weiterbuchen**.
+
+## Belegfotos als ZIP
+
+**Datensicherung → Belegfotos als ZIP** packt alle fotografierten Belege als normale Bilddateien in eine ZIP-Datei –
+geordnet nach Monat und Kostenart, dazu eine Liste `Belegliste.csv`. Auch Fotos, die noch im Beleg-Eingang warten, sind
+dabei. Unter **Zeitraum** lässt sich ein einzelner Monat wählen. Am Bestand ändert sich nichts.
+
+Auf dem Handy geht die Datei an das Teilen-Menü. Android teilt ZIP-Dateien meist nicht – dann liegt sie unter
+**Downloads** und lässt sich von dort per Kabel, OneDrive oder Mail auf den PC kopieren.
+
+Für SpesenKit am PC braucht man die ZIP nicht: Die JSON-Sicherung enthält die Fotos schon, und „Vom Handy übernehmen“
+holt sie mit (siehe oben). Die ZIP ist zum Ansehen, Ablegen und Weitergeben.
 
 ## Sicherungen
 

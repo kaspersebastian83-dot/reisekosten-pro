@@ -1,5 +1,22 @@
 # Release Notes
 
+## 1.20.0 – 27. November 2026
+
+Die Belegfotos vom Handy auf den PC oder zu jemand anderem zu bringen, ging bisher nur in der JSON-Sicherung (für Menschen
+nicht lesbar) oder als „ZIP + Belege“ einer Monatsabrechnung (braucht einen Entwurf, ohne Fotos im Beleg-Eingang).
+- **Datensicherung → „Belegfotos als ZIP“:** alle Belegfotos dieses Geräts als normale Bilddateien in einer ZIP-Datei
+  (`SpesenKit-Belege_alle_<Datum>.zip`), wahlweise nur ein Monat (`SpesenKit-Belege_<JJJJ-MM>_<Datum>.zip`).
+  - `Kosten/<JJJJ-MM>/<Datum>_<Kostenart>_<Betrag>_<Händler>.jpg` – das Foto jeder Kostenposition (ohne stornierte);
+  - `Beleg-Eingang/<Datum>_<Dateiname>` – Fotos im Beleg-Eingang, die (noch) keiner Kostenposition gehören;
+  - `Belegliste.csv` – eine Zeile je Foto (Datum, Kostenart, Betrag, Händler, Zahlungsart, Projekt, Status).
+  Dasselbe Foto steht nur einmal darin. Die Bilder werden unverändert abgelegt. Am Bestand ändert sich nichts.
+- Fehlt ein Bild auf dem Gerät, steht es mit Hinweis in der Belegliste; die ZIP entsteht trotzdem.
+- Auf Handy und Tablet geht die ZIP an das Teilen-Menü. Teilt das Gerät keine ZIP-Dateien (Chrome auf Android), wird sie wie
+  andere solche Dateien unter „Downloads“ gespeichert; die Karte sagt das.
+- Regeln in `lib/belege-zip.ts`, Karte in `app/backup.tsx`.
+- Tests: `tests/belege-zip.test.ts` (6 Fälle), Browserprüfung `belege-zip-browser-check.mjs` (PC lädt herunter und prüft den
+  Inhalt der ZIP, Zeitraum; Handy teilt bzw. lädt bei Android herunter).
+
 ## 1.19.0 – 27. November 2026
 
 Wer vom Handy nur die JSON-Sicherung auf den PC bekommen hat, musste bisher „Sicherung wiederherstellen“ nehmen – das
